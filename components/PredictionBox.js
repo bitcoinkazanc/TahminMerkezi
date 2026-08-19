@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 export default function PredictionBox({
-  matchId,
+  match,
   onPredictionCreated,
 }) {
   const [prediction, setPrediction] = useState("");
@@ -38,7 +38,7 @@ export default function PredictionBox({
       return;
     }
 
-    if (!matchId) {
+    if (!match?.id) {
       setError("Maç bilgisi bulunamadı.");
       return;
     }
@@ -70,7 +70,7 @@ export default function PredictionBox({
         },
         body: JSON.stringify({
           user_id: user.id,
-          match_id: matchId,
+          match_id: match.id,
           prediction,
           confidence: Number(confidence),
           message: message.trim() || null,
@@ -194,7 +194,9 @@ export default function PredictionBox({
         className="primary-button prediction-submit"
         disabled={sending || !prediction}
       >
-        {sending ? "Gönderiliyor..." : "Tahminimi Gönder"}
+        {sending
+          ? "Gönderiliyor..."
+          : "Tahminimi Gönder"}
       </button>
     </form>
   );
