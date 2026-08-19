@@ -172,7 +172,7 @@ export default function HomePage() {
         </section>
 
         <section className="section-card">
-          <div className="section-title">
+          <div className="section-title home-matches-title">
             <h2>Günün maçları seni bekliyor</h2>
 
             <p>
@@ -205,16 +205,7 @@ export default function HomePage() {
               </Link>
             </div>
           ) : (
-            <>
-              <MatchList matches={matches} />
-
-              <Link
-                href="/maclar"
-                className="home-all-matches"
-              >
-                Tüm Maçları Gör →
-              </Link>
-            </>
+            <MatchList matches={matches} />
           )}
         </section>
       </div>
