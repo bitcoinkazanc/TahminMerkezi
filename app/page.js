@@ -173,11 +173,12 @@ export default function HomePage() {
 
         <section className="section-card">
           <div className="section-title">
-            <h2>Yaklaşan Maçlar</h2>
+            <h2>Günün maçları seni bekliyor</h2>
 
             <p>
-              Yaklaşan karşılaşmalar ve topluluk
-              tahminleri.
+              Sahne hazır, seni bekliyor! Tahminlerin
+              ve yorumlarınla bilgini konuştur,
+              zirveye yüksel.
             </p>
           </div>
 
