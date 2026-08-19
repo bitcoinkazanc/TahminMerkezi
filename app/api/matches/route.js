@@ -192,6 +192,29 @@ export async function GET(request) {
         );
     }
 
+    /*
+     * Ana sayfa geçmiş maçları göstermesin.
+     *
+     * /api/matches?id=... kullanıldığında
+     * eski maç detaylarına erişim devam eder.
+     *
+     * /api/matches?status=finished gibi özel
+     * sorgular da geçmiş maçları getirmeye
+     * devam edebilir.
+     *
+     * Normal maç listesinde ise:
+     * - Gelecek maçlar gösterilir.
+     * - Bugünkü maçlar gösterilir.
+     * - Canlı maçlar ayrıca gösterilir.
+     */
+    if (!matchId && !status) {
+      const now = new Date().toISOString();
+
+      query = query.or(
+        `match_date.gte.${now},status.eq.live`
+      );
+    }
+
     const {
       data,
       error,
