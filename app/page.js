@@ -174,12 +174,6 @@ export default function HomePage() {
         <section className="section-card">
           <div className="section-title home-matches-title">
             <h2>Günün maçları seni bekliyor</h2>
-
-            <p>
-              Sahne hazır, seni bekliyor! Tahminlerin
-              ve yorumlarınla bilgini konuştur,
-              zirveye yüksel.
-            </p>
           </div>
 
           {loading ? (
@@ -205,7 +199,16 @@ export default function HomePage() {
               </Link>
             </div>
           ) : (
-            <MatchList matches={matches} />
+            <>
+              <MatchList matches={matches} />
+
+              <div className="home-disclaimer">
+                <strong>❗ Sorumluluk Reddi:</strong>{" "}
+                Tahminler yalnızca eğlence ve bilgi
+                amaçlıdır. Gerçek para ile bahis veya
+                kazanç garantisi içermez.
+              </div>
+            </>
           )}
         </section>
       </div>
