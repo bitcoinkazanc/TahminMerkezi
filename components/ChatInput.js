@@ -66,8 +66,10 @@ export default function ChatInput({
       }
     } catch (err) {
       console.error("Chat message error:", err);
+
       setError(
-        err.message || "Mesaj gönderilirken bir hata oluştu."
+        err.message ||
+          "Mesaj gönderilirken bir hata oluştu."
       );
     } finally {
       setSending(false);
@@ -78,7 +80,9 @@ export default function ChatInput({
     <form className="chat-input" onSubmit={handleSubmit}>
       <textarea
         value={content}
-        onChange={(event) => setContent(event.target.value)}
+        onChange={(event) =>
+          setContent(event.target.value)
+        }
         placeholder="Mesajını yaz..."
         maxLength={1000}
         rows={1}
@@ -88,7 +92,9 @@ export default function ChatInput({
       <button
         type="submit"
         className="chat-send-button"
-        disabled={sending || !content.trim()}
+        disabled={
+          sending || !content.trim()
+        }
         aria-label="Mesaj gönder"
       >
         {sending ? "…" : "➤"}
