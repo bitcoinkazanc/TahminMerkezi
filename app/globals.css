@@ -1604,3 +1604,6 @@ img {
     transition-duration: 0.01ms !important;
   }
 }
+.home-matches-title {
+  text-align: center;
+}
