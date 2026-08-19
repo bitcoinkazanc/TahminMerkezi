@@ -143,16 +143,6 @@ img {
   background: var(--surface-soft);
 }
 
-.back-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 18px;
-  color: var(--primary);
-  font-size: 14px;
-  font-weight: 700;
-}
-
 .section-card {
   margin-top: 18px;
   padding: 18px;
@@ -201,6 +191,54 @@ img {
 
 .primary-button:active {
   transform: scale(0.98);
+}
+
+/* MATCH BACK BUTTON */
+
+.match-back-button {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
+  box-shadow: var(--shadow-sm);
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.match-back-button:hover {
+  border-color: #cbd5e1;
+  background: var(--surface-soft);
+  color: var(--primary);
+  box-shadow: var(--shadow-md);
+}
+
+.match-back-button:active {
+  transform: scale(0.97);
+}
+
+.match-back-icon {
+  display: flex;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: 15px;
+  font-weight: 900;
 }
 
 .error-box {
@@ -836,7 +874,7 @@ img {
   line-height: 1;
 }
 
-/* OLD PREDICTION CLASSES - COMPATIBILITY */
+/* OLD PREDICTION CLASSES */
 
 .prediction-message-header {
   display: flex;
@@ -1283,6 +1321,20 @@ img {
 
   .match-team-name {
     font-size: 12px;
+  }
+
+  .match-back-button {
+    min-height: 38px;
+    margin-bottom: 14px;
+    padding: 0 12px;
+    border-radius: 10px;
+    font-size: 12px;
+  }
+
+  .match-back-icon {
+    width: 21px;
+    height: 21px;
+    font-size: 14px;
   }
 
   .prediction-message {
