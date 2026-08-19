@@ -23,163 +23,55 @@ function getSupabase() {
   });
 }
 
-function getValue(object, paths) {
-  for (const path of paths) {
-    const parts = path.split(".");
-    let value = object;
-
-    for (const part of parts) {
-      if (
-        value === null ||
-        value === undefined
-      ) {
-        break;
-      }
-
-      value = value[part];
-    }
-
-    if (
-      value !== undefined &&
-      value !== null &&
-      value !== ""
-    ) {
-      return value;
-    }
-  }
-
-  return null;
-}
-
 function normalizeMatch(match) {
-  const externalId = getValue(match, [
-    "id",
-    "match_id",
-    "external_id",
-    "slug",
-  ]);
-
-  const homeTeam = getValue(match, [
-    "home_team",
-    "homeTeam",
-    "home.name",
-    "home.team.name",
-    "homeTeam.name",
-  ]);
-
-  const awayTeam = getValue(match, [
-    "away_team",
-    "awayTeam",
-    "away.name",
-    "away.team.name",
-    "awayTeam.name",
-  ]);
-
-  const matchDate = getValue(match, [
-    "match_date",
-    "matchDate",
-    "start_time",
-    "startTime",
-    "date",
-    "start_at",
-    "startAt",
-  ]);
-
-  const league = getValue(match, [
-    "league",
-    "league.name",
-    "league_name",
-    "competition.name",
-    "tournament.name",
-  ]);
-
-  const leagueLogo = getValue(match, [
-    "league_logo",
-    "league.logo",
-    "competition.logo",
-    "tournament.logo",
-  ]);
-
-  const homeLogo = getValue(match, [
-    "home_logo",
-    "home.logo",
-    "home.team.logo",
-    "homeTeam.logo",
-  ]);
-
-  const awayLogo = getValue(match, [
-    "away_logo",
-    "away.logo",
-    "away.team.logo",
-    "awayTeam.logo",
-  ]);
-
-  const rawStatus = String(
-    getValue(match, [
-      "status",
-      "match_status",
-      "state",
-    ]) || ""
-  ).toLowerCase();
+  const externalId =
+    match.url ||
+    `${match.home}-${match.away}-${match.time}`;
 
   let status = "scheduled";
 
-  if (
-    rawStatus.includes("live") ||
-    rawStatus.includes("inplay") ||
-    rawStatus.includes("in-play")
-  ) {
+  if (match.status === "live") {
     status = "live";
-  } else if (
-    rawStatus.includes("finish") ||
-    rawStatus.includes("ended") ||
-    rawStatus.includes("completed")
-  ) {
+  } else if (match.status === "finished") {
     status = "finished";
-  } else if (
-    rawStatus.includes("postpon")
-  ) {
+  } else if (match.status === "postponed") {
     status = "postponed";
-  } else if (
-    rawStatus.includes("cancel")
-  ) {
+  } else if (match.status === "cancelled") {
     status = "cancelled";
   }
 
-  let parsedDate = null;
+  const parsedDate = new Date(match.time);
 
-  if (matchDate) {
-    const date = new Date(matchDate);
-
-    if (!Number.isNaN(date.getTime())) {
-      parsedDate = date.toISOString();
-    }
+  if (Number.isNaN(parsedDate.getTime())) {
+    return null;
   }
 
   return {
-    external_id: externalId
-      ? String(externalId)
+    external_id: String(externalId),
+
+    league: match.competition
+      ? String(match.competition)
       : null,
 
-    league: league
-      ? String(league)
+    league_logo:
+      match.competition_logo || null,
+
+    home_team: match.home
+      ? String(match.home).trim()
       : null,
 
-    league_logo: leagueLogo || null,
-
-    home_team: homeTeam
-      ? String(homeTeam).trim()
+    away_team: match.away
+      ? String(match.away).trim()
       : null,
 
-    away_team: awayTeam
-      ? String(awayTeam).trim()
-      : null,
+    home_logo:
+      match.home_logo || null,
 
-    home_logo: homeLogo || null,
+    away_logo:
+      match.away_logo || null,
 
-    away_logo: awayLogo || null,
-
-    match_date: parsedDate,
+    match_date:
+      parsedDate.toISOString(),
 
     status,
   };
@@ -207,9 +99,6 @@ export async function GET(request) {
       100
     );
 
-    /*
-     * 1. SportScore'dan maçları al.
-     */
     const sportScoreData =
       await getMatches(
         Math.min(limit, 50)
@@ -222,13 +111,10 @@ export async function GET(request) {
         ? sportScoreData.matches
         : [];
 
-    /*
-     * 2. SportScore verilerini
-     * Supabase formatına dönüştür.
-     */
     const normalizedMatches =
       sportScoreMatches
         .map(normalizeMatch)
+        .filter(Boolean)
         .filter(
           (match) =>
             match.external_id &&
@@ -237,9 +123,6 @@ export async function GET(request) {
             match.match_date
         );
 
-    /*
-     * 3. Supabase'e kaydet veya güncelle.
-     */
     if (normalizedMatches.length > 0) {
       const {
         error: upsertError,
@@ -258,12 +141,20 @@ export async function GET(request) {
           "SportScore matches upsert error:",
           upsertError
         );
+
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              upsertError.message,
+          },
+          {
+            status: 500,
+          }
+        );
       }
     }
 
-    /*
-     * 4. Supabase'den maçları getir.
-     */
     let query = supabase
       .from("matches")
       .select(`
@@ -391,9 +282,7 @@ export async function POST(request) {
     ];
 
     if (
-      !validStatuses.includes(
-        status
-      )
+      !validStatuses.includes(status)
     ) {
       return NextResponse.json(
         {
