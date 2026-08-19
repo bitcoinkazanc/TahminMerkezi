@@ -419,11 +419,22 @@ img {
   border-radius: 4px;
 }
 
-.match-time {
-  flex: 0 0 auto;
-  color: var(--primary);
-  font-size: 11px;
+.match-status {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--text-soft);
+  font-size: 10px;
   font-weight: 800;
+  white-space: nowrap;
+}
+
+.match-status.live {
+  background: var(--danger-soft);
+  color: var(--danger);
 }
 
 .match-teams {
@@ -476,8 +487,48 @@ img {
 
 .match-vs-small {
   color: var(--text-muted);
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.match-card-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid var(--border);
+}
+
+.match-date-time {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.match-date-time strong {
+  color: var(--primary);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.match-prediction-button {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: var(--primary-soft);
+  color: var(--primary);
   font-size: 10px;
   font-weight: 800;
+  white-space: nowrap;
 }
 
 /* MATCH DETAIL */
@@ -1289,6 +1340,26 @@ img {
 
   .match-team-name {
     font-size: 12px;
+  }
+
+  .match-card-bottom {
+    margin-top: 8px;
+    padding-top: 8px;
+  }
+
+  .match-date-time {
+    gap: 5px;
+    font-size: 9px;
+  }
+
+  .match-date-time strong {
+    font-size: 10px;
+  }
+
+  .match-prediction-button {
+    min-height: 27px;
+    padding: 0 8px;
+    font-size: 9.5px;
   }
 
   .prediction-message {
