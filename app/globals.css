@@ -1607,3 +1607,15 @@ img {
 .home-matches-title {
   text-align: center;
 }
+.home-disclaimer {
+  margin-top: 14px;
+  padding: 0 8px;
+  text-align: center;
+  color: var(--text-soft);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.home-disclaimer strong {
+  font-weight: 700;
+}
