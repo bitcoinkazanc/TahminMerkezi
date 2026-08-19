@@ -716,35 +716,41 @@ img {
 }
 
 .prediction-message {
-  padding: 10px 11px;
+  padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: 13px;
   background: var(--surface-soft);
 }
 
 .prediction-message-main {
-  display: flex;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: start;
   gap: 9px;
   min-width: 0;
 }
 
 .prediction-message-avatar {
+  width: 34px;
+  height: 34px;
   flex: 0 0 34px;
 }
 
 .prediction-message-content {
   min-width: 0;
-  flex: 1;
+  width: 100%;
 }
 
 .prediction-message-top {
-  min-height: 18px;
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 25px;
 }
 
 .prediction-message-top strong {
+  min-width: 0;
   overflow: hidden;
   color: var(--text);
   font-size: 12px;
@@ -779,37 +785,43 @@ img {
 .prediction-message-result {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
   gap: 6px;
-  margin-top: 5px;
+  margin-top: -25px;
+  margin-left: auto;
+  width: fit-content;
+  max-width: 100%;
 }
 
 .prediction-badge {
   display: inline-flex;
   min-height: 25px;
   align-items: center;
-  padding: 0 8px;
+  padding: 0 9px;
   border-radius: 7px;
   background: var(--primary-soft);
   color: var(--primary);
   font-size: 11px;
   font-weight: 900;
+  white-space: nowrap;
 }
 
 .prediction-confidence-value {
   display: inline-flex;
   min-height: 25px;
   align-items: center;
-  padding: 0 8px;
+  padding: 0 9px;
   border-radius: 7px;
   background: var(--success-soft);
   color: var(--success);
   font-size: 10px;
   font-weight: 800;
+  white-space: nowrap;
 }
 
 .prediction-message-text {
-  margin: 6px 0 0;
+  margin: 7px 0 0;
   color: var(--text);
   font-size: 12px;
   line-height: 1.4;
@@ -856,10 +868,6 @@ img {
 .prediction-user-info span {
   color: var(--text-muted);
   font-size: 11px;
-}
-
-.prediction-message-content {
-  min-width: 0;
 }
 
 /* CHAT */
@@ -1282,11 +1290,13 @@ img {
   }
 
   .prediction-message-main {
+    grid-template-columns: 32px minmax(0, 1fr);
     gap: 8px;
   }
 
   .prediction-message-avatar {
-    flex-basis: 32px;
+    width: 32px;
+    height: 32px;
   }
 
   .user-avatar,
@@ -1296,7 +1306,32 @@ img {
     flex-basis: 32px;
   }
 
+  .prediction-message-top {
+    min-height: 24px;
+  }
+
+  .prediction-message-top strong {
+    font-size: 11.5px;
+  }
+
+  .prediction-message-result {
+    gap: 5px;
+  }
+
+  .prediction-badge {
+    min-height: 24px;
+    padding: 0 7px;
+    font-size: 10px;
+  }
+
+  .prediction-confidence-value {
+    min-height: 24px;
+    padding: 0 7px;
+    font-size: 9.5px;
+  }
+
   .prediction-message-text {
+    margin-top: 6px;
     font-size: 11.5px;
   }
 
