@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { getMatches } from "../../../lib/football-api";
+import {
+  getMatches,
+  getMatch,
+} from "../../../lib/football-api";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -99,6 +102,101 @@ export async function GET(request) {
       100
     );
 
+    /*
+     * GEÇİCİ DEBUG
+     *
+     * Bir maç ID'si ile istek geldiğinde
+     * Supabase'deki external_id içinden
+     * SportScore slug'ını çıkarıp gerçek
+     * maç detayını getiriyoruz.
+     *
+     * Şimdilik sadece response içine
+     * sportScoreDebug alanı ekliyoruz.
+     */
+    let sportScoreDebug = null;
+
+    if (matchId) {
+      const {
+        data: debugMatch,
+        error: debugMatchError,
+      } = await supabase
+        .from("matches")
+        .select(
+          "id, external_id, home_team, away_team"
+        )
+        .eq("id", matchId)
+        .maybeSingle();
+
+      if (debugMatchError) {
+        console.error(
+          "Debug match lookup error:",
+          debugMatchError
+        );
+      } else if (debugMatch) {
+        const externalId =
+          debugMatch.external_id || "";
+
+        const slug =
+          externalId
+            .replace(/^\/football\/match\//, "")
+            .replace(/\/$/, "");
+
+        console.log(
+          "SPORTSCORE DEBUG - external_id:",
+          externalId
+        );
+
+        console.log(
+          "SPORTSCORE DEBUG - slug:",
+          slug
+        );
+
+        if (slug) {
+          try {
+            const detail =
+              await getMatch(slug);
+
+            console.log(
+              "SPORTSCORE DEBUG - full response:",
+              JSON.stringify(
+                detail,
+                null,
+                2
+              )
+            );
+
+            console.log(
+              "SPORTSCORE DEBUG - score:",
+              JSON.stringify(
+                detail?.score,
+                null,
+                2
+              )
+            );
+
+            sportScoreDebug = {
+              slug,
+              score: detail?.score ?? null,
+              status: detail?.status ?? null,
+              detail,
+            };
+          } catch (debugError) {
+            console.error(
+              "SportScore debug request error:",
+              debugError
+            );
+
+            sportScoreDebug = {
+              slug,
+              error:
+                debugError?.message ||
+                "SportScore detay isteği başarısız.",
+            };
+          }
+        }
+      }
+    }
+
     const sportScoreData =
       await getMatches(
         Math.min(limit, 50)
@@ -168,6 +266,8 @@ export async function GET(request) {
         away_logo,
         match_date,
         status,
+        home_score,
+        away_score,
         created_at,
         updated_at
       `)
@@ -218,6 +318,7 @@ export async function GET(request) {
       success: true,
       matches: data || [],
       source: "SportScore",
+      sportScoreDebug,
     });
   } catch (error) {
     console.error(
@@ -371,6 +472,8 @@ export async function POST(request) {
             away_logo,
             match_date,
             status,
+            home_score,
+            away_score,
             created_at,
             updated_at
           `)
@@ -393,6 +496,8 @@ export async function POST(request) {
             away_logo,
             match_date,
             status,
+            home_score,
+            away_score,
             created_at,
             updated_at
           `)
