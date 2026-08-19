@@ -1,22 +1,21 @@
 "use client";
 
-export default function PredictionMessage({ prediction }) {
+export default function PredictionMessage({
+  prediction,
+}) {
   if (!prediction) {
     return null;
   }
 
   const user = prediction.users;
 
-  const name =
-    [user?.first_name, user?.last_name]
-      .filter(Boolean)
-      .join(" ") ||
-    user?.username ||
-    "Telegram Kullanıcısı";
+  const username = user?.username
+    ? `@${user.username}`
+    : "Telegram Kullanıcısı";
 
   const avatarLetter = (
-    user?.first_name ||
     user?.username ||
+    user?.first_name ||
     "T"
   )
     .charAt(0)
@@ -40,8 +39,7 @@ export default function PredictionMessage({ prediction }) {
     date && !Number.isNaN(date.getTime())
       ? date.toLocaleDateString("tr-TR", {
           day: "2-digit",
-          month: "2-digit",
-          year: "numeric",
+          month: "short",
         })
       : "";
 
@@ -55,53 +53,51 @@ export default function PredictionMessage({ prediction }) {
 
   return (
     <article className="prediction-message">
-      <div className="prediction-message-user">
-        {user?.avatar_url ? (
-          <img
-            src={user.avatar_url}
-            alt={name}
-            className="user-avatar"
-          />
-        ) : (
-          <div className="user-avatar-placeholder">
-            {avatarLetter}
+      <div className="prediction-message-main">
+        <div className="prediction-message-avatar">
+          {user?.avatar_url ? (
+            <img
+              src={user.avatar_url}
+              alt={username}
+              className="user-avatar"
+            />
+          ) : (
+            <div className="user-avatar-placeholder">
+              {avatarLetter}
+            </div>
+          )}
+        </div>
+
+        <div className="prediction-message-content">
+          <div className="prediction-message-top">
+            <strong>{username}</strong>
           </div>
-        )}
 
-        <div>
-          <strong>{name}</strong>
-
-          {user?.username ? (
-            <span className="prediction-username">
-              @{user.username}
+          <div className="prediction-message-result">
+            <span className="prediction-badge">
+              {predictionLabel}
             </span>
+
+            {prediction.confidence != null ? (
+              <span className="prediction-confidence-value">
+                Güven %{prediction.confidence}
+              </span>
+            ) : null}
+          </div>
+
+          {prediction.message ? (
+            <p className="prediction-message-text">
+              {prediction.message}
+            </p>
+          ) : null}
+
+          {formattedDate ? (
+            <div className="prediction-message-date">
+              {formattedDate} · {formattedTime}
+            </div>
           ) : null}
         </div>
       </div>
-
-      <div className="prediction-message-result">
-        <span className="prediction-badge">
-          {predictionLabel}
-        </span>
-
-        {prediction.confidence != null ? (
-          <span className="prediction-confidence-value">
-            Güven %{prediction.confidence}
-          </span>
-        ) : null}
-      </div>
-
-      {prediction.message ? (
-        <p className="prediction-message-text">
-          {prediction.message}
-        </p>
-      ) : null}
-
-      {formattedDate ? (
-        <div className="prediction-message-date">
-          {formattedDate} {formattedTime}
-        </div>
-      ) : null}
     </article>
   );
 }
