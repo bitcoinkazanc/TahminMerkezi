@@ -38,7 +38,9 @@ export default function MatchCard({ match }) {
   };
 
   const statusLabel =
-    statusLabels[match.status] || match.status || "Yaklaşan";
+    statusLabels[match.status] ||
+    match.status ||
+    "Yaklaşan";
 
   const isLive = match.status === "live";
 
@@ -85,14 +87,20 @@ export default function MatchCard({ match }) {
             </div>
           )}
 
-          <span>{match.home_team}</span>
+          <span className="match-team-name">
+            {match.home_team}
+          </span>
         </div>
 
-        <div className="match-time">
-          {formattedTime || "--:--"}
+        <div className="match-vs-small">
+          VS
         </div>
 
-        <div className="match-team">
+        <div className="match-team away">
+          <span className="match-team-name">
+            {match.away_team}
+          </span>
+
           {match.away_logo ? (
             <img
               src={match.away_logo}
@@ -104,17 +112,21 @@ export default function MatchCard({ match }) {
               ⚽
             </div>
           )}
-
-          <span>{match.away_team}</span>
         </div>
       </div>
 
       <div className="match-card-bottom">
-        <span>
-          {formattedDate || "Tarih belirtilmemiş"}
-        </span>
+        <div className="match-date-time">
+          <span>
+            {formattedDate || "Tarih belirtilmemiş"}
+          </span>
 
-        <span className="match-arrow">
+          {formattedTime ? (
+            <strong>{formattedTime}</strong>
+          ) : null}
+        </div>
+
+        <span className="match-prediction-button">
           Tahmin Yap →
         </span>
       </div>
