@@ -384,14 +384,14 @@ img {
 
 .match-list {
   display: grid;
-  gap: 14px;
+  gap: 9px;
 }
 
 .match-card {
   display: block;
-  padding: 16px;
+  padding: 11px 13px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: 15px;
   background: var(--surface);
   box-shadow: var(--shadow-sm);
   transition:
@@ -408,23 +408,23 @@ img {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 14px;
+  gap: 10px;
+  margin-bottom: 9px;
 }
 
 .match-league {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   min-width: 0;
   color: var(--text-soft);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
 }
 
 .league-logo {
-  width: 20px;
-  height: 20px;
+  width: 17px;
+  height: 17px;
   object-fit: contain;
   border-radius: 4px;
 }
@@ -432,7 +432,7 @@ img {
 .match-time {
   flex: 0 0 auto;
   color: var(--primary);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
 }
 
@@ -440,13 +440,13 @@ img {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  gap: 12px;
+  gap: 9px;
 }
 
 .match-team {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 7px;
   min-width: 0;
 }
 
@@ -456,29 +456,29 @@ img {
 }
 
 .team-logo {
-  width: 34px;
-  height: 34px;
-  flex: 0 0 34px;
+  width: 27px;
+  height: 27px;
+  flex: 0 0 27px;
   object-fit: contain;
   border-radius: 50%;
 }
 
 .team-logo-placeholder {
   display: flex;
-  width: 34px;
-  height: 34px;
-  flex: 0 0 34px;
+  width: 27px;
+  height: 27px;
+  flex: 0 0 27px;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
   background: var(--surface-soft);
-  font-size: 17px;
+  font-size: 14px;
 }
 
 .match-team-name {
   overflow: hidden;
   color: var(--text);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -486,7 +486,7 @@ img {
 
 .match-vs-small {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 800;
 }
 
@@ -562,27 +562,51 @@ img {
   font-weight: 800;
 }
 
-/* PREDICTION */
+/* PREDICTION BOX */
 
 .prediction-box {
   display: grid;
   gap: 14px;
 }
 
+.prediction-box-header h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.prediction-box-header p {
+  margin: 4px 0 0;
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
 .prediction-options {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
+  gap: 7px;
 }
 
 .prediction-option {
-  min-height: 52px;
+  display: flex;
+  min-height: 50px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 6px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 11px;
   background: var(--surface);
   color: var(--text);
-  font-size: 14px;
-  font-weight: 800;
+}
+
+.prediction-option strong {
+  font-size: 13px;
+}
+
+.prediction-option span {
+  color: var(--text-muted);
+  font-size: 10px;
 }
 
 .prediction-option:hover {
@@ -593,6 +617,73 @@ img {
   border-color: var(--primary);
   background: var(--primary-soft);
   color: var(--primary);
+}
+
+.prediction-confidence {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--surface-soft);
+}
+
+.prediction-field-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 7px;
+}
+
+.prediction-field-header label {
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.prediction-field-header strong {
+  color: var(--primary);
+  font-size: 13px;
+}
+
+.prediction-confidence input[type="range"] {
+  width: 100%;
+  accent-color: var(--primary);
+}
+
+.prediction-message-field {
+  position: relative;
+}
+
+.prediction-message-field label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.prediction-message-field textarea {
+  width: 100%;
+  min-height: 84px;
+  padding: 10px 11px;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  outline: none;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.prediction-message-field textarea:focus {
+  border-color: var(--primary);
+}
+
+.prediction-message-field small {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 10px;
+  text-align: right;
 }
 
 .prediction-textarea {
@@ -617,17 +708,123 @@ img {
   width: 100%;
 }
 
+/* PREDICTION LIST */
+
 .prediction-list {
   display: grid;
-  gap: 12px;
+  gap: 8px;
 }
 
 .prediction-message {
-  padding: 14px;
+  padding: 10px 11px;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: 13px;
   background: var(--surface-soft);
 }
+
+.prediction-message-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  min-width: 0;
+}
+
+.prediction-message-avatar {
+  flex: 0 0 34px;
+}
+
+.prediction-message-content {
+  min-width: 0;
+  flex: 1;
+}
+
+.prediction-message-top {
+  min-height: 18px;
+  display: flex;
+  align-items: center;
+}
+
+.prediction-message-top strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-avatar {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--border);
+}
+
+.user-avatar-placeholder {
+  display: flex;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.prediction-message-result {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 5px;
+}
+
+.prediction-badge {
+  display: inline-flex;
+  min-height: 25px;
+  align-items: center;
+  padding: 0 8px;
+  border-radius: 7px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.prediction-confidence-value {
+  display: inline-flex;
+  min-height: 25px;
+  align-items: center;
+  padding: 0 8px;
+  border-radius: 7px;
+  background: var(--success-soft);
+  color: var(--success);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.prediction-message-text {
+  margin: 6px 0 0;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.prediction-message-date {
+  margin-top: 5px;
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1;
+}
+
+/* OLD PREDICTION CLASSES - COMPATIBILITY */
 
 .prediction-message-header {
   display: flex;
@@ -641,29 +838,6 @@ img {
   align-items: center;
   gap: 9px;
   min-width: 0;
-}
-
-.user-avatar {
-  width: 36px;
-  height: 36px;
-  flex: 0 0 36px;
-  border-radius: 50%;
-  object-fit: cover;
-  background: var(--border);
-}
-
-.user-avatar-placeholder {
-  display: flex;
-  width: 36px;
-  height: 36px;
-  flex: 0 0 36px;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: var(--primary-soft);
-  color: var(--primary);
-  font-size: 14px;
-  font-weight: 800;
 }
 
 .prediction-user-info {
@@ -684,34 +858,8 @@ img {
   font-size: 11px;
 }
 
-.prediction-badge {
-  display: inline-flex;
-  min-height: 30px;
-  align-items: center;
-  padding: 0 10px;
-  border-radius: 999px;
-  background: var(--primary-soft);
-  color: var(--primary);
-  font-size: 12px;
-  font-weight: 900;
-}
-
 .prediction-message-content {
-  margin: 12px 0 0;
-  color: var(--text);
-  font-size: 13px;
-  line-height: 1.55;
-  white-space: pre-wrap;
-}
-
-.prediction-message-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-top: 12px;
-  color: var(--text-muted);
-  font-size: 11px;
+  min-width: 0;
 }
 
 /* CHAT */
@@ -1093,6 +1241,63 @@ img {
     min-height: 36px;
     max-width: 36px !important;
     max-height: 36px !important;
+  }
+
+  .match-card {
+    padding: 10px 11px;
+    border-radius: 13px;
+  }
+
+  .match-card-top {
+    margin-bottom: 7px;
+  }
+
+  .match-teams {
+    gap: 6px;
+  }
+
+  .team-logo {
+    width: 25px;
+    height: 25px;
+    flex-basis: 25px;
+  }
+
+  .team-logo-placeholder {
+    width: 25px;
+    height: 25px;
+    flex-basis: 25px;
+    font-size: 13px;
+  }
+
+  .match-team {
+    gap: 6px;
+  }
+
+  .match-team-name {
+    font-size: 12px;
+  }
+
+  .prediction-message {
+    padding: 9px 10px;
+  }
+
+  .prediction-message-main {
+    gap: 8px;
+  }
+
+  .prediction-message-avatar {
+    flex-basis: 32px;
+  }
+
+  .user-avatar,
+  .user-avatar-placeholder {
+    width: 32px;
+    height: 32px;
+    flex-basis: 32px;
+  }
+
+  .prediction-message-text {
+    font-size: 11.5px;
   }
 
   .bottom-nav {
