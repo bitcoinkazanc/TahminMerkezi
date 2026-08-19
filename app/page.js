@@ -29,7 +29,7 @@ export default function HomePage() {
 
       try {
         const response = await fetch(
-          "/api/matches?limit=10",
+          "/api/matches?limit=20",
           {
             cache: "no-store",
           }
