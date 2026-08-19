@@ -135,45 +135,32 @@ export default function HomePage() {
   const displayName =
     user?.first_name ||
     user?.username ||
-    "TahminMerkezi";
+    "";
 
   return (
     <main className="page">
       <div className="page-container">
         <section className="home-hero">
-          <span className="page-eyebrow">
-            TAHMİNMERCİZİ
-          </span>
+          <div className="home-hero-icon">
+            🏆
+          </div>
 
           <h1>
-            Hoş geldin
-            {displayName !== "TahminMerkezi"
-              ? `, ${displayName}`
-              : ""}
-            !
+            Tahmin skorunu yükselt!
           </h1>
 
-          <p>
-            Maçları incele, tahminini yap ve
-            topluluğun görüşlerine katıl.
-          </p>
+          {displayName ? (
+            <p>
+              {displayName}, bugün hangi maçın
+              tahminini yapacaksın?
+            </p>
+          ) : (
+            <p>
+              Bugün hangi maçın tahminini
+              yapacaksın?
+            </p>
+          )}
         </section>
-
-        <div className="home-actions">
-          <Link
-            href="/maclar"
-            className="primary-button"
-          >
-            ⚽ Maçları Gör
-          </Link>
-
-          <Link
-            href="/profil"
-            className="secondary-button"
-          >
-            👤 Profilim
-          </Link>
-        </div>
 
         <section className="section-card">
           <div className="section-title">
