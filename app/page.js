@@ -137,6 +137,66 @@ export default function HomePage() {
     user?.username ||
     "";
 
+  const leaguePriority = [
+    "Turkish Super League",
+    "Turkish First League",
+    "Turkish Second League",
+    "Turkish Third League",
+    "English Premier League",
+    "Spanish La Liga",
+    "Italian Serie A",
+    "Bundesliga",
+    "French Ligue 1",
+    "Netherlands Eredivisie",
+    "Portuguese Primeira Liga",
+    "Belgian Pro League",
+  ];
+
+  const sortedMatches = [...matches].sort(
+    (a, b) => {
+      const leagueA = (
+        a?.league || ""
+      ).toLowerCase();
+
+      const leagueB = (
+        b?.league || ""
+      ).toLowerCase();
+
+      const indexA =
+        leaguePriority.findIndex((league) =>
+          leagueA.includes(
+            league.toLowerCase()
+          )
+        );
+
+      const indexB =
+        leaguePriority.findIndex((league) =>
+          leagueB.includes(
+            league.toLowerCase()
+          )
+        );
+
+      const priorityA =
+        indexA === -1
+          ? leaguePriority.length
+          : indexA;
+
+      const priorityB =
+        indexB === -1
+          ? leaguePriority.length
+          : indexB;
+
+      if (priorityA !== priorityB) {
+        return priorityA - priorityB;
+      }
+
+      return (
+        new Date(a.match_date) -
+        new Date(b.match_date)
+      );
+    }
+  );
+
   return (
     <main className="page">
       <div className="page-container">
@@ -178,7 +238,7 @@ export default function HomePage() {
 
           {loading ? (
             <Loading />
-          ) : matches.length === 0 ? (
+          ) : sortedMatches.length === 0 ? (
             <div className="empty-state small">
               <div className="empty-icon">
                 ⚽
@@ -200,7 +260,7 @@ export default function HomePage() {
             </div>
           ) : (
             <>
-              <MatchList matches={matches} />
+              <MatchList matches={sortedMatches} />
 
               <div className="home-disclaimer">
                 <strong>❗ Sorumluluk Reddi:</strong>{" "}
