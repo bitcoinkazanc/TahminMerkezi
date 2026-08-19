@@ -10,6 +10,13 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="tr">
+      <head>
+        <script
+          src="https://telegram.org/js/telegram-web-app.js"
+          async
+        ></script>
+      </head>
+
       <body>
         <Header />
 
