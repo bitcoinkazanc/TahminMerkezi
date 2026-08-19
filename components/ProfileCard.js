@@ -41,6 +41,19 @@ export default function ProfileCard({ user }) {
           src={user.avatar_url}
           alt={displayName}
           className="profile-avatar"
+          width={72}
+          height={72}
+          style={{
+            width: "72px",
+            height: "72px",
+            minWidth: "72px",
+            minHeight: "72px",
+            maxWidth: "72px",
+            maxHeight: "72px",
+            objectFit: "cover",
+            borderRadius: "50%",
+            display: "block",
+          }}
         />
       ) : (
         <div className="profile-avatar-placeholder">
