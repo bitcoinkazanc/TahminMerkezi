@@ -48,6 +48,7 @@ export default function MatchDetailPage() {
       setMatch(foundMatch);
     } catch (err) {
       console.error(err);
+
       setError(
         err.message || "Maç yüklenirken hata oluştu."
       );
@@ -113,16 +114,9 @@ export default function MatchDetailPage() {
     return (
       <main className="page">
         <div className="page-container">
-          <Link
-            href="/maclar"
-            className="match-back-button"
-          >
-            <span className="match-back-icon">←</span>
-            <span>Maçlara Dön</span>
-          </Link>
-
           <div className="error-box">
             <h2>Bir sorun oluştu</h2>
+
             <p>{error}</p>
 
             <button
@@ -145,16 +139,9 @@ export default function MatchDetailPage() {
     return (
       <main className="page">
         <div className="page-container">
-          <Link
-            href="/maclar"
-            className="match-back-button"
-          >
-            <span className="match-back-icon">←</span>
-            <span>Maçlara Dön</span>
-          </Link>
-
           <div className="empty-state">
             <h2>Maç bulunamadı</h2>
+
             <p>
               Aradığınız maç artık mevcut değil.
             </p>
@@ -182,14 +169,6 @@ export default function MatchDetailPage() {
   return (
     <main className="page">
       <div className="page-container">
-        <Link
-          href="/maclar"
-          className="match-back-button"
-        >
-          <span className="match-back-icon">←</span>
-          <span>Maçlara Dön</span>
-        </Link>
-
         <section className="match-detail-card">
           <div className="match-detail-league">
             {match.league_logo ? (
@@ -263,6 +242,7 @@ export default function MatchDetailPage() {
         <section className="section-card">
           <div className="section-title">
             <h2>Tahminini Yap</h2>
+
             <p>
               Bu maç için tahminini seç ve
               toplulukla paylaş.
@@ -280,6 +260,7 @@ export default function MatchDetailPage() {
         <section className="section-card">
           <div className="section-title">
             <h2>Tahminler</h2>
+
             <p>
               Bu maç için yapılan topluluk
               tahminleri.
@@ -292,6 +273,7 @@ export default function MatchDetailPage() {
                 Henüz bu maç için tahmin
                 yapılmamış.
               </p>
+
               <span>
                 İlk tahmini sen yapabilirsin.
               </span>
@@ -311,6 +293,7 @@ export default function MatchDetailPage() {
         <section className="section-card">
           <div className="section-title">
             <h2>Maç Sohbeti</h2>
+
             <p>
               Bu maç hakkında toplulukla konuş.
             </p>
