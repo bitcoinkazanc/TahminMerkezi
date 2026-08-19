@@ -141,25 +141,34 @@ export default function HomePage() {
     <main className="page">
       <div className="page-container">
         <section className="home-hero">
-          <div className="home-hero-icon">
-            🏆
+          <div className="home-hero-title">
+            <span className="home-hero-decoration">
+              ✦
+            </span>
+
+            <h1>
+              Başarı oranın ne kadar yüksekse,
+              sesin o kadar gür çıkar
+            </h1>
+
+            <span className="home-hero-decoration">
+              ✦
+            </span>
           </div>
 
-          <h1>
-            Tahmin skorunu yükselt!
-          </h1>
-
           {displayName ? (
-            <p>
-              {displayName}, bugün hangi maçın
-              tahminini yapacaksın?
-            </p>
-          ) : (
-            <p>
-              Bugün hangi maçın tahminini
-              yapacaksın?
-            </p>
-          )}
+            <div className="home-welcome">
+              Hoş geldin,{" "}
+              <strong>{displayName}</strong>!
+            </div>
+          ) : null}
+
+          <p className="home-hero-text">
+            Unutma, en büyük analizciler de tek bir
+            doğru tahminle başladı. Sahadaki heyecana
+            ortak ol, bilgini konuştur ve liderlik
+            kürsüsüne doğru ilk adımını at. 🏆
+          </p>
         </section>
 
         <section className="section-card">
