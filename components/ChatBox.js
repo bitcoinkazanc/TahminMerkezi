@@ -14,7 +14,9 @@ export default function ChatBox({ matchId = null }) {
       setLoading(true);
 
       const query = matchId
-        ? `/api/messages?match_id=${encodeURIComponent(matchId)}&limit=100`
+        ? `/api/messages?match_id=${encodeURIComponent(
+            matchId
+          )}&limit=100`
         : "/api/messages?limit=100";
 
       const response = await fetch(query, {
@@ -53,12 +55,17 @@ export default function ChatBox({ matchId = null }) {
         return current;
       }
 
-      return [...current, newMessage];
+      return [newMessage, ...current];
     });
   }
 
   return (
     <div className="chat-box">
+      <ChatInput
+        matchId={matchId}
+        onMessageCreated={handleMessageCreated}
+      />
+
       {loading ? (
         <Loading />
       ) : messages.length === 0 ? (
@@ -79,11 +86,6 @@ export default function ChatBox({ matchId = null }) {
           ))}
         </div>
       )}
-
-      <ChatInput
-        matchId={matchId}
-        onMessageCreated={handleMessageCreated}
-      />
     </div>
   );
 }
