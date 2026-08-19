@@ -34,7 +34,9 @@ export default function MatchDetailPage() {
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        throw new Error(result.error || "Maç bilgileri alınamadı.");
+        throw new Error(
+          result.error || "Maç bilgileri alınamadı."
+        );
       }
 
       const foundMatch = result.matches?.[0];
@@ -46,7 +48,9 @@ export default function MatchDetailPage() {
       setMatch(foundMatch);
     } catch (err) {
       console.error(err);
-      setError(err.message || "Maç yüklenirken hata oluştu.");
+      setError(
+        err.message || "Maç yüklenirken hata oluştu."
+      );
     } finally {
       setLoading(false);
     }
@@ -57,7 +61,9 @@ export default function MatchDetailPage() {
 
     try {
       const response = await fetch(
-        `/api/predictions?match_id=${encodeURIComponent(matchId)}`,
+        `/api/predictions?match_id=${encodeURIComponent(
+          matchId
+        )}`,
         {
           cache: "no-store",
         }
@@ -71,7 +77,10 @@ export default function MatchDetailPage() {
 
       setPredictions(result.predictions || []);
     } catch (err) {
-      console.error("Predictions loading error:", err);
+      console.error(
+        "Predictions loading error:",
+        err
+      );
     }
   }
 
@@ -104,8 +113,12 @@ export default function MatchDetailPage() {
     return (
       <main className="page">
         <div className="page-container">
-          <Link href="/maclar" className="back-link">
-            ← Maçlara Dön
+          <Link
+            href="/maclar"
+            className="match-back-button"
+          >
+            <span className="match-back-icon">←</span>
+            <span>Maçlara Dön</span>
           </Link>
 
           <div className="error-box">
@@ -132,13 +145,19 @@ export default function MatchDetailPage() {
     return (
       <main className="page">
         <div className="page-container">
-          <Link href="/maclar" className="back-link">
-            ← Maçlara Dön
+          <Link
+            href="/maclar"
+            className="match-back-button"
+          >
+            <span className="match-back-icon">←</span>
+            <span>Maçlara Dön</span>
           </Link>
 
           <div className="empty-state">
             <h2>Maç bulunamadı</h2>
-            <p>Aradığınız maç artık mevcut değil.</p>
+            <p>
+              Aradığınız maç artık mevcut değil.
+            </p>
           </div>
         </div>
       </main>
@@ -147,22 +166,28 @@ export default function MatchDetailPage() {
 
   const matchDate = new Date(match.match_date);
 
-  const formattedDate = matchDate.toLocaleDateString("tr-TR", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  });
+  const formattedDate =
+    matchDate.toLocaleDateString("tr-TR", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    });
 
-  const formattedTime = matchDate.toLocaleTimeString("tr-TR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const formattedTime =
+    matchDate.toLocaleTimeString("tr-TR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
 
   return (
     <main className="page">
       <div className="page-container">
-        <Link href="/maclar" className="back-link">
-          ← Maçlara Dön
+        <Link
+          href="/maclar"
+          className="match-back-button"
+        >
+          <span className="match-back-icon">←</span>
+          <span>Maçlara Dön</span>
         </Link>
 
         <section className="match-detail-card">
@@ -175,7 +200,9 @@ export default function MatchDetailPage() {
               />
             ) : null}
 
-            <span>{match.league || "Futbol"}</span>
+            <span>
+              {match.league || "Futbol"}
+            </span>
           </div>
 
           <div className="match-detail-date">
@@ -191,7 +218,9 @@ export default function MatchDetailPage() {
                   className="team-logo-large"
                 />
               ) : (
-                <div className="team-logo-placeholder">⚽</div>
+                <div className="team-logo-placeholder">
+                  ⚽
+                </div>
               )}
 
               <strong>{match.home_team}</strong>
@@ -209,7 +238,9 @@ export default function MatchDetailPage() {
                   className="team-logo-large"
                 />
               ) : (
-                <div className="team-logo-placeholder">⚽</div>
+                <div className="team-logo-placeholder">
+                  ⚽
+                </div>
               )}
 
               <strong>{match.away_team}</strong>
@@ -232,12 +263,17 @@ export default function MatchDetailPage() {
         <section className="section-card">
           <div className="section-title">
             <h2>Tahminini Yap</h2>
-            <p>Bu maç için tahminini seç ve toplulukla paylaş.</p>
+            <p>
+              Bu maç için tahminini seç ve
+              toplulukla paylaş.
+            </p>
           </div>
 
           <PredictionBox
             match={match}
-            onPredictionCreated={handlePredictionCreated}
+            onPredictionCreated={
+              handlePredictionCreated
+            }
           />
         </section>
 
@@ -245,14 +281,20 @@ export default function MatchDetailPage() {
           <div className="section-title">
             <h2>Tahminler</h2>
             <p>
-              Bu maç için yapılan topluluk tahminleri.
+              Bu maç için yapılan topluluk
+              tahminleri.
             </p>
           </div>
 
           {predictions.length === 0 ? (
             <div className="empty-state small">
-              <p>Henüz bu maç için tahmin yapılmamış.</p>
-              <span>İlk tahmini sen yapabilirsin.</span>
+              <p>
+                Henüz bu maç için tahmin
+                yapılmamış.
+              </p>
+              <span>
+                İlk tahmini sen yapabilirsin.
+              </span>
             </div>
           ) : (
             <div className="prediction-list">
@@ -269,7 +311,9 @@ export default function MatchDetailPage() {
         <section className="section-card">
           <div className="section-title">
             <h2>Maç Sohbeti</h2>
-            <p>Bu maç hakkında toplulukla konuş.</p>
+            <p>
+              Bu maç hakkında toplulukla konuş.
+            </p>
           </div>
 
           <ChatBox matchId={match.id} />
