@@ -9,22 +9,11 @@ export default function ProfileCard({ user }) {
         </div>
 
         <div className="profile-info">
-          <h2>Telegram Kullanıcısı</h2>
-
-          <p>
-            Profil bilgileri yüklenemedi.
-          </p>
+          <p>Profil bilgileri yüklenemedi.</p>
         </div>
       </section>
     );
   }
-
-  const displayName =
-    [user.first_name, user.last_name]
-      .filter(Boolean)
-      .join(" ") ||
-    user.username ||
-    "Telegram Kullanıcısı";
 
   const avatarLetter = (
     user.first_name ||
@@ -39,7 +28,11 @@ export default function ProfileCard({ user }) {
       {user.avatar_url ? (
         <img
           src={user.avatar_url}
-          alt={displayName}
+          alt={
+            user.username
+              ? `@${user.username}`
+              : "Telegram Kullanıcısı"
+          }
           className="profile-avatar"
           width={72}
           height={72}
@@ -62,8 +55,6 @@ export default function ProfileCard({ user }) {
       )}
 
       <div className="profile-info">
-        <h2>{displayName}</h2>
-
         {user.username ? (
           <p>@{user.username}</p>
         ) : (
