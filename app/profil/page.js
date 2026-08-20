@@ -80,13 +80,6 @@ export default function ProfilePage() {
     );
   }
 
-  const displayName =
-    [user.first_name, user.last_name]
-      .filter(Boolean)
-      .join(" ") ||
-    user.username ||
-    "Telegram Kullanıcısı";
-
   return (
     <main className="page">
       <div className="page-container">
@@ -188,15 +181,6 @@ export default function ProfilePage() {
             </div>
           )}
         </section>
-
-        <div className="profile-user-id">
-          <span>Kullanıcı</span>
-          <strong>{displayName}</strong>
-
-          {user.username ? (
-            <small>@{user.username}</small>
-          ) : null}
-        </div>
       </div>
     </main>
   );
