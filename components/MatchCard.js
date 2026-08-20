@@ -12,25 +12,33 @@ export default function MatchCard({ match }) {
     : null;
 
   const validDate =
-    matchDate && !Number.isNaN(matchDate.getTime());
+    matchDate &&
+    !Number.isNaN(matchDate.getTime());
 
   const formattedDate = validDate
-    ? matchDate.toLocaleDateString("tr-TR", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-      })
+    ? matchDate.toLocaleDateString(
+        "tr-TR",
+        {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+        }
+      )
     : "";
 
   const formattedTime = validDate
-    ? matchDate.toLocaleTimeString("tr-TR", {
-        hour: "2-digit",
-        minute: "2-digit",
-      })
+    ? matchDate.toLocaleTimeString(
+        "tr-TR",
+        {
+          hour: "2-digit",
+          minute: "2-digit",
+        }
+      )
     : "";
 
   const statusLabels = {
     scheduled: "Yaklaşan",
+    upcoming: "Yaklaşan",
     live: "CANLI",
     finished: "Bitti",
     postponed: "Ertelendi",
@@ -42,7 +50,26 @@ export default function MatchCard({ match }) {
     match.status ||
     "Yaklaşan";
 
-  const isLive = match.status === "live";
+  const isLive =
+    match.status === "live";
+
+  const isFinished =
+    match.status === "finished";
+
+  const hasScore =
+    isLive || isFinished;
+
+  const homeScore =
+    match.home_score !== null &&
+    match.home_score !== undefined
+      ? match.home_score
+      : 0;
+
+  const awayScore =
+    match.away_score !== null &&
+    match.away_score !== undefined
+      ? match.away_score
+      : 0;
 
   return (
     <Link
@@ -93,7 +120,13 @@ export default function MatchCard({ match }) {
         </div>
 
         <div className="match-vs-small">
-          VS
+          {hasScore ? (
+            <strong>
+              {homeScore} - {awayScore}
+            </strong>
+          ) : (
+            "VS"
+          )}
         </div>
 
         <div className="match-team away">
@@ -118,11 +151,14 @@ export default function MatchCard({ match }) {
       <div className="match-card-bottom">
         <div className="match-date-time">
           <span>
-            {formattedDate || "Tarih belirtilmemiş"}
+            {formattedDate ||
+              "Tarih belirtilmemiş"}
           </span>
 
           {formattedTime ? (
-            <strong>{formattedTime}</strong>
+            <strong>
+              {formattedTime}
+            </strong>
           ) : null}
         </div>
 
