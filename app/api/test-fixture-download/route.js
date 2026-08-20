@@ -1,91 +1,49 @@
+import { NextResponse } from "next/server";
+
 export async function GET() {
+  const url =
+    "https://www.tff.org/default.aspx?pageID=198";
+
   try {
-    const apiKey =
-      process.env.KICKOFF_API_KEY;
-
-    if (!apiKey) {
-      return Response.json(
-        {
-          success: false,
-          message:
-            "KICKOFF_API_KEY bulunamadı. Vercel Environment Variables kontrol edilmeli.",
-        },
-        { status: 500 }
-      );
-    }
-
-    const url =
-      "https://api.kickoffapi.com/api/v1/fixtures?live=all";
-
-    const response =
-      await fetch(url, {
-        method: "GET",
-        headers: {
-          Accept: "application/json",
-          "x-api-key": apiKey,
-        },
-        cache: "no-store",
-      });
-
-    const text =
-      await response.text();
-
-    let data;
-
-    try {
-      data = JSON.parse(text);
-    } catch {
-      data = {
-        raw: text,
-      };
-    }
-
-    return Response.json(
-      {
-        success: response.ok,
-        status: response.status,
-        results:
-          data?.results ?? null,
-        matchCount:
-          Array.isArray(data?.response)
-            ? data.response.length
-            : 0,
-        rateLimit: {
-          limit:
-            response.headers.get(
-              "X-RateLimit-Limit"
-            ),
-          remaining:
-            response.headers.get(
-              "X-RateLimit-Remaining"
-            ),
-          reset:
-            response.headers.get(
-              "X-RateLimit-Reset"
-            ),
-        },
-        matches:
-          Array.isArray(data?.response)
-            ? data.response.slice(0, 10)
-            : data,
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36",
+        "Accept":
+          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language":
+          "tr-TR,tr;q=0.9,en;q=0.8",
       },
-      {
-        status: response.ok
-          ? 200
-          : response.status,
-      }
-    );
+      cache: "no-store",
+    });
+
+    const html = await response.text();
+
+    return NextResponse.json({
+      success: response.ok,
+      status: response.status,
+      contentType:
+        response.headers.get("content-type"),
+      htmlLength: html.length,
+      containsTff: html.includes("TFF"),
+      containsSuperLig:
+        html.toLowerCase().includes("süper lig"),
+      contains2026:
+        html.includes("2026-2027"),
+      preview:
+        html.substring(0, 500),
+    });
+
   } catch (error) {
-    return Response.json(
+    return NextResponse.json(
       {
         success: false,
-        message:
-          "KickoffAPI bağlantı hatası.",
-        error:
-          error?.message ||
-          "Bilinmeyen hata",
+        error: error.message,
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 }
