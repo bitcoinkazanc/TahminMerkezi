@@ -25,22 +25,16 @@ export default function PredictionsPage() {
         }
       );
 
-      const result =
-        await response.json();
+      const result = await response.json();
 
-      if (
-        !response.ok ||
-        !result.success
-      ) {
+      if (!response.ok || !result.success) {
         throw new Error(
           result.error ||
             "Tahminler alınamadı."
         );
       }
 
-      setPredictions(
-        result.predictions || []
-      );
+      setPredictions(result.predictions || []);
     } catch (err) {
       console.error(
         "Predictions page error:",
@@ -56,19 +50,30 @@ export default function PredictionsPage() {
     }
   }
 
-  function getUserName(prediction) {
-    const user =
-      prediction?.users;
-
-    if (user?.first_name) {
-      return user.first_name;
-    }
+  function getUsername(prediction) {
+    const user = prediction?.users;
 
     if (user?.username) {
       return `@${user.username}`;
     }
 
-    return "Kullanıcı";
+    if (user?.first_name) {
+      return user.first_name;
+    }
+
+    return "Telegram Kullanıcısı";
+  }
+
+  function getAvatarLetter(prediction) {
+    const user = prediction?.users;
+
+    return (
+      user?.username ||
+      user?.first_name ||
+      "T"
+    )
+      .charAt(0)
+      .toUpperCase();
   }
 
   function getPredictionLabel(value) {
@@ -81,37 +86,33 @@ export default function PredictionsPage() {
     return labels[value] || value;
   }
 
-  function getPredictionDescription(value) {
-    const descriptions = {
-      MS1: "Ev sahibi kazanır",
-      MSX: "Beraberlik",
-      MS2: "Deplasman kazanır",
-    };
-
-    return descriptions[value] || "";
-  }
-
   function formatDate(value) {
     if (!value) {
-      return "";
+      return null;
     }
 
     const date = new Date(value);
 
     if (Number.isNaN(date.getTime())) {
-      return "";
+      return null;
     }
 
-    return date.toLocaleString(
-      "tr-TR",
-      {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      }
-    );
+    return {
+      date: date.toLocaleDateString(
+        "tr-TR",
+        {
+          day: "2-digit",
+          month: "short",
+        }
+      ),
+      time: date.toLocaleTimeString(
+        "tr-TR",
+        {
+          hour: "2-digit",
+          minute: "2-digit",
+        }
+      ),
+    };
   }
 
   if (loading) {
@@ -129,9 +130,7 @@ export default function PredictionsPage() {
       <main className="page">
         <div className="page-container">
           <div className="error-box">
-            <h2>
-              Bir sorun oluştu
-            </h2>
+            <h2>Bir sorun oluştu</h2>
 
             <p>{error}</p>
 
@@ -151,12 +150,9 @@ export default function PredictionsPage() {
   return (
     <main className="page">
       <div className="page-container">
-
         <section className="section-card">
           <div className="section-title">
-            <h1>
-              🎯 Tahminler
-            </h1>
+            <h1>🎯 Tahminler</h1>
 
             <p>
               Topluluğun yaptığı son
@@ -187,123 +183,115 @@ export default function PredictionsPage() {
             </div>
           ) : (
             <div className="prediction-feed">
-              {predictions.map(
-                (item) => {
-                  const userName =
-                    getUserName(item);
+              {predictions.map((prediction) => {
+                const match =
+                  prediction?.matches;
 
-                  const match =
-                    item?.matches;
+                if (!match) {
+                  return null;
+                }
 
-                  if (!match) {
-                    return null;
-                  }
+                const user =
+                  prediction?.users;
 
-                  return (
-                    <Link
-                      key={item.id}
-                      href={`/mac/${match.id}`}
-                      className="prediction-feed-card"
-                    >
-                      <div className="prediction-feed-user">
-                        {item?.users
-                          ?.avatar_url ? (
-                          <img
-                            src={
-                              item.users
-                                .avatar_url
-                            }
-                            alt={
-                              userName
-                            }
-                            className="prediction-feed-avatar"
-                          />
-                        ) : (
-                          <div className="prediction-feed-avatar-placeholder">
-                            👤
-                          </div>
-                        )}
+                const username =
+                  getUsername(prediction);
 
-                        <div>
-                          <strong>
-                            {userName}
-                          </strong>
+                const avatarLetter =
+                  getAvatarLetter(prediction);
 
-                          <span>
-                            {formatDate(
-                              item.created_at
-                            )}
-                          </span>
-                        </div>
-                      </div>
+                const formattedDate =
+                  formatDate(
+                    prediction.created_at
+                  );
 
-                      <div className="prediction-feed-match">
-                        <div className="prediction-feed-league">
-                          {match.league ||
-                            "Futbol"}
-                        </div>
-
-                        <div className="prediction-feed-teams">
-                          <span>
-                            {match.home_team}
-                          </span>
-
-                          <strong>
-                            VS
-                          </strong>
-
-                          <span>
-                            {match.away_team}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="prediction-feed-result">
-                        <div>
-                          <strong>
-                            {getPredictionLabel(
-                              item.prediction
-                            )}
-                          </strong>
-
-                          <span>
-                            {getPredictionDescription(
-                              item.prediction
-                            )}
-                          </span>
-                        </div>
-
-                        {item.confidence !==
-                        null ? (
-                          <div className="prediction-feed-confidence">
-                            %{item.confidence}
-                          </div>
-                        ) : null}
-                      </div>
-
-                      {item.message ? (
-                        <div className="prediction-feed-message">
-                          “{item.message}”
-                        </div>
-                      ) : null}
-
-                      <div className="prediction-feed-footer">
+                return (
+                  <Link
+                    key={prediction.id}
+                    href={`/mac/${match.id}`}
+                    className="prediction-message-link"
+                  >
+                    <article className="prediction-message">
+                      <div className="prediction-match-info">
                         <span>
-                          Maça git
+                          {match.home_team}
                         </span>
 
-                        <strong>
-                          →
-                        </strong>
+                        <strong>—</strong>
+
+                        <span>
+                          {match.away_team}
+                        </span>
                       </div>
-                    </Link>
-                  );
-                }
-              )}
+
+                      <div className="prediction-message-main">
+                        <div className="prediction-message-avatar">
+                          {user?.avatar_url ? (
+                            <img
+                              src={
+                                user.avatar_url
+                              }
+                              alt={username}
+                              className="user-avatar"
+                            />
+                          ) : (
+                            <div className="user-avatar-placeholder">
+                              {avatarLetter}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="prediction-message-content">
+                          <div className="prediction-message-top">
+                            <strong>
+                              {username}
+                            </strong>
+                          </div>
+
+                          <div className="prediction-message-result">
+                            <span className="prediction-badge">
+                              {getPredictionLabel(
+                                prediction.prediction
+                              )}
+                            </span>
+
+                            {prediction.confidence !=
+                            null ? (
+                              <span className="prediction-confidence-value">
+                                Güven %
+                                {
+                                  prediction.confidence
+                                }
+                              </span>
+                            ) : null}
+                          </div>
+
+                          {prediction.message ? (
+                            <p className="prediction-message-text">
+                              {prediction.message}
+                            </p>
+                          ) : null}
+
+                          {formattedDate ? (
+                            <div className="prediction-message-date">
+                              {
+                                formattedDate.date
+                              }{" "}
+                              ·{" "}
+                              {
+                                formattedDate.time
+                              }
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                    </article>
+                  </Link>
+                );
+              })}
             </div>
           )}
         </section>
-
       </div>
     </main>
   );
