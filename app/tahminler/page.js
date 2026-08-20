@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Loading from "../../components/Loading";
+import PredictionMessage from "../../components/PredictionMessage";
 
 export default function PredictionsPage() {
   const [predictions, setPredictions] = useState([]);
@@ -48,71 +49,6 @@ export default function PredictionsPage() {
     } finally {
       setLoading(false);
     }
-  }
-
-  function getUsername(prediction) {
-    const user = prediction?.users;
-
-    if (user?.username) {
-      return `@${user.username}`;
-    }
-
-    if (user?.first_name) {
-      return user.first_name;
-    }
-
-    return "Telegram Kullanıcısı";
-  }
-
-  function getAvatarLetter(prediction) {
-    const user = prediction?.users;
-
-    return (
-      user?.username ||
-      user?.first_name ||
-      "T"
-    )
-      .charAt(0)
-      .toUpperCase();
-  }
-
-  function getPredictionLabel(value) {
-    const labels = {
-      MS1: "MS 1",
-      MSX: "MS X",
-      MS2: "MS 2",
-    };
-
-    return labels[value] || value;
-  }
-
-  function formatDate(value) {
-    if (!value) {
-      return null;
-    }
-
-    const date = new Date(value);
-
-    if (Number.isNaN(date.getTime())) {
-      return null;
-    }
-
-    return {
-      date: date.toLocaleDateString(
-        "tr-TR",
-        {
-          day: "2-digit",
-          month: "short",
-        }
-      ),
-      time: date.toLocaleTimeString(
-        "tr-TR",
-        {
-          hour: "2-digit",
-          minute: "2-digit",
-        }
-      ),
-    };
   }
 
   if (loading) {
@@ -182,7 +118,7 @@ export default function PredictionsPage() {
               </Link>
             </div>
           ) : (
-            <div className="prediction-feed">
+            <div className="prediction-list">
               {predictions.map((prediction) => {
                 const match =
                   prediction?.matches;
@@ -191,101 +127,29 @@ export default function PredictionsPage() {
                   return null;
                 }
 
-                const user =
-                  prediction?.users;
-
-                const username =
-                  getUsername(prediction);
-
-                const avatarLetter =
-                  getAvatarLetter(prediction);
-
-                const formattedDate =
-                  formatDate(
-                    prediction.created_at
-                  );
-
                 return (
                   <Link
                     key={prediction.id}
                     href={`/mac/${match.id}`}
-                    className="prediction-message-link"
                   >
-                    <article className="prediction-message">
-                      <div className="prediction-match-info">
-                        <span>
-                          {match.home_team}
-                        </span>
-
-                        <strong>—</strong>
-
-                        <span>
-                          {match.away_team}
-                        </span>
+                    <div>
+                      <div
+                        style={{
+                          marginBottom: "6px",
+                          color: "var(--text-soft)",
+                          fontSize: "11px",
+                          fontWeight: 700,
+                        }}
+                      >
+                        {match.home_team}
+                        {" — "}
+                        {match.away_team}
                       </div>
 
-                      <div className="prediction-message-main">
-                        <div className="prediction-message-avatar">
-                          {user?.avatar_url ? (
-                            <img
-                              src={
-                                user.avatar_url
-                              }
-                              alt={username}
-                              className="user-avatar"
-                            />
-                          ) : (
-                            <div className="user-avatar-placeholder">
-                              {avatarLetter}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="prediction-message-content">
-                          <div className="prediction-message-top">
-                            <strong>
-                              {username}
-                            </strong>
-                          </div>
-
-                          <div className="prediction-message-result">
-                            <span className="prediction-badge">
-                              {getPredictionLabel(
-                                prediction.prediction
-                              )}
-                            </span>
-
-                            {prediction.confidence !=
-                            null ? (
-                              <span className="prediction-confidence-value">
-                                Güven %
-                                {
-                                  prediction.confidence
-                                }
-                              </span>
-                            ) : null}
-                          </div>
-
-                          {prediction.message ? (
-                            <p className="prediction-message-text">
-                              {prediction.message}
-                            </p>
-                          ) : null}
-
-                          {formattedDate ? (
-                            <div className="prediction-message-date">
-                              {
-                                formattedDate.date
-                              }{" "}
-                              ·{" "}
-                              {
-                                formattedDate.time
-                              }
-                            </div>
-                          ) : null}
-                        </div>
-                      </div>
-                    </article>
+                      <PredictionMessage
+                        prediction={prediction}
+                      />
+                    </div>
                   </Link>
                 );
               })}
