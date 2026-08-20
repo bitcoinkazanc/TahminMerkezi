@@ -149,11 +149,8 @@ export default function ProfilePage() {
                     )
                   : "";
 
-                return (
-                  <div
-                    className="my-prediction-item"
-                    key={item.id}
-                  >
+                const content = (
+                  <div className="my-prediction-item">
                     <div className="my-prediction-info">
                       <strong>{matchName}</strong>
 
@@ -167,6 +164,23 @@ export default function ProfilePage() {
                     <div className="my-prediction-value">
                       {predictionLabel}
                     </div>
+                  </div>
+                );
+
+                if (match?.id) {
+                  return (
+                    <Link
+                      key={item.id}
+                      href={`/mac/${match.id}`}
+                    >
+                      {content}
+                    </Link>
+                  );
+                }
+
+                return (
+                  <div key={item.id}>
+                    {content}
                   </div>
                 );
               })}
