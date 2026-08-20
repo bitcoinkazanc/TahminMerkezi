@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { getMatches } from "../../../lib/football-api";
+import {
+  getMatches,
+  getMatch,
+} from "../../../lib/football-api";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -100,6 +103,67 @@ function normalizeMatch(match) {
   };
 }
 
+function getSlugFromMatchUrl(matchUrl) {
+  if (!matchUrl) {
+    return null;
+  }
+
+  const parts =
+    String(matchUrl)
+      .split("/")
+      .filter(Boolean);
+
+  return parts.length > 0
+    ? parts[parts.length - 1]
+    : null;
+}
+
+async function getLiveMinute(
+  match
+) {
+  if (
+    !match ||
+    match.status !== "live" ||
+    !match.url
+  ) {
+    return null;
+  }
+
+  const slug =
+    getSlugFromMatchUrl(
+      match.url
+    );
+
+  if (!slug) {
+    return null;
+  }
+
+  try {
+    const detail =
+      await getMatch(slug);
+
+    const liveMinute =
+      detail?.match?.live_minute;
+
+    if (
+      liveMinute === undefined ||
+      liveMinute === null ||
+      liveMinute === ""
+    ) {
+      return null;
+    }
+
+    return String(liveMinute);
+  } catch (error) {
+    console.error(
+      "Live minute loading error:",
+      error
+    );
+
+    return null;
+  }
+}
+
 export async function GET(request) {
   try {
     const supabase =
@@ -177,11 +241,6 @@ export async function GET(request) {
       }
     }
 
-    /*
-     * Supabase'den en güncel maçları getiriyoruz.
-     * Önceden ascending olduğu için eski maçlar
-     * listenin başına geliyordu.
-     */
     let query =
       supabase
         .from("matches")
@@ -248,11 +307,51 @@ export async function GET(request) {
       );
     }
 
+    let matches =
+      data || [];
+
+    if (matchId && matches.length > 0) {
+      const currentMatch =
+        matches[0];
+
+      if (
+        currentMatch.status ===
+        "live"
+      ) {
+        const sourceMatch =
+          sourceMatches.find(
+            (item) =>
+              String(
+                item?.url || ""
+              ) ===
+              String(
+                currentMatch.external_id ||
+                  ""
+              )
+          );
+
+        if (sourceMatch) {
+          const liveMinute =
+            await getLiveMinute(
+              sourceMatch
+            );
+
+          matches =
+            matches.map(
+              (item) => ({
+                ...item,
+                live_minute:
+                  liveMinute,
+              })
+            );
+        }
+      }
+    }
+
     return NextResponse.json(
       {
         success: true,
-        matches:
-          data || [],
+        matches,
         source:
           "SportScore",
         source_count:
