@@ -128,7 +128,61 @@ export async function POST(request) {
       );
     }
 
-    const allowedPredictions = ["MS1", "MSX", "MS2"];
+    const allowedPredictions = [
+      "MS1",
+      "MSX",
+      "MS2",
+
+      "DC1X",
+      "DC12",
+      "DCX2",
+
+      "U05",
+      "O05",
+      "U15",
+      "O15",
+      "U25",
+      "O25",
+      "U35",
+      "O35",
+      "U45",
+      "O45",
+
+      "HT1",
+      "HTX",
+      "HT2",
+      "HTU05",
+      "HTO05",
+      "HTU15",
+      "HTO15",
+      "HTU25",
+      "HTO25",
+      "HTDC1X",
+      "HTDC12",
+      "HTDCX2",
+
+      "2H1",
+      "2HX",
+      "2H2",
+
+      "ODD",
+      "EVEN",
+      "GOAL_RANGE_0_1",
+      "GOAL_RANGE_2_3",
+      "GOAL_RANGE_4_5",
+      "GOAL_RANGE_6_PLUS",
+
+      "BTTS_YES",
+      "BTTS_NO",
+
+      "FIRST_GOAL_HOME",
+      "FIRST_GOAL_NONE",
+      "FIRST_GOAL_AWAY",
+
+      "MOST_GOALS_1H",
+      "MOST_GOALS_EQUAL",
+      "MOST_GOALS_2H",
+    ];
 
     if (!allowedPredictions.includes(prediction)) {
       return NextResponse.json(
@@ -243,15 +297,19 @@ export async function POST(request) {
       );
     }
 
-    const { data: existingPrediction, error: existingError } = await supabase
-      .from("predictions")
-      .select("id")
-      .eq("user_id", userId)
-      .eq("match_id", matchId)
-      .maybeSingle();
+    const { data: existingPrediction, error: existingError } =
+      await supabase
+        .from("predictions")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("match_id", matchId)
+        .maybeSingle();
 
     if (existingError) {
-      console.error("Existing prediction lookup error:", existingError);
+      console.error(
+        "Existing prediction lookup error:",
+        existingError
+      );
 
       return NextResponse.json(
         {
