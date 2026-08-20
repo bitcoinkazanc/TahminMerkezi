@@ -164,6 +164,117 @@ async function getLiveMinute(
   }
 }
 
+async function evaluateFinishedMatch(
+  supabase,
+  match
+) {
+  if (
+    !match ||
+    match.status !== "finished"
+  ) {
+    return;
+  }
+
+  if (
+    match.home_score === null ||
+    match.away_score === null
+  ) {
+    return;
+  }
+
+  const {
+    data: predictions,
+    error: predictionsError,
+  } = await supabase
+    .from("predictions")
+    .select(`
+      id,
+      prediction,
+      result,
+      points
+    `)
+    .eq("match_id", match.id)
+    .eq("result", "pending");
+
+  if (predictionsError) {
+    console.error(
+      "Finished match predictions lookup error:",
+      predictionsError
+    );
+
+    return;
+  }
+
+  if (
+    !predictions ||
+    predictions.length === 0
+  ) {
+    return;
+  }
+
+  const homeScore =
+    Number(match.home_score);
+
+  const awayScore =
+    Number(match.away_score);
+
+  let matchResult;
+
+  if (homeScore > awayScore) {
+    matchResult = "MS1";
+  } else if (homeScore === awayScore) {
+    matchResult = "MSX";
+  } else {
+    matchResult = "MS2";
+  }
+
+  for (const prediction of predictions) {
+    if (
+      ![
+        "MS1",
+        "MSX",
+        "MS2",
+      ].includes(
+        prediction.prediction
+      )
+    ) {
+      continue;
+    }
+
+    const isCorrect =
+      prediction.prediction ===
+      matchResult;
+
+    const result =
+      isCorrect
+        ? "correct"
+        : "wrong";
+
+    const points =
+      isCorrect
+        ? 10
+        : 0;
+
+    const {
+      error: updateError,
+    } = await supabase
+      .from("predictions")
+      .update({
+        result,
+        points,
+      })
+      .eq("id", prediction.id)
+      .eq("result", "pending");
+
+    if (updateError) {
+      console.error(
+        "Prediction result update error:",
+        updateError
+      );
+    }
+  }
+}
+
 export async function GET(request) {
   try {
     const supabase =
@@ -309,6 +420,18 @@ export async function GET(request) {
 
     let matches =
       data || [];
+
+    for (const match of matches) {
+      if (
+        match.status ===
+        "finished"
+      ) {
+        await evaluateFinishedMatch(
+          supabase,
+          match
+        );
+      }
+    }
 
     if (matchId && matches.length > 0) {
       const currentMatch =
