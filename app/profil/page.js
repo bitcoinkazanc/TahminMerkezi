@@ -83,14 +83,6 @@ export default function ProfilePage() {
   return (
     <main className="page">
       <div className="page-container">
-        <div className="page-header">
-          <div>
-            <span className="page-eyebrow">HESABIM</span>
-            <h1>Profil</h1>
-            <p>TahminMerkezi profilin.</p>
-          </div>
-        </div>
-
         <ProfileCard user={user} />
 
         <section className="profile-stats">
