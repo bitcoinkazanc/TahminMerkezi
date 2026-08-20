@@ -4,6 +4,7 @@ import { getMatches } from "../../../lib/football-api";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -334,14 +335,48 @@ export async function GET(request) {
       );
     }
 
-    return NextResponse.json({
-      success: true,
-      matches: data || [],
-      source: "SportScore",
+    return NextResponse.json(
+      {
+        success: true,
 
-      sportScoreRaw:
-        sportScoreMatches.slice(0, 3),
-    });
+        matches: data || [],
+
+        source: "SportScore",
+
+        DEBUG_SPORTSCORE: {
+          response_keys:
+            Object.keys(
+              sportScoreData || {}
+            ),
+
+          matches_is_array:
+            Array.isArray(
+              sportScoreData?.matches
+            ),
+
+          matches_count:
+            sportScoreMatches.length,
+
+          first_match:
+            sportScoreMatches[0] || null,
+
+          first_match_keys:
+            sportScoreMatches[0]
+              ? Object.keys(
+                  sportScoreMatches[0]
+                )
+              : [],
+        },
+      },
+      {
+        headers: {
+          "Cache-Control":
+            "no-store, no-cache, must-revalidate, proxy-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
+        },
+      }
+    );
   } catch (error) {
     console.error(
       "Matches GET server error:",
