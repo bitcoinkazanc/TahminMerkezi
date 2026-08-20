@@ -23,6 +23,18 @@ export default function ProfileCard({ user }) {
     .charAt(0)
     .toUpperCase();
 
+  function openTelegram() {
+    if (!user.username) {
+      return;
+    }
+
+    window.open(
+      `https://t.me/${user.username}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
+  }
+
   return (
     <section className="profile-card">
       {user.avatar_url ? (
@@ -56,7 +68,17 @@ export default function ProfileCard({ user }) {
 
       <div className="profile-info">
         {user.username ? (
-          <p>@{user.username}</p>
+          <>
+            <p>@{user.username}</p>
+
+            <button
+              type="button"
+              className="primary-button"
+              onClick={openTelegram}
+            >
+              💬 Mesaj Yaz
+            </button>
+          </>
         ) : (
           <p>Telegram kullanıcısı</p>
         )}
