@@ -148,7 +148,7 @@ export default function PredictionsPage() {
                     >
                       {user?.id ? (
                         <Link
-                          href={`/profile?user_id=${encodeURIComponent(
+                          href={`/profil?user_id=${encodeURIComponent(
                             user.id
                           )}`}
                           style={{
