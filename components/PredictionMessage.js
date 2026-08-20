@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 export default function PredictionMessage({
   prediction,
 }) {
@@ -8,6 +10,7 @@ export default function PredictionMessage({
   }
 
   const user = prediction.users;
+  const match = prediction.matches;
 
   const username = user?.username
     ? `@${user.username}`
@@ -98,6 +101,69 @@ export default function PredictionMessage({
           ) : null}
         </div>
       </div>
+
+      {match ? (
+        <div
+          style={{
+            display: "flex",
+            gap: "8px",
+            marginTop: "12px",
+            paddingTop: "10px",
+            borderTop:
+              "1px solid var(--border)",
+          }}
+        >
+          {user?.id ? (
+            <Link
+              href={`/profil?user_id=${encodeURIComponent(
+                user.id
+              )}`}
+              style={{
+                flex: 1,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                minHeight: "34px",
+                padding: "7px 10px",
+                border:
+                  "1px solid var(--border)",
+                borderRadius: "9px",
+                background:
+                  "var(--surface-soft)",
+                color: "var(--text)",
+                fontSize: "11px",
+                fontWeight: 800,
+                textDecoration: "none",
+              }}
+            >
+              👤 Profile Git
+            </Link>
+          ) : null}
+
+          <Link
+            href={`/mac/${match.id}`}
+            style={{
+              flex: 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              minHeight: "34px",
+              padding: "7px 10px",
+              border:
+                "1px solid var(--primary)",
+              borderRadius: "9px",
+              background:
+                "var(--primary)",
+              color: "#fff",
+              fontSize: "11px",
+              fontWeight: 800,
+              textDecoration: "none",
+            }}
+          >
+            ⚽ Maça Git
+          </Link>
+        </div>
+      ) : null}
     </article>
   );
 }
