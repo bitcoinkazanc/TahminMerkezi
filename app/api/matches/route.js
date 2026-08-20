@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { getMatches } from "../../../lib/football-api";
+import {
+  getMatches,
+  getMatch,
+} from "../../../lib/football-api";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -22,107 +24,6 @@ function getSupabase() {
       persistSession: false,
     },
   });
-}
-
-function parseScore(score) {
-  if (
-    score === null ||
-    score === undefined
-  ) {
-    return {
-      home: null,
-      away: null,
-    };
-  }
-
-  if (
-    typeof score === "object" &&
-    !Array.isArray(score)
-  ) {
-    const home =
-      score.home ??
-      score.home_score ??
-      score.homeScore ??
-      score.home_team ??
-      score.homeTeam ??
-      null;
-
-    const away =
-      score.away ??
-      score.away_score ??
-      score.awayScore ??
-      score.away_team ??
-      score.awayTeam ??
-      null;
-
-    if (
-      home !== null &&
-      away !== null
-    ) {
-      return {
-        home: Number(home),
-        away: Number(away),
-      };
-    }
-
-    if (
-      score.current &&
-      typeof score.current === "object"
-    ) {
-      const current =
-        parseScore(score.current);
-
-      if (
-        current.home !== null &&
-        current.away !== null
-      ) {
-        return current;
-      }
-    }
-
-    if (
-      score.display &&
-      typeof score.display === "string"
-    ) {
-      return parseScore(score.display);
-    }
-  }
-
-  if (Array.isArray(score)) {
-    if (score.length >= 2) {
-      const home = Number(score[0]);
-      const away = Number(score[1]);
-
-      if (
-        Number.isFinite(home) &&
-        Number.isFinite(away)
-      ) {
-        return {
-          home,
-          away,
-        };
-      }
-    }
-  }
-
-  if (typeof score === "string") {
-    const match =
-      score.match(
-        /^\s*(\d+)\s*[-:]\s*(\d+)\s*$/
-      );
-
-    if (match) {
-      return {
-        home: Number(match[1]),
-        away: Number(match[2]),
-      };
-    }
-  }
-
-  return {
-    home: null,
-    away: null,
-  };
 }
 
 function normalizeMatch(match) {
@@ -152,9 +53,6 @@ function normalizeMatch(match) {
   ) {
     return null;
   }
-
-  const score =
-    parseScore(match.score);
 
   return {
     external_id:
@@ -187,16 +85,141 @@ function normalizeMatch(match) {
     status,
 
     home_score:
-      score.home,
+      match.home_score !== undefined &&
+      match.home_score !== null
+        ? Number(match.home_score)
+        : null,
 
     away_score:
-      score.away,
+      match.away_score !== undefined &&
+      match.away_score !== null
+        ? Number(match.away_score)
+        : null,
   };
+}
+
+function getMatchSlug(externalId) {
+  if (!externalId) {
+    return null;
+  }
+
+  const value =
+    String(externalId).trim();
+
+  const match =
+    value.match(
+      /\/football\/match\/([^/]+)\/?/
+    );
+
+  return match?.[1] || null;
+}
+
+async function addMatchDetails(matches) {
+  const detailedMatches = [];
+
+  for (const match of matches) {
+    try {
+      const slug =
+        getMatchSlug(
+          match.external_id
+        );
+
+      if (!slug) {
+        detailedMatches.push(match);
+        continue;
+      }
+
+      const detail =
+        await getMatch(slug);
+
+      const detailMatch =
+        detail?.match;
+
+      if (!detailMatch) {
+        detailedMatches.push(match);
+        continue;
+      }
+
+      const homeScore =
+        detailMatch.home_score;
+
+      const awayScore =
+        detailMatch.away_score;
+
+      const validHomeScore =
+        homeScore !== undefined &&
+        homeScore !== null &&
+        homeScore !== "" &&
+        Number.isFinite(
+          Number(homeScore)
+        );
+
+      const validAwayScore =
+        awayScore !== undefined &&
+        awayScore !== null &&
+        awayScore !== "" &&
+        Number.isFinite(
+          Number(awayScore)
+        );
+
+      let status =
+        match.status;
+
+      if (
+        detailMatch.status === "live"
+      ) {
+        status = "live";
+      } else if (
+        detailMatch.status === "finished"
+      ) {
+        status = "finished";
+      } else if (
+        detailMatch.status === "postponed"
+      ) {
+        status = "postponed";
+      } else if (
+        detailMatch.status === "cancelled"
+      ) {
+        status = "cancelled";
+      } else if (
+        detailMatch.status === "scheduled"
+      ) {
+        status = "scheduled";
+      }
+
+      detailedMatches.push({
+        ...match,
+
+        status,
+
+        home_score:
+          validHomeScore
+            ? Number(homeScore)
+            : match.home_score,
+
+        away_score:
+          validAwayScore
+            ? Number(awayScore)
+            : match.away_score,
+      });
+    } catch (error) {
+      console.error(
+        "SportScore match detail error:",
+        match.external_id,
+        error
+      );
+
+      detailedMatches.push(match);
+    }
+  }
+
+  return detailedMatches;
 }
 
 export async function GET(request) {
   try {
-    const supabase = getSupabase();
+    const supabase =
+      getSupabase();
 
     const { searchParams } =
       new URL(request.url);
@@ -240,15 +263,20 @@ export async function GET(request) {
             match.match_date
         );
 
+    const detailedMatches =
+      await addMatchDetails(
+        normalizedMatches
+      );
+
     if (
-      normalizedMatches.length > 0
+      detailedMatches.length > 0
     ) {
       const {
         error: upsertError,
       } = await supabase
         .from("matches")
         .upsert(
-          normalizedMatches,
+          detailedMatches,
           {
             onConflict:
               "external_id",
@@ -335,48 +363,11 @@ export async function GET(request) {
       );
     }
 
-    return NextResponse.json(
-      {
-        success: true,
-
-        matches: data || [],
-
-        source: "SportScore",
-
-        DEBUG_SPORTSCORE: {
-          response_keys:
-            Object.keys(
-              sportScoreData || {}
-            ),
-
-          matches_is_array:
-            Array.isArray(
-              sportScoreData?.matches
-            ),
-
-          matches_count:
-            sportScoreMatches.length,
-
-          first_match:
-            sportScoreMatches[0] || null,
-
-          first_match_keys:
-            sportScoreMatches[0]
-              ? Object.keys(
-                  sportScoreMatches[0]
-                )
-              : [],
-        },
-      },
-      {
-        headers: {
-          "Cache-Control":
-            "no-store, no-cache, must-revalidate, proxy-revalidate",
-          Pragma: "no-cache",
-          Expires: "0",
-        },
-      }
-    );
+    return NextResponse.json({
+      success: true,
+      matches: data || [],
+      source: "SportScore",
+    });
   } catch (error) {
     console.error(
       "Matches GET server error:",
