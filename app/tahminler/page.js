@@ -123,9 +123,6 @@ export default function PredictionsPage() {
                 const match =
                   prediction?.matches;
 
-                const user =
-                  prediction?.users;
-
                 if (!match) {
                   return null;
                 }
@@ -138,62 +135,6 @@ export default function PredictionsPage() {
                     <PredictionMessage
                       prediction={prediction}
                     />
-
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: "8px",
-                        marginTop: "8px",
-                      }}
-                    >
-                      {user?.id ? (
-                        <Link
-                          href={`/profil?user_id=${encodeURIComponent(
-                            user.id
-                          )}`}
-                          style={{
-                            flex: 1,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            minHeight: "34px",
-                            padding: "7px 10px",
-                            border: "1px solid var(--border)",
-                            borderRadius: "9px",
-                            background:
-                              "var(--surface-soft)",
-                            color: "var(--text)",
-                            fontSize: "11px",
-                            fontWeight: 800,
-                            textDecoration: "none",
-                          }}
-                        >
-                          👤 Profile Git
-                        </Link>
-                      ) : null}
-
-                      <Link
-                        href={`/mac/${match.id}`}
-                        style={{
-                          flex: 1,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          minHeight: "34px",
-                          padding: "7px 10px",
-                          border: "1px solid var(--primary)",
-                          borderRadius: "9px",
-                          background:
-                            "var(--primary)",
-                          color: "#fff",
-                          fontSize: "11px",
-                          fontWeight: 800,
-                          textDecoration: "none",
-                        }}
-                      >
-                        ⚽ Maça Git
-                      </Link>
-                    </div>
                   </div>
                 );
               })}
