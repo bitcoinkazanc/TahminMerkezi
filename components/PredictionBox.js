@@ -47,7 +47,8 @@ export default function PredictionBox({
       setSending(true);
       setError("");
 
-      const savedUser = localStorage.getItem("tm_user");
+      const savedUser =
+        localStorage.getItem("tm_user");
 
       if (!savedUser) {
         setError(
@@ -59,29 +60,41 @@ export default function PredictionBox({
       const user = JSON.parse(savedUser);
 
       if (!user?.id) {
-        setError("Kullanıcı bilgisi bulunamadı.");
+        setError(
+          "Kullanıcı bilgisi bulunamadı."
+        );
         return;
       }
 
-      const response = await fetch("/api/predictions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          user_id: user.id,
-          match_id: match.id,
-          prediction,
-          confidence: Number(confidence),
-          message: message.trim() || null,
-        }),
-      });
+      const response = await fetch(
+        "/api/predictions",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            user_id: user.id,
+            match_id: match.id,
+            prediction,
+            confidence: Number(confidence),
+            message:
+              message.trim() || null,
+          }),
+        }
+      );
 
-      const result = await response.json();
+      const result =
+        await response.json();
 
-      if (!response.ok || !result.success) {
+      if (
+        !response.ok ||
+        !result.success
+      ) {
         throw new Error(
-          result.error || "Tahmin gönderilemedi."
+          result.error ||
+            "Tahmin gönderilemedi."
         );
       }
 
@@ -90,10 +103,15 @@ export default function PredictionBox({
       setMessage("");
 
       if (onPredictionCreated) {
-        onPredictionCreated(result.prediction);
+        onPredictionCreated(
+          result.prediction
+        );
       }
     } catch (err) {
-      console.error("Prediction error:", err);
+      console.error(
+        "Prediction error:",
+        err
+      );
 
       setError(
         err.message ||
@@ -109,14 +127,6 @@ export default function PredictionBox({
       className="prediction-box"
       onSubmit={handleSubmit}
     >
-      <div className="prediction-box-header">
-        <h3>Tahminini Yap</h3>
-
-        <p>
-          Maç sonucu için tahminini seç.
-        </p>
-      </div>
-
       <div className="prediction-options">
         {options.map((option) => (
           <button
@@ -128,13 +138,19 @@ export default function PredictionBox({
                 : ""
             }`}
             onClick={() =>
-              setPrediction(option.value)
+              setPrediction(
+                option.value
+              )
             }
             disabled={sending}
           >
-            <strong>{option.label}</strong>
+            <strong>
+              {option.label}
+            </strong>
 
-            <span>{option.description}</span>
+            <span>
+              {option.description}
+            </span>
           </button>
         ))}
       </div>
@@ -145,7 +161,9 @@ export default function PredictionBox({
             Güven Seviyesi
           </label>
 
-          <strong>%{confidence}</strong>
+          <strong>
+            %{confidence}
+          </strong>
         </div>
 
         <input
@@ -155,7 +173,9 @@ export default function PredictionBox({
           max="100"
           value={confidence}
           onChange={(event) =>
-            setConfidence(event.target.value)
+            setConfidence(
+              event.target.value
+            )
           }
           disabled={sending}
         />
@@ -170,7 +190,9 @@ export default function PredictionBox({
           id="prediction-message"
           value={message}
           onChange={(event) =>
-            setMessage(event.target.value)
+            setMessage(
+              event.target.value
+            )
           }
           placeholder="İstersen maç hakkındaki düşünceni yaz..."
           maxLength={2000}
@@ -192,7 +214,9 @@ export default function PredictionBox({
       <button
         type="submit"
         className="primary-button prediction-submit"
-        disabled={sending || !prediction}
+        disabled={
+          sending || !prediction
+        }
       >
         {sending
           ? "Gönderiliyor..."
