@@ -26,6 +26,28 @@ function getSupabase() {
   });
 }
 
+function isAuthorized(request) {
+  const cronSecret =
+    process.env.CRON_SECRET;
+
+  const authHeader =
+    request.headers.get(
+      "authorization"
+    );
+
+  if (
+    !cronSecret ||
+    !authHeader
+  ) {
+    return false;
+  }
+
+  return (
+    authHeader ===
+    `Bearer ${cronSecret}`
+  );
+}
+
 function getSlugFromMatchUrl(matchUrl) {
   if (!matchUrl) {
     return null;
@@ -549,7 +571,20 @@ function getPredictionCorrectness(
   return null;
 }
 
-export async function GET() {
+export async function GET(request) {
+  if (!isAuthorized(request)) {
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          "Unauthorized",
+      },
+      {
+        status: 401,
+      }
+    );
+  }
+
   try {
     const supabase =
       getSupabase();
@@ -920,7 +955,7 @@ export async function GET() {
               wrongError.message,
           },
           {
-            status: 500,
+            status: 500
           }
         );
       }
