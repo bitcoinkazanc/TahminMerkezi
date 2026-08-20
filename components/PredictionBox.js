@@ -6,13 +6,20 @@ export default function PredictionBox({
   match,
   onPredictionCreated,
 }) {
-  const [prediction, setPrediction] = useState("");
-  const [confidence, setConfidence] = useState(50);
-  const [message, setMessage] = useState("");
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState("");
-  const [activeCategory, setActiveCategory] =
-    useState("ms");
+  const [prediction, setPrediction] =
+    useState("");
+
+  const [confidence, setConfidence] =
+    useState(50);
+
+  const [message, setMessage] =
+    useState("");
+
+  const [sending, setSending] =
+    useState(false);
+
+  const [error, setError] =
+    useState("");
 
   const categories = [
     {
@@ -41,7 +48,10 @@ export default function PredictionBox({
     },
   ];
 
-  const predictionCategories = {
+  const [activeCategory, setActiveCategory] =
+    useState("ms");
+
+  const optionsByCategory = {
     ms: [
       {
         value: "MS1",
@@ -62,160 +72,167 @@ export default function PredictionBox({
 
     "double-chance": [
       {
-        value: "DOUBLE_1X",
+        value: "DC1X",
         label: "1-X",
         description:
-          "Ev sahibi veya beraberlik",
+          "Ev sahibi kazanır veya beraberlik",
       },
       {
-        value: "DOUBLE_12",
+        value: "DC12",
         label: "1-2",
         description:
-          "Taraflardan biri kazanır",
+          "Maç berabere bitmez",
       },
       {
-        value: "DOUBLE_X2",
+        value: "DCX2",
         label: "X-2",
         description:
-          "Beraberlik veya deplasman",
+          "Deplasman kazanır veya beraberlik",
       },
     ],
 
     "over-under": [
       {
-        value: "OVER_0_5",
-        label: "0,5 Üst",
-        description:
-          "Toplam gol 1 veya daha fazla",
-      },
-      {
-        value: "UNDER_0_5",
+        value: "U05",
         label: "0,5 Alt",
-        description:
-          "Toplam gol 0",
+        description: "Toplam gol 0",
       },
       {
-        value: "OVER_1_5",
-        label: "1,5 Üst",
-        description:
-          "Toplam gol 2 veya daha fazla",
+        value: "O05",
+        label: "0,5 Üst",
+        description: "En az 1 gol",
       },
       {
-        value: "UNDER_1_5",
+        value: "U15",
         label: "1,5 Alt",
-        description:
-          "Toplam gol 0-1",
+        description: "Toplam 0-1 gol",
       },
       {
-        value: "OVER_2_5",
-        label: "2,5 Üst",
-        description:
-          "Toplam gol 3 veya daha fazla",
+        value: "O15",
+        label: "1,5 Üst",
+        description: "En az 2 gol",
       },
       {
-        value: "UNDER_2_5",
+        value: "U25",
         label: "2,5 Alt",
-        description:
-          "Toplam gol 0-2",
+        description: "Toplam 0-2 gol",
       },
       {
-        value: "OVER_3_5",
-        label: "3,5 Üst",
-        description:
-          "Toplam gol 4 veya daha fazla",
+        value: "O25",
+        label: "2,5 Üst",
+        description: "En az 3 gol",
       },
       {
-        value: "UNDER_3_5",
+        value: "U35",
         label: "3,5 Alt",
-        description:
-          "Toplam gol 0-3",
+        description: "Toplam 0-3 gol",
       },
       {
-        value: "OVER_4_5",
-        label: "4,5 Üst",
-        description:
-          "Toplam gol 5 veya daha fazla",
+        value: "O35",
+        label: "3,5 Üst",
+        description: "En az 4 gol",
       },
       {
-        value: "UNDER_4_5",
+        value: "U45",
         label: "4,5 Alt",
-        description:
-          "Toplam gol 0-4",
+        description: "Toplam 0-4 gol",
+      },
+      {
+        value: "O45",
+        label: "4,5 Üst",
+        description: "En az 5 gol",
       },
     ],
 
     "first-half": [
       {
-        value: "HT_1",
+        value: "HT1",
         label: "İY 1",
         description:
           "Ev sahibi ilk yarıyı kazanır",
       },
       {
-        value: "HT_X",
+        value: "HTX",
         label: "İY X",
         description:
-          "İlk yarı berabere",
+          "İlk yarı beraberlik",
       },
       {
-        value: "HT_2",
+        value: "HT2",
         label: "İY 2",
         description:
           "Deplasman ilk yarıyı kazanır",
       },
       {
-        value: "HT_OVER_0_5",
+        value: "HTU05",
+        label: "İY 0,5 Alt",
+        description: "İlk yarıda 0 gol",
+      },
+      {
+        value: "HTO05",
         label: "İY 0,5 Üst",
         description:
           "İlk yarıda en az 1 gol",
       },
       {
-        value: "HT_UNDER_0_5",
-        label: "İY 0,5 Alt",
-        description:
-          "İlk yarıda gol yok",
-      },
-      {
-        value: "HT_OVER_1_5",
-        label: "İY 1,5 Üst",
-        description:
-          "İlk yarıda en az 2 gol",
-      },
-      {
-        value: "HT_UNDER_1_5",
+        value: "HTU15",
         label: "İY 1,5 Alt",
         description:
           "İlk yarıda 0-1 gol",
       },
       {
-        value: "HT_OVER_2_5",
+        value: "HTO15",
+        label: "İY 1,5 Üst",
+        description:
+          "İlk yarıda en az 2 gol",
+      },
+      {
+        value: "HTU25",
+        label: "İY 2,5 Alt",
+        description:
+          "İlk yarıda 0-2 gol",
+      },
+      {
+        value: "HTO25",
         label: "İY 2,5 Üst",
         description:
           "İlk yarıda en az 3 gol",
       },
       {
-        value: "HT_UNDER_2_5",
-        label: "İY 2,5 Alt",
+        value: "HTDC1X",
+        label: "İY 1-X",
         description:
-          "İlk yarıda 0-2 gol",
+          "İlk yarı 1 veya X",
+      },
+      {
+        value: "HTDC12",
+        label: "İY 1-2",
+        description:
+          "İlk yarı 1 veya 2",
+      },
+      {
+        value: "HTDCX2",
+        label: "İY X-2",
+        description:
+          "İlk yarı X veya 2",
       },
     ],
 
     "second-half": [
       {
-        value: "SECOND_HALF_1",
+        value: "2H1",
         label: "2Y 1",
         description:
           "İkinci yarıyı ev sahibi kazanır",
       },
       {
-        value: "SECOND_HALF_X",
+        value: "2HX",
         label: "2Y X",
         description:
-          "İkinci yarı berabere",
+          "İkinci yarı beraberlik",
       },
       {
-        value: "SECOND_HALF_2",
+        value: "2H2",
         label: "2Y 2",
         description:
           "İkinci yarıyı deplasman kazanır",
@@ -227,13 +244,13 @@ export default function PredictionBox({
         value: "ODD",
         label: "Tek",
         description:
-          "Toplam gol tek sayı",
+          "Toplam gol tek",
       },
       {
         value: "EVEN",
         label: "Çift",
         description:
-          "Toplam gol çift sayı",
+          "Toplam gol çift",
       },
       {
         value: "GOAL_RANGE_0_1",
@@ -269,7 +286,7 @@ export default function PredictionBox({
         value: "BTTS_NO",
         label: "KG Yok",
         description:
-          "En az bir takım gol atamaz",
+          "Takımlardan biri gol atamaz",
       },
       {
         value: "FIRST_GOAL_HOME",
@@ -289,11 +306,29 @@ export default function PredictionBox({
         description:
           "İlk golü deplasman atar",
       },
+      {
+        value: "MOST_GOALS_1H",
+        label: "En Çok Gol 1Y",
+        description:
+          "Daha fazla gol ilk yarıda",
+      },
+      {
+        value: "MOST_GOALS_EQUAL",
+        label: "En Çok Gol Eşit",
+        description:
+          "İki yarıda eşit gol",
+      },
+      {
+        value: "MOST_GOALS_2H",
+        label: "En Çok Gol 2Y",
+        description:
+          "Daha fazla gol ikinci yarıda",
+      },
     ],
   };
 
   const activeOptions =
-    predictionCategories[activeCategory] || [];
+    optionsByCategory[activeCategory] || [];
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -387,43 +422,61 @@ export default function PredictionBox({
     }
   }
 
+  function handleCategoryChange(
+    categoryId
+  ) {
+    setActiveCategory(categoryId);
+    setPrediction("");
+    setError("");
+  }
+
   return (
     <form
       className="prediction-box"
       onSubmit={handleSubmit}
     >
       <div
-        className="prediction-categories"
         style={{
           display: "flex",
           gap: "6px",
           overflowX: "auto",
-          overflowY: "hidden",
-          whiteSpace: "nowrap",
-          paddingBottom: "4px",
-          scrollbarWidth: "none",
+          paddingBottom: "7px",
+          marginBottom: "8px",
+          scrollbarWidth: "thin",
         }}
       >
         {categories.map((category) => (
           <button
             key={category.id}
             type="button"
-            className={`prediction-category ${
-              activeCategory === category.id
-                ? "active"
-                : ""
-            }`}
-            onClick={() => {
-              setActiveCategory(
+            onClick={() =>
+              handleCategoryChange(
                 category.id
-              );
-              setPrediction("");
-              setError("");
-            }}
+              )
+            }
             disabled={sending}
             style={{
-              flex: "0 0 auto",
-              whiteSpace: "nowrap",
+              flexShrink: 0,
+              border:
+                activeCategory ===
+                category.id
+                  ? "1px solid var(--primary)"
+                  : "1px solid var(--border)",
+              borderRadius: "7px",
+              background:
+                activeCategory ===
+                category.id
+                  ? "var(--primary)"
+                  : "var(--surface-soft)",
+              color:
+                activeCategory ===
+                category.id
+                  ? "#fff"
+                  : "var(--text)",
+              padding: "6px 9px",
+              fontSize: "10px",
+              fontWeight: 800,
+              cursor: "pointer",
             }}
           >
             {category.label}
@@ -432,36 +485,74 @@ export default function PredictionBox({
       </div>
 
       <div
-        className="prediction-options"
         style={{
-          height: "320px",
-          maxHeight: "320px",
+          border:
+            "1px solid var(--border)",
+          borderRadius: "9px",
           overflowY: "auto",
-          overflowX: "hidden",
-          paddingRight: "5px",
+          height: "320px",
+          padding: "5px",
+          background:
+            "var(--surface-soft)",
+          scrollbarWidth: "thin",
         }}
       >
         {activeOptions.map((option) => (
           <button
             key={option.value}
             type="button"
-            className={`prediction-option ${
-              prediction === option.value
-                ? "selected"
-                : ""
-            }`}
             onClick={() =>
               setPrediction(
                 option.value
               )
             }
             disabled={sending}
+            style={{
+              width: "100%",
+              minHeight: "30px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent:
+                "space-between",
+              gap: "8px",
+              marginBottom: "4px",
+              padding: "6px 9px",
+              border:
+                prediction === option.value
+                  ? "1px solid var(--primary)"
+                  : "1px solid var(--border)",
+              borderRadius: "6px",
+              background:
+                prediction === option.value
+                  ? "var(--primary)"
+                  : "var(--surface)",
+              color:
+                prediction === option.value
+                  ? "#fff"
+                  : "var(--text)",
+              textAlign: "left",
+              cursor: "pointer",
+            }}
           >
-            <strong>
+            <strong
+              style={{
+                fontSize: "10px",
+                whiteSpace: "nowrap",
+              }}
+            >
               {option.label}
             </strong>
 
-            <span>
+            <span
+              style={{
+                fontSize: "8px",
+                opacity:
+                  prediction === option.value
+                    ? 0.9
+                    : 0.65,
+                textAlign: "right",
+              }}
+            >
               {option.description}
             </span>
           </button>
