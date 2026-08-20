@@ -338,6 +338,9 @@ export async function GET(request) {
       success: true,
       matches: data || [],
       source: "SportScore",
+
+      sportScoreRaw:
+        sportScoreMatches.slice(0, 3),
     });
   } catch (error) {
     console.error(
