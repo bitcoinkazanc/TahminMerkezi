@@ -100,13 +100,39 @@ function normalizeMatch(match) {
   };
 }
 
-export async function GET() {
+export async function GET(request) {
   try {
     const supabase =
       getSupabase();
 
+    const { searchParams } =
+      new URL(request.url);
+
+    const matchId =
+      searchParams.get("id");
+
+    const status =
+      searchParams.get("status");
+
+    const requestedLimit =
+      Number(
+        searchParams.get("limit") || 50
+      );
+
+    const limit =
+      Math.min(
+        Math.max(
+          requestedLimit,
+          1
+        ),
+        50
+      );
+
+    /*
+     * SportScore'dan güncel maçları alıyoruz.
+     */
     const sportScoreData =
-      await getMatches(50);
+      await getMatches(limit);
 
     const sourceMatches =
       Array.isArray(
@@ -116,107 +142,149 @@ export async function GET() {
         : [];
 
     /*
-     * Özellikle skoru olan ilk maçı buluyoruz.
+     * SportScore verisini Supabase formatına
+     * çeviriyoruz.
      */
-    const sourceMatch =
-      sourceMatches.find(
-        (match) =>
-          match?.home_score !== null &&
-          match?.home_score !== undefined &&
-          match?.away_score !== null &&
-          match?.away_score !== undefined
-      );
+    const normalizedMatches =
+      sourceMatches
+        .map(normalizeMatch)
+        .filter(Boolean);
 
-    if (!sourceMatch) {
-      return NextResponse.json({
-        success: false,
-        error:
-          "SportScore cevabında skor bulunan maç bulunamadı.",
-      });
+    /*
+     * Maçları Supabase'e yazıyoruz.
+     *
+     * Aynı external_id mevcutsa kayıt güncellenir.
+     * Böylece maç sonuçlandığında skorlar da
+     * mevcut kayda işlenir.
+     */
+    if (
+      normalizedMatches.length > 0
+    ) {
+      const {
+        error: upsertError,
+      } = await supabase
+        .from("matches")
+        .upsert(
+          normalizedMatches,
+          {
+            onConflict:
+              "external_id",
+          }
+        );
+
+      if (upsertError) {
+        console.error(
+          "Matches upsert error:",
+          upsertError
+        );
+
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              upsertError.message,
+          },
+          {
+            status: 500,
+          }
+        );
+      }
     }
 
     /*
-     * SportScore'dan gelen ham veri.
+     * Güncellenmiş kayıtları Supabase'den
+     * tekrar okuyoruz.
      */
-    const normalizedMatch =
-      normalizeMatch(sourceMatch);
+    let query =
+      supabase
+        .from("matches")
+        .select(`
+          id,
+          external_id,
+          league,
+          league_logo,
+          home_team,
+          away_team,
+          home_logo,
+          away_logo,
+          match_date,
+          status,
+          home_score,
+          away_score,
+          created_at,
+          updated_at
+        `)
+        .order(
+          "match_date",
+          {
+            ascending: true,
+          }
+        )
+        .limit(limit);
 
-    /*
-     * Supabase'e tam olarak hangi nesneyi
-     * gönderdiğimizi görüyoruz.
-     */
+    if (matchId) {
+      query =
+        query.eq(
+          "id",
+          matchId
+        );
+    }
+
+    if (status) {
+      query =
+        query.eq(
+          "status",
+          status
+        );
+    }
+
     const {
       data,
       error,
-    } = await supabase
-      .from("matches")
-      .upsert(
-        normalizedMatch,
-        {
-          onConflict:
-            "external_id",
-        }
-      )
-      .select(`
-        id,
-        external_id,
-        home_team,
-        away_team,
-        status,
-        home_score,
-        away_score
-      `)
-      .single();
+    } = await query;
 
-    return NextResponse.json({
-      success: true,
-
-      sportscore_raw: {
-        home:
-          sourceMatch.home,
-
-        away:
-          sourceMatch.away,
-
-        home_score:
-          sourceMatch.home_score,
-
-        away_score:
-          sourceMatch.away_score,
-
-        status:
-          sourceMatch.status,
-
-        url:
-          sourceMatch.url,
-      },
-
-      normalized_for_supabase:
-        normalizedMatch,
-
-      supabase_result:
-        data,
-
-      supabase_error:
+    if (error) {
+      console.error(
+        "Matches select error:",
         error
-          ? {
-              message:
-                error.message,
+      );
 
-              details:
-                error.details,
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            error.message,
+        },
+        {
+          status: 500,
+        }
+      );
+    }
 
-              hint:
-                error.hint,
-
-              code:
-                error.code,
-            }
-          : null,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        matches:
+          data || [],
+        source:
+          "SportScore",
+        source_count:
+          sourceMatches.length,
+      },
+      {
+        headers: {
+          "Cache-Control":
+            "no-store, no-cache, must-revalidate, proxy-revalidate",
+          Pragma:
+            "no-cache",
+          Expires:
+            "0",
+        },
+      }
+    );
   } catch (error) {
     console.error(
-      "Score debug error:",
+      "Matches GET error:",
       error
     );
 
@@ -225,7 +293,229 @@ export async function GET() {
         success: false,
         error:
           error?.message ||
-          "Test sırasında hata oluştu.",
+          "Maçlar alınırken hata oluştu.",
+      },
+      {
+        status: 500,
+      }
+    );
+  }
+}
+
+export async function POST(request) {
+  try {
+    const body =
+      await request.json();
+
+    const {
+      external_id,
+      league,
+      league_logo,
+      home_team,
+      away_team,
+      home_logo,
+      away_logo,
+      match_date,
+      status = "scheduled",
+      home_score,
+      away_score,
+    } = body || {};
+
+    if (
+      !home_team ||
+      !away_team ||
+      !match_date
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Ev sahibi, deplasman ve maç tarihi zorunludur.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const parsedDate =
+      new Date(match_date);
+
+    if (
+      Number.isNaN(
+        parsedDate.getTime()
+      )
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Geçersiz maç tarihi.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const validStatuses = [
+      "scheduled",
+      "upcoming",
+      "live",
+      "finished",
+      "postponed",
+      "cancelled",
+    ];
+
+    if (
+      !validStatuses.includes(
+        status
+      )
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Geçersiz maç durumu.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const supabase =
+      getSupabase();
+
+    const matchData = {
+      external_id:
+        external_id || null,
+
+      league:
+        league || null,
+
+      league_logo:
+        league_logo || null,
+
+      home_team:
+        String(
+          home_team
+        ).trim(),
+
+      away_team:
+        String(
+          away_team
+        ).trim(),
+
+      home_logo:
+        home_logo || null,
+
+      away_logo:
+        away_logo || null,
+
+      match_date:
+        parsedDate.toISOString(),
+
+      status,
+
+      home_score:
+        toScore(home_score),
+
+      away_score:
+        toScore(away_score),
+    };
+
+    let result;
+
+    if (external_id) {
+      result =
+        await supabase
+          .from("matches")
+          .upsert(
+            matchData,
+            {
+              onConflict:
+                "external_id",
+            }
+          )
+          .select(`
+            id,
+            external_id,
+            league,
+            league_logo,
+            home_team,
+            away_team,
+            home_logo,
+            away_logo,
+            match_date,
+            status,
+            home_score,
+            away_score,
+            created_at,
+            updated_at
+          `)
+          .single();
+    } else {
+      result =
+        await supabase
+          .from("matches")
+          .insert(
+            matchData
+          )
+          .select(`
+            id,
+            external_id,
+            league,
+            league_logo,
+            home_team,
+            away_team,
+            home_logo,
+            away_logo,
+            match_date,
+            status,
+            home_score,
+            away_score,
+            created_at,
+            updated_at
+          `)
+          .single();
+    }
+
+    if (result.error) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            result.error.message,
+        },
+        {
+          status: 500,
+        }
+      );
+    }
+
+    return NextResponse.json(
+      {
+        success: true,
+        match:
+          result.data,
+      },
+      {
+        status: 201,
+      }
+    );
+  } catch (error) {
+    console.error(
+      "Matches POST error:",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          error?.message ||
+          "Maç kaydedilirken hata oluştu.",
       },
       {
         status: 500,
