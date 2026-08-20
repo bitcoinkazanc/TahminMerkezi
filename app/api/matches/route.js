@@ -318,15 +318,27 @@ export async function GET(request) {
         .map(normalizeMatch)
         .filter(Boolean);
 
+    const uniqueMatches =
+      Array.from(
+        new Map(
+          normalizedMatches.map(
+            (match) => [
+              match.external_id,
+              match,
+            ]
+          )
+        ).values()
+      );
+
     if (
-      normalizedMatches.length > 0
+      uniqueMatches.length > 0
     ) {
       const {
         error: upsertError,
       } = await supabase
         .from("matches")
         .upsert(
-          normalizedMatches,
+          uniqueMatches,
           {
             onConflict:
               "external_id",
