@@ -9,8 +9,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 function getSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url =
+    process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+  const key =
+    process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!url || !key) {
     throw new Error(
@@ -58,20 +61,23 @@ function normalizeMatch(match) {
     external_id:
       String(externalId),
 
-    league: match.competition
-      ? String(match.competition)
-      : null,
+    league:
+      match.competition
+        ? String(match.competition)
+        : null,
 
     league_logo:
       match.competition_logo || null,
 
-    home_team: match.home
-      ? String(match.home).trim()
-      : null,
+    home_team:
+      match.home
+        ? String(match.home).trim()
+        : null,
 
-    away_team: match.away
-      ? String(match.away).trim()
-      : null,
+    away_team:
+      match.away
+        ? String(match.away).trim()
+        : null,
 
     home_logo:
       match.home_logo || null,
@@ -84,17 +90,8 @@ function normalizeMatch(match) {
 
     status,
 
-    home_score:
-      match.home_score !== undefined &&
-      match.home_score !== null
-        ? Number(match.home_score)
-        : null,
-
-    away_score:
-      match.away_score !== undefined &&
-      match.away_score !== null
-        ? Number(match.away_score)
-        : null,
+    home_score: null,
+    away_score: null,
   };
 }
 
@@ -108,109 +105,103 @@ function getMatchSlug(externalId) {
 
   const match =
     value.match(
-      /\/football\/match\/([^/]+)\/?/
+      /\/football\/match\/([^/]+)\/?$/
     );
 
   return match?.[1] || null;
+}
+
+async function getDetailedScore(match) {
+  const slug =
+    getMatchSlug(
+      match.external_id
+    );
+
+  if (!slug) {
+    return match;
+  }
+
+  try {
+    const detail =
+      await getMatch(slug);
+
+    const detailMatch =
+      detail?.match;
+
+    if (!detailMatch) {
+      return match;
+    }
+
+    const homeScore =
+      detailMatch.home_score;
+
+    const awayScore =
+      detailMatch.away_score;
+
+    const hasHomeScore =
+      homeScore !== undefined &&
+      homeScore !== null &&
+      homeScore !== "" &&
+      Number.isFinite(
+        Number(homeScore)
+      );
+
+    const hasAwayScore =
+      awayScore !== undefined &&
+      awayScore !== null &&
+      awayScore !== "" &&
+      Number.isFinite(
+        Number(awayScore)
+      );
+
+    let status =
+      match.status;
+
+    if (
+      detailMatch.status
+    ) {
+      status =
+        detailMatch.status;
+    }
+
+    return {
+      ...match,
+
+      status,
+
+      home_score:
+        hasHomeScore
+          ? Number(homeScore)
+          : null,
+
+      away_score:
+        hasAwayScore
+          ? Number(awayScore)
+          : null,
+    };
+  } catch (error) {
+    console.error(
+      "SportScore detay hatası:",
+      slug,
+      error
+    );
+
+    return match;
+  }
 }
 
 async function addMatchDetails(matches) {
   const detailedMatches = [];
 
   for (const match of matches) {
-    try {
-      const slug =
-        getMatchSlug(
-          match.external_id
-        );
-
-      if (!slug) {
-        detailedMatches.push(match);
-        continue;
-      }
-
-      const detail =
-        await getMatch(slug);
-
-      const detailMatch =
-        detail?.match;
-
-      if (!detailMatch) {
-        detailedMatches.push(match);
-        continue;
-      }
-
-      const homeScore =
-        detailMatch.home_score;
-
-      const awayScore =
-        detailMatch.away_score;
-
-      const validHomeScore =
-        homeScore !== undefined &&
-        homeScore !== null &&
-        homeScore !== "" &&
-        Number.isFinite(
-          Number(homeScore)
-        );
-
-      const validAwayScore =
-        awayScore !== undefined &&
-        awayScore !== null &&
-        awayScore !== "" &&
-        Number.isFinite(
-          Number(awayScore)
-        );
-
-      let status =
-        match.status;
-
-      if (
-        detailMatch.status === "live"
-      ) {
-        status = "live";
-      } else if (
-        detailMatch.status === "finished"
-      ) {
-        status = "finished";
-      } else if (
-        detailMatch.status === "postponed"
-      ) {
-        status = "postponed";
-      } else if (
-        detailMatch.status === "cancelled"
-      ) {
-        status = "cancelled";
-      } else if (
-        detailMatch.status === "scheduled"
-      ) {
-        status = "scheduled";
-      }
-
-      detailedMatches.push({
-        ...match,
-
-        status,
-
-        home_score:
-          validHomeScore
-            ? Number(homeScore)
-            : match.home_score,
-
-        away_score:
-          validAwayScore
-            ? Number(awayScore)
-            : match.away_score,
-      });
-    } catch (error) {
-      console.error(
-        "SportScore match detail error:",
-        match.external_id,
-        error
+    const detailedMatch =
+      await getDetailedScore(
+        match
       );
 
-      detailedMatches.push(match);
-    }
+    detailedMatches.push(
+      detailedMatch
+    );
   }
 
   return detailedMatches;
@@ -230,18 +221,28 @@ export async function GET(request) {
     const status =
       searchParams.get("status");
 
-    const limitParam = Number(
-      searchParams.get("limit") || 50
-    );
+    const limitParam =
+      Number(
+        searchParams.get(
+          "limit"
+        ) || 50
+      );
 
-    const limit = Math.min(
-      Math.max(limitParam, 1),
-      100
-    );
+    const limit =
+      Math.min(
+        Math.max(
+          limitParam,
+          1
+        ),
+        100
+      );
 
     const sportScoreData =
       await getMatches(
-        Math.min(limit, 50)
+        Math.min(
+          limit,
+          50
+        )
       );
 
     const sportScoreMatches =
@@ -285,7 +286,7 @@ export async function GET(request) {
 
       if (upsertError) {
         console.error(
-          "SportScore matches upsert error:",
+          "Matches upsert error:",
           upsertError
         );
 
@@ -302,28 +303,32 @@ export async function GET(request) {
       }
     }
 
-    let query = supabase
-      .from("matches")
-      .select(`
-        id,
-        external_id,
-        league,
-        league_logo,
-        home_team,
-        away_team,
-        home_logo,
-        away_logo,
-        match_date,
-        status,
-        home_score,
-        away_score,
-        created_at,
-        updated_at
-      `)
-      .order("match_date", {
-        ascending: true,
-      })
-      .limit(limit);
+    let query =
+      supabase
+        .from("matches")
+        .select(`
+          id,
+          external_id,
+          league,
+          league_logo,
+          home_team,
+          away_team,
+          home_logo,
+          away_logo,
+          match_date,
+          status,
+          home_score,
+          away_score,
+          created_at,
+          updated_at
+        `)
+        .order(
+          "match_date",
+          {
+            ascending: true,
+          }
+        )
+        .limit(limit);
 
     if (matchId) {
       query =
@@ -355,7 +360,8 @@ export async function GET(request) {
       return NextResponse.json(
         {
           success: false,
-          error: error.message,
+          error:
+            error.message,
         },
         {
           status: 500,
@@ -363,11 +369,25 @@ export async function GET(request) {
       );
     }
 
-    return NextResponse.json({
-      success: true,
-      matches: data || [],
-      source: "SportScore",
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        matches:
+          data || [],
+        source:
+          "SportScore",
+      },
+      {
+        headers: {
+          "Cache-Control":
+            "no-store, no-cache, must-revalidate, proxy-revalidate",
+          Pragma:
+            "no-cache",
+          Expires:
+            "0",
+        },
+      }
+    );
   } catch (error) {
     console.error(
       "Matches GET server error:",
@@ -431,7 +451,9 @@ export async function POST(request) {
     ];
 
     if (
-      !validStatuses.includes(status)
+      !validStatuses.includes(
+        status
+      )
     ) {
       return NextResponse.json(
         {
@@ -479,10 +501,14 @@ export async function POST(request) {
         league_logo || null,
 
       home_team:
-        String(home_team).trim(),
+        String(
+          home_team
+        ).trim(),
 
       away_team:
-        String(away_team).trim(),
+        String(
+          away_team
+        ).trim(),
 
       home_logo:
         home_logo || null,
@@ -573,7 +599,8 @@ export async function POST(request) {
     return NextResponse.json(
       {
         success: true,
-        match: result.data,
+        match:
+          result.data,
       },
       {
         status: 201,
