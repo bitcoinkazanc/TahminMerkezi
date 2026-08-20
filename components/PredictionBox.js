@@ -65,19 +65,19 @@ export default function PredictionBox({
         value: "DOUBLE_1X",
         label: "1-X",
         description:
-          "Ev sahibi kazanır veya beraberlik",
+          "Ev sahibi veya beraberlik",
       },
       {
         value: "DOUBLE_12",
         label: "1-2",
         description:
-          "Ev sahibi veya deplasman kazanır",
+          "Taraflardan biri kazanır",
       },
       {
         value: "DOUBLE_X2",
         label: "X-2",
         description:
-          "Beraberlik veya deplasman kazanır",
+          "Beraberlik veya deplasman",
       },
     ],
 
@@ -392,7 +392,18 @@ export default function PredictionBox({
       className="prediction-box"
       onSubmit={handleSubmit}
     >
-      <div className="prediction-categories">
+      <div
+        className="prediction-categories"
+        style={{
+          display: "flex",
+          gap: "6px",
+          overflowX: "auto",
+          overflowY: "hidden",
+          whiteSpace: "nowrap",
+          paddingBottom: "4px",
+          scrollbarWidth: "none",
+        }}
+      >
         {categories.map((category) => (
           <button
             key={category.id}
@@ -410,6 +421,10 @@ export default function PredictionBox({
               setError("");
             }}
             disabled={sending}
+            style={{
+              flex: "0 0 auto",
+              whiteSpace: "nowrap",
+            }}
           >
             {category.label}
           </button>
@@ -419,10 +434,11 @@ export default function PredictionBox({
       <div
         className="prediction-options"
         style={{
+          height: "320px",
           maxHeight: "320px",
           overflowY: "auto",
           overflowX: "hidden",
-          paddingRight: "4px",
+          paddingRight: "5px",
         }}
       >
         {activeOptions.map((option) => (
