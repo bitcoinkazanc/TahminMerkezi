@@ -6,57 +6,43 @@ export default function PredictionBox({
   match,
   onPredictionCreated,
 }) {
-  const [prediction, setPrediction] =
-    useState("");
-
-  const [confidence, setConfidence] =
-    useState(50);
-
-  const [message, setMessage] =
-    useState("");
-
-  const [sending, setSending] =
-    useState(false);
-
-  const [error, setError] =
-    useState("");
+  const [prediction, setPrediction] = useState("");
+  const [confidence, setConfidence] = useState(50);
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
+  const [activeCategory, setActiveCategory] =
+    useState("ms");
 
   const categories = [
     {
-      id: "match-result",
-      label: "Maç Sonucu",
+      id: "ms",
+      label: "🏆 MS",
     },
     {
       id: "double-chance",
-      label: "Çifte Şans",
+      label: "🎯 Çifte Şans",
     },
     {
-      id: "goals",
-      label: "Gol",
+      id: "over-under",
+      label: "⬆️ Üst/Alt",
     },
     {
       id: "first-half",
-      label: "1. Yarı",
+      label: "🕐 1. Yarı",
     },
     {
       id: "second-half",
-      label: "2. Yarı",
+      label: "🕐 2. Yarı",
     },
     {
-      id: "both-teams",
-      label: "KG",
-    },
-    {
-      id: "special",
-      label: "Özel",
+      id: "other",
+      label: "🎯 Diğer",
     },
   ];
 
-  const [activeCategory, setActiveCategory] =
-    useState("match-result");
-
-  const optionsByCategory = {
-    "match-result": [
+  const predictionCategories = {
+    ms: [
       {
         value: "MS1",
         label: "MS 1",
@@ -76,236 +62,238 @@ export default function PredictionBox({
 
     "double-chance": [
       {
-        value: "DC1X",
+        value: "DOUBLE_1X",
         label: "1-X",
         description:
           "Ev sahibi kazanır veya beraberlik",
       },
       {
-        value: "DC12",
+        value: "DOUBLE_12",
         label: "1-2",
         description:
-          "Maç berabere bitmez",
+          "Ev sahibi veya deplasman kazanır",
       },
       {
-        value: "DCX2",
+        value: "DOUBLE_X2",
         label: "X-2",
         description:
-          "Deplasman kazanır veya beraberlik",
+          "Beraberlik veya deplasman kazanır",
       },
     ],
 
-    goals: [
+    "over-under": [
       {
-        value: "U05",
-        label: "0,5 Alt",
-        description: "Toplam gol 0",
-      },
-      {
-        value: "O05",
+        value: "OVER_0_5",
         label: "0,5 Üst",
-        description: "En az 1 gol",
+        description:
+          "Toplam gol 1 veya daha fazla",
       },
       {
-        value: "U15",
-        label: "1,5 Alt",
-        description: "Toplam 0-1 gol",
+        value: "UNDER_0_5",
+        label: "0,5 Alt",
+        description:
+          "Toplam gol 0",
       },
       {
-        value: "O15",
+        value: "OVER_1_5",
         label: "1,5 Üst",
-        description: "En az 2 gol",
+        description:
+          "Toplam gol 2 veya daha fazla",
       },
       {
-        value: "U25",
-        label: "2,5 Alt",
-        description: "Toplam 0-2 gol",
+        value: "UNDER_1_5",
+        label: "1,5 Alt",
+        description:
+          "Toplam gol 0-1",
       },
       {
-        value: "O25",
+        value: "OVER_2_5",
         label: "2,5 Üst",
-        description: "En az 3 gol",
+        description:
+          "Toplam gol 3 veya daha fazla",
       },
       {
-        value: "U35",
-        label: "3,5 Alt",
-        description: "Toplam 0-3 gol",
+        value: "UNDER_2_5",
+        label: "2,5 Alt",
+        description:
+          "Toplam gol 0-2",
       },
       {
-        value: "O35",
+        value: "OVER_3_5",
         label: "3,5 Üst",
-        description: "En az 4 gol",
+        description:
+          "Toplam gol 4 veya daha fazla",
       },
       {
-        value: "U45",
-        label: "4,5 Alt",
-        description: "Toplam 0-4 gol",
+        value: "UNDER_3_5",
+        label: "3,5 Alt",
+        description:
+          "Toplam gol 0-3",
       },
       {
-        value: "O45",
+        value: "OVER_4_5",
         label: "4,5 Üst",
-        description: "En az 5 gol",
+        description:
+          "Toplam gol 5 veya daha fazla",
+      },
+      {
+        value: "UNDER_4_5",
+        label: "4,5 Alt",
+        description:
+          "Toplam gol 0-4",
       },
     ],
 
     "first-half": [
       {
-        value: "HT1",
-        label: "1. Yarı 1",
-        description: "Ev sahibi önde",
+        value: "HT_1",
+        label: "İY 1",
+        description:
+          "Ev sahibi ilk yarıyı kazanır",
       },
       {
-        value: "HTX",
-        label: "1. Yarı X",
-        description: "İlk yarı beraberlik",
+        value: "HT_X",
+        label: "İY X",
+        description:
+          "İlk yarı berabere",
       },
       {
-        value: "HT2",
-        label: "1. Yarı 2",
-        description: "Deplasman önde",
+        value: "HT_2",
+        label: "İY 2",
+        description:
+          "Deplasman ilk yarıyı kazanır",
       },
       {
-        value: "HTU05",
-        label: "1. Yarı 0,5 Alt",
-        description: "0 gol",
+        value: "HT_OVER_0_5",
+        label: "İY 0,5 Üst",
+        description:
+          "İlk yarıda en az 1 gol",
       },
       {
-        value: "HTO05",
-        label: "1. Yarı 0,5 Üst",
-        description: "En az 1 gol",
+        value: "HT_UNDER_0_5",
+        label: "İY 0,5 Alt",
+        description:
+          "İlk yarıda gol yok",
       },
       {
-        value: "HTU15",
-        label: "1. Yarı 1,5 Alt",
-        description: "0-1 gol",
+        value: "HT_OVER_1_5",
+        label: "İY 1,5 Üst",
+        description:
+          "İlk yarıda en az 2 gol",
       },
       {
-        value: "HTO15",
-        label: "1. Yarı 1,5 Üst",
-        description: "En az 2 gol",
+        value: "HT_UNDER_1_5",
+        label: "İY 1,5 Alt",
+        description:
+          "İlk yarıda 0-1 gol",
       },
       {
-        value: "HTU25",
-        label: "1. Yarı 2,5 Alt",
-        description: "0-2 gol",
+        value: "HT_OVER_2_5",
+        label: "İY 2,5 Üst",
+        description:
+          "İlk yarıda en az 3 gol",
       },
       {
-        value: "HTO25",
-        label: "1. Yarı 2,5 Üst",
-        description: "En az 3 gol",
-      },
-      {
-        value: "HTDC1X",
-        label: "1. Yarı 1-X",
-        description: "1 veya X",
-      },
-      {
-        value: "HTDC12",
-        label: "1. Yarı 1-2",
-        description: "1 veya 2",
-      },
-      {
-        value: "HTDCX2",
-        label: "1. Yarı X-2",
-        description: "X veya 2",
+        value: "HT_UNDER_2_5",
+        label: "İY 2,5 Alt",
+        description:
+          "İlk yarıda 0-2 gol",
       },
     ],
 
     "second-half": [
       {
-        value: "2H1",
-        label: "2. Yarı 1",
-        description: "Ev sahibi kazanır",
+        value: "SECOND_HALF_1",
+        label: "2Y 1",
+        description:
+          "İkinci yarıyı ev sahibi kazanır",
       },
       {
-        value: "2HX",
-        label: "2. Yarı X",
-        description: "İkinci yarı beraberlik",
+        value: "SECOND_HALF_X",
+        label: "2Y X",
+        description:
+          "İkinci yarı berabere",
       },
       {
-        value: "2H2",
-        label: "2. Yarı 2",
-        description: "Deplasman kazanır",
+        value: "SECOND_HALF_2",
+        label: "2Y 2",
+        description:
+          "İkinci yarıyı deplasman kazanır",
       },
     ],
 
-    "both-teams": [
-      {
-        value: "BTTS_YES",
-        label: "KG Var",
-        description: "İki takım da gol atar",
-      },
-      {
-        value: "BTTS_NO",
-        label: "KG Yok",
-        description: "Takımlardan biri gol atamaz",
-      },
-      {
-        value: "HT_BTTS_YES",
-        label: "1. Yarı KG Var",
-        description:
-          "İlk yarıda iki takım da gol atar",
-      },
-      {
-        value: "HT_BTTS_NO",
-        label: "1. Yarı KG Yok",
-        description:
-          "İlk yarıda iki takım birlikte gol atamaz",
-      },
-    ],
-
-    special: [
+    other: [
       {
         value: "ODD",
         label: "Tek",
-        description: "Toplam gol tek",
+        description:
+          "Toplam gol tek sayı",
       },
       {
         value: "EVEN",
         label: "Çift",
-        description: "Toplam gol çift",
+        description:
+          "Toplam gol çift sayı",
       },
       {
-        value: "GOAL_HOME",
+        value: "GOAL_RANGE_0_1",
+        label: "0-1 Gol",
+        description:
+          "Toplam 0 veya 1 gol",
+      },
+      {
+        value: "GOAL_RANGE_2_3",
+        label: "2-3 Gol",
+        description:
+          "Toplam 2 veya 3 gol",
+      },
+      {
+        value: "GOAL_RANGE_4_5",
+        label: "4-5 Gol",
+        description:
+          "Toplam 4 veya 5 gol",
+      },
+      {
+        value: "GOAL_RANGE_6_PLUS",
+        label: "6+ Gol",
+        description:
+          "Toplam 6 veya daha fazla gol",
+      },
+      {
+        value: "BTTS_YES",
+        label: "KG Var",
+        description:
+          "İki takım da gol atar",
+      },
+      {
+        value: "BTTS_NO",
+        label: "KG Yok",
+        description:
+          "En az bir takım gol atamaz",
+      },
+      {
+        value: "FIRST_GOAL_HOME",
         label: "İlk Gol 1",
         description:
           "İlk golü ev sahibi atar",
       },
       {
-        value: "GOAL_NONE",
-        label: "İlk Gol Yok",
+        value: "FIRST_GOAL_NONE",
+        label: "İlk Gol Olmaz",
         description:
           "Maçta gol olmaz",
       },
       {
-        value: "GOAL_AWAY",
+        value: "FIRST_GOAL_AWAY",
         label: "İlk Gol 2",
         description:
           "İlk golü deplasman atar",
-      },
-      {
-        value: "MOST_GOALS_1H",
-        label: "En Çok Gol 1. Yarı",
-        description:
-          "Daha fazla gol ilk yarıda",
-      },
-      {
-        value: "MOST_GOALS_EQUAL",
-        label: "En Çok Gol Eşit",
-        description:
-          "İki yarıda eşit gol",
-      },
-      {
-        value: "MOST_GOALS_2H",
-        label: "En Çok Gol 2. Yarı",
-        description:
-          "Daha fazla gol ikinci yarıda",
       },
     ],
   };
 
   const activeOptions =
-    optionsByCategory[activeCategory] || [];
+    predictionCategories[activeCategory] || [];
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -399,62 +387,29 @@ export default function PredictionBox({
     }
   }
 
-  function handleCategoryChange(
-    categoryId
-  ) {
-    setActiveCategory(categoryId);
-    setPrediction("");
-    setError("");
-  }
-
   return (
     <form
       className="prediction-box"
       onSubmit={handleSubmit}
     >
-      <div
-        style={{
-          display: "flex",
-          gap: "6px",
-          overflowX: "auto",
-          paddingBottom: "7px",
-          marginBottom: "8px",
-          scrollbarWidth: "thin",
-        }}
-      >
+      <div className="prediction-categories">
         {categories.map((category) => (
           <button
             key={category.id}
             type="button"
-            onClick={() =>
-              handleCategoryChange(
+            className={`prediction-category ${
+              activeCategory === category.id
+                ? "active"
+                : ""
+            }`}
+            onClick={() => {
+              setActiveCategory(
                 category.id
-              )
-            }
-            disabled={sending}
-            style={{
-              flexShrink: 0,
-              border:
-                activeCategory ===
-                category.id
-                  ? "1px solid var(--primary)"
-                  : "1px solid var(--border)",
-              borderRadius: "7px",
-              background:
-                activeCategory ===
-                category.id
-                  ? "var(--primary)"
-                  : "var(--surface-soft)",
-              color:
-                activeCategory ===
-                category.id
-                  ? "#fff"
-                  : "var(--text)",
-              padding: "6px 9px",
-              fontSize: "10px",
-              fontWeight: 800,
-              cursor: "pointer",
+              );
+              setPrediction("");
+              setError("");
             }}
+            disabled={sending}
           >
             {category.label}
           </button>
@@ -462,74 +417,35 @@ export default function PredictionBox({
       </div>
 
       <div
+        className="prediction-options"
         style={{
-          border:
-            "1px solid var(--border)",
-          borderRadius: "9px",
+          maxHeight: "320px",
           overflowY: "auto",
-          height: "320px",
-          padding: "5px",
-          background:
-            "var(--surface-soft)",
-          scrollbarWidth: "thin",
+          overflowX: "hidden",
+          paddingRight: "4px",
         }}
       >
         {activeOptions.map((option) => (
           <button
             key={option.value}
             type="button"
+            className={`prediction-option ${
+              prediction === option.value
+                ? "selected"
+                : ""
+            }`}
             onClick={() =>
               setPrediction(
                 option.value
               )
             }
             disabled={sending}
-            style={{
-              width: "100%",
-              minHeight: "30px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent:
-                "space-between",
-              gap: "8px",
-              marginBottom: "4px",
-              padding: "6px 9px",
-              border:
-                prediction === option.value
-                  ? "1px solid var(--primary)"
-                  : "1px solid var(--border)",
-              borderRadius: "6px",
-              background:
-                prediction === option.value
-                  ? "var(--primary)"
-                  : "var(--surface)",
-              color:
-                prediction === option.value
-                  ? "#fff"
-                  : "var(--text)",
-              textAlign: "left",
-              cursor: "pointer",
-            }}
           >
-            <strong
-              style={{
-                fontSize: "10px",
-                whiteSpace: "nowrap",
-              }}
-            >
+            <strong>
               {option.label}
             </strong>
 
-            <span
-              style={{
-                fontSize: "8px",
-                opacity:
-                  prediction === option.value
-                    ? 0.9
-                    : 0.65,
-                textAlign: "right",
-              }}
-            >
+            <span>
               {option.description}
             </span>
           </button>
