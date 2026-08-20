@@ -123,34 +123,78 @@ export default function PredictionsPage() {
                 const match =
                   prediction?.matches;
 
+                const user =
+                  prediction?.users;
+
                 if (!match) {
                   return null;
                 }
 
                 return (
-                  <Link
+                  <div
                     key={prediction.id}
-                    href={`/mac/${match.id}`}
+                    className="prediction-feed-item"
                   >
-                    <div>
-                      <div
+                    <PredictionMessage
+                      prediction={prediction}
+                    />
+
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: "8px",
+                        marginTop: "8px",
+                      }}
+                    >
+                      {user?.id ? (
+                        <Link
+                          href={`/profile?user_id=${encodeURIComponent(
+                            user.id
+                          )}`}
+                          style={{
+                            flex: 1,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            minHeight: "34px",
+                            padding: "7px 10px",
+                            border: "1px solid var(--border)",
+                            borderRadius: "9px",
+                            background:
+                              "var(--surface-soft)",
+                            color: "var(--text)",
+                            fontSize: "11px",
+                            fontWeight: 800,
+                            textDecoration: "none",
+                          }}
+                        >
+                          👤 Profile Git
+                        </Link>
+                      ) : null}
+
+                      <Link
+                        href={`/mac/${match.id}`}
                         style={{
-                          marginBottom: "6px",
-                          color: "var(--text-soft)",
+                          flex: 1,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          minHeight: "34px",
+                          padding: "7px 10px",
+                          border: "1px solid var(--primary)",
+                          borderRadius: "9px",
+                          background:
+                            "var(--primary)",
+                          color: "#fff",
                           fontSize: "11px",
-                          fontWeight: 700,
+                          fontWeight: 800,
+                          textDecoration: "none",
                         }}
                       >
-                        {match.home_team}
-                        {" — "}
-                        {match.away_team}
-                      </div>
-
-                      <PredictionMessage
-                        prediction={prediction}
-                      />
+                        ⚽ Maça Git
+                      </Link>
                     </div>
-                  </Link>
+                  </div>
                 );
               })}
             </div>
