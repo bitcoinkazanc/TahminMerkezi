@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import {
-  getMatches,
-  getMatch,
-} from "../../../lib/football-api";
+import { getMatches } from "../../../lib/football-api";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,6 +23,107 @@ function getSupabase() {
   });
 }
 
+function parseScore(score) {
+  if (
+    score === null ||
+    score === undefined
+  ) {
+    return {
+      home: null,
+      away: null,
+    };
+  }
+
+  if (
+    typeof score === "object" &&
+    !Array.isArray(score)
+  ) {
+    const home =
+      score.home ??
+      score.home_score ??
+      score.homeScore ??
+      score.home_team ??
+      score.homeTeam ??
+      null;
+
+    const away =
+      score.away ??
+      score.away_score ??
+      score.awayScore ??
+      score.away_team ??
+      score.awayTeam ??
+      null;
+
+    if (
+      home !== null &&
+      away !== null
+    ) {
+      return {
+        home: Number(home),
+        away: Number(away),
+      };
+    }
+
+    if (
+      score.current &&
+      typeof score.current === "object"
+    ) {
+      const current =
+        parseScore(score.current);
+
+      if (
+        current.home !== null &&
+        current.away !== null
+      ) {
+        return current;
+      }
+    }
+
+    if (
+      score.display &&
+      typeof score.display === "string"
+    ) {
+      return parseScore(score.display);
+    }
+  }
+
+  if (Array.isArray(score)) {
+    if (score.length >= 2) {
+      const home = Number(score[0]);
+      const away = Number(score[1]);
+
+      if (
+        Number.isFinite(home) &&
+        Number.isFinite(away)
+      ) {
+        return {
+          home,
+          away,
+        };
+      }
+    }
+  }
+
+  if (typeof score === "string") {
+    const match =
+      score.match(
+        /^\s*(\d+)\s*[-:]\s*(\d+)\s*$/
+      );
+
+    if (match) {
+      return {
+        home: Number(match[1]),
+        away: Number(match[2]),
+      };
+    }
+  }
+
+  return {
+    home: null,
+    away: null,
+  };
+}
+
 function normalizeMatch(match) {
   const externalId =
     match.url ||
@@ -43,14 +141,23 @@ function normalizeMatch(match) {
     status = "cancelled";
   }
 
-  const parsedDate = new Date(match.time);
+  const parsedDate =
+    new Date(match.time);
 
-  if (Number.isNaN(parsedDate.getTime())) {
+  if (
+    Number.isNaN(
+      parsedDate.getTime()
+    )
+  ) {
     return null;
   }
 
+  const score =
+    parseScore(match.score);
+
   return {
-    external_id: String(externalId),
+    external_id:
+      String(externalId),
 
     league: match.competition
       ? String(match.competition)
@@ -77,6 +184,12 @@ function normalizeMatch(match) {
       parsedDate.toISOString(),
 
     status,
+
+    home_score:
+      score.home,
+
+    away_score:
+      score.away,
   };
 }
 
@@ -102,101 +215,6 @@ export async function GET(request) {
       100
     );
 
-    /*
-     * GEÇİCİ DEBUG
-     *
-     * Bir maç ID'si ile istek geldiğinde
-     * Supabase'deki external_id içinden
-     * SportScore slug'ını çıkarıp gerçek
-     * maç detayını getiriyoruz.
-     *
-     * Şimdilik sadece response içine
-     * sportScoreDebug alanı ekliyoruz.
-     */
-    let sportScoreDebug = null;
-
-    if (matchId) {
-      const {
-        data: debugMatch,
-        error: debugMatchError,
-      } = await supabase
-        .from("matches")
-        .select(
-          "id, external_id, home_team, away_team"
-        )
-        .eq("id", matchId)
-        .maybeSingle();
-
-      if (debugMatchError) {
-        console.error(
-          "Debug match lookup error:",
-          debugMatchError
-        );
-      } else if (debugMatch) {
-        const externalId =
-          debugMatch.external_id || "";
-
-        const slug =
-          externalId
-            .replace(/^\/football\/match\//, "")
-            .replace(/\/$/, "");
-
-        console.log(
-          "SPORTSCORE DEBUG - external_id:",
-          externalId
-        );
-
-        console.log(
-          "SPORTSCORE DEBUG - slug:",
-          slug
-        );
-
-        if (slug) {
-          try {
-            const detail =
-              await getMatch(slug);
-
-            console.log(
-              "SPORTSCORE DEBUG - full response:",
-              JSON.stringify(
-                detail,
-                null,
-                2
-              )
-            );
-
-            console.log(
-              "SPORTSCORE DEBUG - score:",
-              JSON.stringify(
-                detail?.score,
-                null,
-                2
-              )
-            );
-
-            sportScoreDebug = {
-              slug,
-              score: detail?.score ?? null,
-              status: detail?.status ?? null,
-              detail,
-            };
-          } catch (debugError) {
-            console.error(
-              "SportScore debug request error:",
-              debugError
-            );
-
-            sportScoreDebug = {
-              slug,
-              error:
-                debugError?.message ||
-                "SportScore detay isteği başarısız.",
-            };
-          }
-        }
-      }
-    }
-
     const sportScoreData =
       await getMatches(
         Math.min(limit, 50)
@@ -221,7 +239,9 @@ export async function GET(request) {
             match.match_date
         );
 
-    if (normalizedMatches.length > 0) {
+    if (
+      normalizedMatches.length > 0
+    ) {
       const {
         error: upsertError,
       } = await supabase
@@ -318,7 +338,6 @@ export async function GET(request) {
       success: true,
       matches: data || [],
       source: "SportScore",
-      sportScoreDebug,
     });
   } catch (error) {
     console.error(
