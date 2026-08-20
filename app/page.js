@@ -115,9 +115,13 @@ export default function HomePage() {
       <main className="page">
         <div className="page-container">
           <div className="empty-state">
-            <div className="empty-icon">⚠️</div>
+            <div className="empty-icon">
+              ⚠️
+            </div>
 
-            <h1>Telegram Giriş Hatası</h1>
+            <h1>
+              Telegram Giriş Hatası
+            </h1>
 
             <p>{authError}</p>
 
@@ -153,50 +157,70 @@ export default function HomePage() {
     "Belgian Pro League",
   ];
 
-  const sortedMatches = [...matches].sort(
-    (a, b) => {
-      const leagueA = (
-        a?.league || ""
-      ).toLowerCase();
+  const activeMatches =
+    matches.filter((match) => {
+      const status =
+        String(
+          match?.status || ""
+        ).toLowerCase();
 
-      const leagueB = (
-        b?.league || ""
-      ).toLowerCase();
+      return (
+        status === "live" ||
+        status === "scheduled" ||
+        status === "upcoming"
+      );
+    });
 
-      const indexA =
-        leaguePriority.findIndex((league) =>
+  const sortedMatches = [
+    ...activeMatches,
+  ].sort((a, b) => {
+    const leagueA = (
+      a?.league || ""
+    ).toLowerCase();
+
+    const leagueB = (
+      b?.league || ""
+    ).toLowerCase();
+
+    const indexA =
+      leaguePriority.findIndex(
+        (league) =>
           leagueA.includes(
             league.toLowerCase()
           )
-        );
+      );
 
-      const indexB =
-        leaguePriority.findIndex((league) =>
+    const indexB =
+      leaguePriority.findIndex(
+        (league) =>
           leagueB.includes(
             league.toLowerCase()
           )
-        );
+      );
 
-      const priorityA =
-        indexA === -1
-          ? leaguePriority.length
-          : indexA;
+    const priorityA =
+      indexA === -1
+        ? leaguePriority.length
+        : indexA;
 
-      const priorityB =
-        indexB === -1
-          ? leaguePriority.length
-          : indexB;
+    const priorityB =
+      indexB === -1
+        ? leaguePriority.length
+        : indexB;
 
-      if (priorityA !== priorityB) {
-        return priorityA - priorityB;
-      }
-
+    if (
+      priorityA !== priorityB
+    ) {
       return (
-        new Date(a.match_date) -
-        new Date(b.match_date)
+        priorityA - priorityB
       );
     }
-  );
+
+    return (
+      new Date(a.match_date) -
+      new Date(b.match_date)
+    );
+  });
 
   const visibleMatches =
     sortedMatches.slice(
@@ -206,7 +230,7 @@ export default function HomePage() {
 
   const hasMoreMatches =
     visibleCount <
-    sortedMatches.length &&
+      sortedMatches.length &&
     visibleCount < 50;
 
   return (
@@ -231,7 +255,10 @@ export default function HomePage() {
           {displayName ? (
             <div className="home-welcome">
               Hoş geldin,{" "}
-              <strong>{displayName}</strong>!
+              <strong>
+                {displayName}
+              </strong>
+              !
             </div>
           ) : null}
 
@@ -245,7 +272,9 @@ export default function HomePage() {
 
         <section className="section-card">
           <div className="section-title home-matches-title">
-            <h2>Günün maçları seni bekliyor</h2>
+            <h2>
+              Günün maçları seni bekliyor
+            </h2>
           </div>
 
           {loading ? (
@@ -256,11 +285,13 @@ export default function HomePage() {
                 ⚽
               </div>
 
-              <h3>Henüz maç yok</h3>
+              <h3>
+                Henüz maç yok
+              </h3>
 
               <p>
-                Maçlar sisteme eklendiğinde burada
-                görünecek.
+                Maçlar sisteme eklendiğinde
+                burada görünecek.
               </p>
 
               <Link
@@ -280,7 +311,8 @@ export default function HomePage() {
                 <div
                   style={{
                     display: "flex",
-                    justifyContent: "center",
+                    justifyContent:
+                      "center",
                     padding: "16px",
                   }}
                 >
@@ -303,7 +335,9 @@ export default function HomePage() {
               ) : null}
 
               <div className="home-disclaimer">
-                <strong>❗ Sorumluluk Reddi:</strong>{" "}
+                <strong>
+                  ❗ Sorumluluk Reddi:
+                </strong>{" "}
                 Tahminler yalnızca eğlence ve bilgi
                 amaçlıdır. Gerçek para ile bahis veya
                 kazanç garantisi içermez.
