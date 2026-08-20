@@ -128,9 +128,6 @@ export async function GET(request) {
         50
       );
 
-    /*
-     * SportScore'dan güncel maçları alıyoruz.
-     */
     const sportScoreData =
       await getMatches(limit);
 
@@ -141,22 +138,11 @@ export async function GET(request) {
         ? sportScoreData.matches
         : [];
 
-    /*
-     * SportScore verisini Supabase formatına
-     * çeviriyoruz.
-     */
     const normalizedMatches =
       sourceMatches
         .map(normalizeMatch)
         .filter(Boolean);
 
-    /*
-     * Maçları Supabase'e yazıyoruz.
-     *
-     * Aynı external_id mevcutsa kayıt güncellenir.
-     * Böylece maç sonuçlandığında skorlar da
-     * mevcut kayda işlenir.
-     */
     if (
       normalizedMatches.length > 0
     ) {
@@ -192,8 +178,9 @@ export async function GET(request) {
     }
 
     /*
-     * Güncellenmiş kayıtları Supabase'den
-     * tekrar okuyoruz.
+     * Supabase'den en güncel maçları getiriyoruz.
+     * Önceden ascending olduğu için eski maçlar
+     * listenin başına geliyordu.
      */
     let query =
       supabase
@@ -217,7 +204,7 @@ export async function GET(request) {
         .order(
           "match_date",
           {
-            ascending: true,
+            ascending: false,
           }
         )
         .limit(limit);
