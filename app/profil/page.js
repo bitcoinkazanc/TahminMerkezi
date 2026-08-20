@@ -2,26 +2,28 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import ProfileCard from "../../components/ProfileCard";
 import Loading from "../../components/Loading";
 
 export default function ProfilePage() {
+  const searchParams = useSearchParams();
+
   const [user, setUser] = useState(null);
   const [predictions, setPredictions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const profileUserId =
+    searchParams.get("user_id");
 
   useEffect(() => {
     async function loadProfile() {
       try {
         setLoading(true);
         setError("");
-
-        const params = new URLSearchParams(
-          window.location.search
-        );
-
-        const profileUserId = params.get("user_id");
+        setUser(null);
+        setPredictions([]);
 
         let profileUser = null;
 
@@ -99,7 +101,7 @@ export default function ProfilePage() {
     }
 
     loadProfile();
-  }, []);
+  }, [profileUserId]);
 
   if (loading) {
     return <Loading />;
