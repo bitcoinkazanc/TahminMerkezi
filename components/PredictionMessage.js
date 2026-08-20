@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 export default function PredictionMessage({
   prediction,
 }) {
@@ -51,6 +53,29 @@ export default function PredictionMessage({
         })
       : "";
 
+  const userProfileUrl = user?.id
+    ? `/profile?user_id=${encodeURIComponent(
+        user.id
+      )}`
+    : null;
+
+  const usernameElement = userProfileUrl ? (
+    <Link
+      href={userProfileUrl}
+      onClick={(event) => {
+        event.stopPropagation();
+      }}
+      style={{
+        color: "var(--text)",
+        textDecoration: "none",
+      }}
+    >
+      <strong>{username}</strong>
+    </Link>
+  ) : (
+    <strong>{username}</strong>
+  );
+
   return (
     <article className="prediction-message">
       <div className="prediction-message-main">
@@ -70,7 +95,7 @@ export default function PredictionMessage({
 
         <div className="prediction-message-content">
           <div className="prediction-message-top">
-            <strong>{username}</strong>
+            {usernameElement}
           </div>
 
           <div className="prediction-message-result">
