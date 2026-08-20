@@ -123,7 +123,9 @@ function getFirstHalfScoreFromIncidents(
   };
 }
 
-function predictionNeedsDetail(prediction) {
+function predictionNeedsDetail(
+  prediction
+) {
   return [
     "HT1",
     "HTX",
@@ -256,53 +258,39 @@ function getPredictionCorrectness(
   }
 
   if (
-    [
-      "GOAL_RANGE_0_1",
-      "GOAL_RANGE_2_3",
-      "GOAL_RANGE_4_5",
-      "GOAL_RANGE_6_PLUS",
-    ].includes(code)
+    code ===
+    "GOAL_RANGE_0_1"
   ) {
-    if (
-      code ===
-      "GOAL_RANGE_0_1"
-    ) {
-      return (
-        totalGoals >= 0 &&
-        totalGoals <= 1
-      );
-    }
+    return (
+      totalGoals >= 0 &&
+      totalGoals <= 1
+    );
+  }
 
-    if (
-      code ===
-      "GOAL_RANGE_2_3"
-    ) {
-      return (
-        totalGoals >= 2 &&
-        totalGoals <= 3
-      );
-    }
+  if (
+    code ===
+    "GOAL_RANGE_2_3"
+  ) {
+    return (
+      totalGoals >= 2 &&
+      totalGoals <= 3
+    );
+  }
 
-    if (
-      code ===
-      "GOAL_RANGE_4_5"
-    ) {
-      return (
-        totalGoals >= 2 &&
-        totalGoals <= 3
-      );
-    }
+  if (
+    code ===
+    "GOAL_RANGE_4_5"
+  ) {
+    return (
+      totalGoals >= 4 &&
+      totalGoals <= 5
+    );
+  }
 
-    if (
-      code ===
-      "GOAL_RANGE_4_5"
-    ) {
-      return (
-        totalGoals >= 4 &&
-        totalGoals <= 5
-      );
-    }
-
+  if (
+    code ===
+    "GOAL_RANGE_6_PLUS"
+  ) {
     return totalGoals >= 6;
   }
 
@@ -541,14 +529,18 @@ function getPredictionCorrectness(
       code ===
       "FIRST_GOAL_HOME"
     ) {
-      return firstGoal.side === "home";
+      return (
+        firstGoal.side === "home"
+      );
     }
 
     if (
       code ===
       "FIRST_GOAL_AWAY"
     ) {
-      return firstGoal.side === "away";
+      return (
+        firstGoal.side === "away"
+      );
     }
 
     return false;
@@ -557,209 +549,104 @@ function getPredictionCorrectness(
   return null;
 }
 
-async function evaluateFinishedMatch(
-  supabase,
-  match
-) {
-  if (
-    !match ||
-    match.status !== "finished"
-  ) {
-    return {
-      processed: 0,
-      correct: 0,
-      wrong: 0,
-      pending: 0,
-    };
-  }
-
-  if (
-    match.home_score === null ||
-    match.away_score === null
-  ) {
-    return {
-      processed: 0,
-      correct: 0,
-      wrong: 0,
-      pending: 0,
-    };
-  }
-
-  const {
-    data: predictions,
-    error: predictionsError,
-  } = await supabase
-    .from("predictions")
-    .select(`
-      id,
-      prediction,
-      result,
-      points
-    `)
-    .eq("match_id", match.id)
-    .eq("result", "pending");
-
-  if (predictionsError) {
-    console.error(
-      "Finished match predictions lookup error:",
-      predictionsError
-    );
-
-    return {
-      processed: 0,
-      correct: 0,
-      wrong: 0,
-      pending: 0,
-      error: predictionsError.message,
-    };
-  }
-
-  if (
-    !predictions ||
-    predictions.length === 0
-  ) {
-    return {
-      processed: 0,
-      correct: 0,
-      wrong: 0,
-      pending: 0,
-    };
-  }
-
-  const needsDetail =
-    predictions.some(
-      (item) =>
-        predictionNeedsDetail(
-          item.prediction
-        )
-    );
-
-  let detail = null;
-
-  if (needsDetail) {
-    const slug =
-      getSlugFromMatchUrl(
-        match.external_id
-      );
-
-    if (slug) {
-      try {
-        detail =
-          await getMatch(slug);
-      } catch (error) {
-        console.error(
-          "Finished match detail loading error:",
-          error
-        );
-      }
-    }
-  }
-
-  const correctIds = [];
-  const wrongIds = [];
-  let pendingCount = 0;
-
-  for (const prediction of predictions) {
-    const correctness =
-      getPredictionCorrectness(
-        prediction.prediction,
-        match,
-        detail
-      );
-
-    if (
-      correctness === null
-    ) {
-      pendingCount += 1;
-      continue;
-    }
-
-    if (correctness) {
-      correctIds.push(
-        prediction.id
-      );
-    } else {
-      wrongIds.push(
-        prediction.id
-      );
-    }
-  }
-
-  if (correctIds.length > 0) {
-    const {
-      error: correctError,
-    } = await supabase
-      .from("predictions")
-      .update({
-        result: "correct",
-        points: 10,
-      })
-      .in(
-        "id",
-        correctIds
-      )
-      .eq(
-        "result",
-        "pending"
-      );
-
-    if (correctError) {
-      console.error(
-        "Correct predictions update error:",
-        correctError
-      );
-    }
-  }
-
-  if (wrongIds.length > 0) {
-    const {
-      error: wrongError,
-    } = await supabase
-      .from("predictions")
-      .update({
-        result: "wrong",
-        points: 0,
-      })
-      .in(
-        "id",
-        wrongIds
-      )
-      .eq(
-        "result",
-        "pending"
-      );
-
-    if (wrongError) {
-      console.error(
-        "Wrong predictions update error:",
-        wrongError
-      );
-    }
-  }
-
-  return {
-    processed:
-      correctIds.length +
-      wrongIds.length,
-
-    correct:
-      correctIds.length,
-
-    wrong:
-      wrongIds.length,
-
-    pending:
-      pendingCount,
-  };
-}
-
 export async function GET() {
   try {
     const supabase =
       getSupabase();
 
+    /*
+     * Önce bütün pending tahminleri
+     * tek sorguda alıyoruz.
+     */
     const {
-      data: finishedMatches,
+      data: pendingPredictions,
+      error: predictionsError,
+    } = await supabase
+      .from("predictions")
+      .select(`
+        id,
+        match_id,
+        prediction,
+        result,
+        points
+      `)
+      .eq(
+        "result",
+        "pending"
+      );
+
+    if (predictionsError) {
+      console.error(
+        "Pending predictions lookup error:",
+        predictionsError
+      );
+
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            predictionsError.message,
+        },
+        {
+          status: 500,
+        }
+      );
+    }
+
+    if (
+      !pendingPredictions ||
+      pendingPredictions.length === 0
+    ) {
+      return NextResponse.json({
+        success: true,
+        message:
+          "Puanlanacak bekleyen tahmin bulunamadı.",
+        finishedMatches: 0,
+        pendingPredictions: 0,
+        processedMatches: 0,
+        processedPredictions: 0,
+        correctPredictions: 0,
+        wrongPredictions: 0,
+      });
+    }
+
+    /*
+     * Pending tahminlerin bulunduğu
+     * benzersiz maç ID'lerini çıkarıyoruz.
+     */
+    const matchIds =
+      [
+        ...new Set(
+          pendingPredictions
+            .map(
+              (prediction) =>
+                prediction.match_id
+            )
+            .filter(Boolean)
+        ),
+      ];
+
+    if (matchIds.length === 0) {
+      return NextResponse.json({
+        success: true,
+        message:
+          "Tahminlerde geçerli maç bulunamadı.",
+        finishedMatches: 0,
+        pendingPredictions:
+          pendingPredictions.length,
+        processedMatches: 0,
+        processedPredictions: 0,
+        correctPredictions: 0,
+        wrongPredictions: 0,
+      });
+    }
+
+    /*
+     * Sadece bu tahminlere ait maçları
+     * tek sorguda alıyoruz.
+     */
+    const {
+      data: matches,
       error: matchesError,
     } = await supabase
       .from("matches")
@@ -770,24 +657,18 @@ export async function GET() {
         home_score,
         away_score
       `)
+      .in(
+        "id",
+        matchIds
+      )
       .eq(
         "status",
         "finished"
-      )
-      .not(
-        "home_score",
-        "is",
-        null
-      )
-      .not(
-        "away_score",
-        "is",
-        null
       );
 
     if (matchesError) {
       console.error(
-        "Scoring matches lookup error:",
+        "Finished matches lookup error:",
         matchesError
       );
 
@@ -803,39 +684,246 @@ export async function GET() {
       );
     }
 
-    let processedMatches = 0;
-    let processedPredictions = 0;
-    let correctPredictions = 0;
-    let wrongPredictions = 0;
-    let pendingPredictions = 0;
+    if (
+      !matches ||
+      matches.length === 0
+    ) {
+      return NextResponse.json({
+        success: true,
+        message:
+          "Bekleyen tahminlere ait bitmiş maç bulunamadı.",
+        finishedMatches: 0,
+        pendingPredictions:
+          pendingPredictions.length,
+        processedMatches: 0,
+        processedPredictions: 0,
+        correctPredictions: 0,
+        wrongPredictions: 0,
+      });
+    }
+
+    const matchMap =
+      new Map(
+        matches.map(
+          (match) => [
+            String(match.id),
+            match,
+          ]
+        )
+      );
+
+    /*
+     * Tahminleri maçlara göre gruplayalım.
+     */
+    const predictionsByMatch =
+      new Map();
 
     for (
-      const match of
-        finishedMatches || []
+      const prediction of
+        pendingPredictions
     ) {
-      const result =
-        await evaluateFinishedMatch(
-          supabase,
-          match
+      const key =
+        String(
+          prediction.match_id
         );
 
       if (
-        result.processed > 0
+        !predictionsByMatch.has(
+          key
+        )
       ) {
-        processedMatches += 1;
+        predictionsByMatch.set(
+          key,
+          []
+        );
       }
 
-      processedPredictions +=
-        result.processed || 0;
+      predictionsByMatch
+        .get(key)
+        .push(prediction);
+    }
 
-      correctPredictions +=
-        result.correct || 0;
+    const correctIds = [];
+    const wrongIds = [];
 
-      wrongPredictions +=
-        result.wrong || 0;
+    let processedMatches = 0;
+    let pendingWithoutResult = 0;
 
-      pendingPredictions +=
-        result.pending || 0;
+    /*
+     * Sadece pending tahmini bulunan
+     * finished maçları işliyoruz.
+     */
+    for (
+      const match of matches
+    ) {
+      const predictions =
+        predictionsByMatch.get(
+          String(match.id)
+        ) || [];
+
+      if (
+        predictions.length === 0
+      ) {
+        continue;
+      }
+
+      if (
+        match.home_score === null ||
+        match.home_score === undefined ||
+        match.away_score === null ||
+        match.away_score === undefined
+      ) {
+        continue;
+      }
+
+      processedMatches += 1;
+
+      const needsDetail =
+        predictions.some(
+          (item) =>
+            predictionNeedsDetail(
+              item.prediction
+            )
+        );
+
+      let detail = null;
+
+      if (needsDetail) {
+        const slug =
+          getSlugFromMatchUrl(
+            match.external_id
+          );
+
+        if (slug) {
+          try {
+            detail =
+              await getMatch(slug);
+          } catch (error) {
+            console.error(
+              "Match detail loading error:",
+              {
+                matchId: match.id,
+                externalId:
+                  match.external_id,
+                error,
+              }
+            );
+          }
+        }
+      }
+
+      for (
+        const prediction of
+          predictions
+      ) {
+        const correctness =
+          getPredictionCorrectness(
+            prediction.prediction,
+            match,
+            detail
+          );
+
+        if (
+          correctness === null
+        ) {
+          pendingWithoutResult += 1;
+          continue;
+        }
+
+        if (correctness) {
+          correctIds.push(
+            prediction.id
+          );
+        } else {
+          wrongIds.push(
+            prediction.id
+          );
+        }
+      }
+    }
+
+    /*
+     * Doğru tahminleri toplu güncelle.
+     */
+    if (
+      correctIds.length > 0
+    ) {
+      const {
+        error: correctError,
+      } = await supabase
+        .from("predictions")
+        .update({
+          result: "correct",
+          points: 10,
+        })
+        .in(
+          "id",
+          correctIds
+        )
+        .eq(
+          "result",
+          "pending"
+        );
+
+      if (correctError) {
+        console.error(
+          "Correct predictions update error:",
+          correctError
+        );
+
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              correctError.message,
+          },
+          {
+            status: 500,
+          }
+        );
+      }
+    }
+
+    /*
+     * Yanlış tahminleri toplu güncelle.
+     */
+    if (
+      wrongIds.length > 0
+    ) {
+      const {
+        error: wrongError,
+      } = await supabase
+        .from("predictions")
+        .update({
+          result: "wrong",
+          points: 0,
+        })
+        .in(
+          "id",
+          wrongIds
+        )
+        .eq(
+          "result",
+          "pending"
+        );
+
+      if (wrongError) {
+        console.error(
+          "Wrong predictions update error:",
+          wrongError
+        );
+
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              wrongError.message,
+          },
+          {
+            status: 500,
+          }
+        );
+      }
     }
 
     return NextResponse.json({
@@ -843,12 +931,18 @@ export async function GET() {
       message:
         "Puanlama işlemi tamamlandı.",
       finishedMatches:
-        finishedMatches?.length || 0,
+        matches.length,
+      pendingPredictions:
+        pendingPredictions.length,
       processedMatches,
-      processedPredictions,
-      correctPredictions,
-      wrongPredictions,
-      pendingPredictions,
+      processedPredictions:
+        correctIds.length +
+        wrongIds.length,
+      correctPredictions:
+        correctIds.length,
+      wrongPredictions:
+        wrongIds.length,
+      pendingWithoutResult,
     });
   } catch (error) {
     console.error(
