@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import {
-  getMatches,
-  getMatch,
-} from "../../../lib/football-api";
+import { getMatches } from "../../../lib/football-api";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,21 +26,30 @@ function getSupabase() {
   });
 }
 
+function toScore(value) {
+  if (
+    value === undefined ||
+    value === null ||
+    value === ""
+  ) {
+    return null;
+  }
+
+  const number = Number(value);
+
+  return Number.isFinite(number)
+    ? number
+    : null;
+}
+
 function normalizeMatch(match) {
-  const externalId =
-    match.url ||
-    `${match.home}-${match.away}-${match.time}`;
-
-  let status = "scheduled";
-
-  if (match.status === "live") {
-    status = "live";
-  } else if (match.status === "finished") {
-    status = "finished";
-  } else if (match.status === "postponed") {
-    status = "postponed";
-  } else if (match.status === "cancelled") {
-    status = "cancelled";
+  if (
+    !match ||
+    !match.home ||
+    !match.away ||
+    !match.time
+  ) {
+    return null;
   }
 
   const parsedDate =
@@ -57,27 +63,25 @@ function normalizeMatch(match) {
     return null;
   }
 
+  const externalId =
+    match.url ||
+    `${match.home}-${match.away}-${match.time}`;
+
   return {
     external_id:
       String(externalId),
 
     league:
-      match.competition
-        ? String(match.competition)
-        : null,
+      match.competition || null,
 
     league_logo:
       match.competition_logo || null,
 
     home_team:
-      match.home
-        ? String(match.home).trim()
-        : null,
+      String(match.home).trim(),
 
     away_team:
-      match.away
-        ? String(match.away).trim()
-        : null,
+      String(match.away).trim(),
 
     home_logo:
       match.home_logo || null,
@@ -88,123 +92,15 @@ function normalizeMatch(match) {
     match_date:
       parsedDate.toISOString(),
 
-    status,
+    status:
+      match.status || "scheduled",
 
-    home_score: null,
-    away_score: null,
+    home_score:
+      toScore(match.home_score),
+
+    away_score:
+      toScore(match.away_score),
   };
-}
-
-function getMatchSlug(externalId) {
-  if (!externalId) {
-    return null;
-  }
-
-  const value =
-    String(externalId).trim();
-
-  const match =
-    value.match(
-      /\/football\/match\/([^/]+)\/?$/
-    );
-
-  return match?.[1] || null;
-}
-
-async function getDetailedScore(match) {
-  const slug =
-    getMatchSlug(
-      match.external_id
-    );
-
-  if (!slug) {
-    return match;
-  }
-
-  try {
-    const detail =
-      await getMatch(slug);
-
-    const detailMatch =
-      detail?.match;
-
-    if (!detailMatch) {
-      return match;
-    }
-
-    const homeScore =
-      detailMatch.home_score;
-
-    const awayScore =
-      detailMatch.away_score;
-
-    const hasHomeScore =
-      homeScore !== undefined &&
-      homeScore !== null &&
-      homeScore !== "" &&
-      Number.isFinite(
-        Number(homeScore)
-      );
-
-    const hasAwayScore =
-      awayScore !== undefined &&
-      awayScore !== null &&
-      awayScore !== "" &&
-      Number.isFinite(
-        Number(awayScore)
-      );
-
-    let status =
-      match.status;
-
-    if (
-      detailMatch.status
-    ) {
-      status =
-        detailMatch.status;
-    }
-
-    return {
-      ...match,
-
-      status,
-
-      home_score:
-        hasHomeScore
-          ? Number(homeScore)
-          : null,
-
-      away_score:
-        hasAwayScore
-          ? Number(awayScore)
-          : null,
-    };
-  } catch (error) {
-    console.error(
-      "SportScore detay hatası:",
-      slug,
-      error
-    );
-
-    return match;
-  }
-}
-
-async function addMatchDetails(matches) {
-  const detailedMatches = [];
-
-  for (const match of matches) {
-    const detailedMatch =
-      await getDetailedScore(
-        match
-      );
-
-    detailedMatches.push(
-      detailedMatch
-    );
-  }
-
-  return detailedMatches;
 }
 
 export async function GET(request) {
@@ -221,31 +117,30 @@ export async function GET(request) {
     const status =
       searchParams.get("status");
 
-    const limitParam =
+    const requestedLimit =
       Number(
-        searchParams.get(
-          "limit"
-        ) || 50
+        searchParams.get("limit") || 50
       );
 
     const limit =
       Math.min(
         Math.max(
-          limitParam,
+          requestedLimit,
           1
         ),
-        100
+        50
       );
 
+    /*
+     * SportScore'un maç listesini
+     * doğrudan alıyoruz.
+     *
+     * Skorlar zaten bu cevapta geliyor.
+     */
     const sportScoreData =
-      await getMatches(
-        Math.min(
-          limit,
-          50
-        )
-      );
+      await getMatches(limit);
 
-    const sportScoreMatches =
+    const sourceMatches =
       Array.isArray(
         sportScoreData?.matches
       )
@@ -253,31 +148,23 @@ export async function GET(request) {
         : [];
 
     const normalizedMatches =
-      sportScoreMatches
+      sourceMatches
         .map(normalizeMatch)
-        .filter(Boolean)
-        .filter(
-          (match) =>
-            match.external_id &&
-            match.home_team &&
-            match.away_team &&
-            match.match_date
-        );
+        .filter(Boolean);
 
-    const detailedMatches =
-      await addMatchDetails(
-        normalizedMatches
-      );
-
+    /*
+     * SportScore'dan gelen bütün maçları
+     * Supabase'e kaydediyoruz.
+     */
     if (
-      detailedMatches.length > 0
+      normalizedMatches.length > 0
     ) {
       const {
         error: upsertError,
       } = await supabase
         .from("matches")
         .upsert(
-          detailedMatches,
+          normalizedMatches,
           {
             onConflict:
               "external_id",
@@ -303,6 +190,9 @@ export async function GET(request) {
       }
     }
 
+    /*
+     * Veriyi Supabase'den tekrar okuyoruz.
+     */
     let query =
       supabase
         .from("matches")
@@ -353,7 +243,7 @@ export async function GET(request) {
 
     if (error) {
       console.error(
-        "Matches GET error:",
+        "Matches select error:",
         error
       );
 
@@ -376,6 +266,8 @@ export async function GET(request) {
           data || [],
         source:
           "SportScore",
+        source_count:
+          sourceMatches.length,
       },
       {
         headers: {
@@ -390,7 +282,7 @@ export async function GET(request) {
     );
   } catch (error) {
     console.error(
-      "Matches GET server error:",
+      "Matches GET error:",
       error
     );
 
@@ -399,7 +291,7 @@ export async function GET(request) {
         success: false,
         error:
           error?.message ||
-          "Maçlar alınırken bir sunucu hatası oluştu.",
+          "Maçlar alınırken hata oluştu.",
       },
       {
         status: 500,
@@ -423,6 +315,8 @@ export async function POST(request) {
       away_logo,
       match_date,
       status = "scheduled",
+      home_score,
+      away_score,
     } = body || {};
 
     if (
@@ -435,31 +329,6 @@ export async function POST(request) {
           success: false,
           error:
             "Ev sahibi, deplasman ve maç tarihi zorunludur.",
-        },
-        {
-          status: 400,
-        }
-      );
-    }
-
-    const validStatuses = [
-      "scheduled",
-      "live",
-      "finished",
-      "postponed",
-      "cancelled",
-    ];
-
-    if (
-      !validStatuses.includes(
-        status
-      )
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Geçersiz maç durumu.",
         },
         {
           status: 400,
@@ -480,6 +349,32 @@ export async function POST(request) {
           success: false,
           error:
             "Geçersiz maç tarihi.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const validStatuses = [
+      "scheduled",
+      "upcoming",
+      "live",
+      "finished",
+      "postponed",
+      "cancelled",
+    ];
+
+    if (
+      !validStatuses.includes(
+        status
+      )
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Geçersiz maç durumu.",
         },
         {
           status: 400,
@@ -520,6 +415,12 @@ export async function POST(request) {
         parsedDate.toISOString(),
 
       status,
+
+      home_score:
+        toScore(home_score),
+
+      away_score:
+        toScore(away_score),
     };
 
     let result;
@@ -579,11 +480,6 @@ export async function POST(request) {
     }
 
     if (result.error) {
-      console.error(
-        "Matches POST error:",
-        result.error
-      );
-
       return NextResponse.json(
         {
           success: false,
@@ -608,7 +504,7 @@ export async function POST(request) {
     );
   } catch (error) {
     console.error(
-      "Matches POST server error:",
+      "Matches POST error:",
       error
     );
 
@@ -617,7 +513,7 @@ export async function POST(request) {
         success: false,
         error:
           error?.message ||
-          "Maç kaydedilirken bir sunucu hatası oluştu.",
+          "Maç kaydedilirken hata oluştu.",
       },
       {
         status: 500,
