@@ -1,519 +1,58 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { getMatches } from "../../../lib/football-api";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function getSupabase() {
-  const url =
-    process.env.NEXT_PUBLIC_SUPABASE_URL;
-
-  const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!url || !key) {
-    throw new Error(
-      "Supabase environment variables are missing."
-    );
-  }
-
-  return createClient(url, key, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
-}
-
-function toScore(value) {
-  if (
-    value === undefined ||
-    value === null ||
-    value === ""
-  ) {
-    return null;
-  }
-
-  const number = Number(value);
-
-  return Number.isFinite(number)
-    ? number
-    : null;
-}
-
-function normalizeMatch(match) {
-  if (
-    !match ||
-    !match.home ||
-    !match.away ||
-    !match.time
-  ) {
-    return null;
-  }
-
-  const parsedDate =
-    new Date(match.time);
-
-  if (
-    Number.isNaN(
-      parsedDate.getTime()
-    )
-  ) {
-    return null;
-  }
-
-  const externalId =
-    match.url ||
-    `${match.home}-${match.away}-${match.time}`;
-
-  return {
-    external_id:
-      String(externalId),
-
-    league:
-      match.competition || null,
-
-    league_logo:
-      match.competition_logo || null,
-
-    home_team:
-      String(match.home).trim(),
-
-    away_team:
-      String(match.away).trim(),
-
-    home_logo:
-      match.home_logo || null,
-
-    away_logo:
-      match.away_logo || null,
-
-    match_date:
-      parsedDate.toISOString(),
-
-    status:
-      match.status || "scheduled",
-
-    home_score:
-      toScore(match.home_score),
-
-    away_score:
-      toScore(match.away_score),
-  };
-}
-
-export async function GET(request) {
+export async function GET() {
   try {
-    const supabase =
-      getSupabase();
+    const data = await getMatches(50);
 
-    const { searchParams } =
-      new URL(request.url);
-
-    const matchId =
-      searchParams.get("id");
-
-    const status =
-      searchParams.get("status");
-
-    const requestedLimit =
-      Number(
-        searchParams.get("limit") || 50
-      );
-
-    const limit =
-      Math.min(
-        Math.max(
-          requestedLimit,
-          1
-        ),
-        50
-      );
-
-    /*
-     * SportScore'un maç listesini
-     * doğrudan alıyoruz.
-     *
-     * Skorlar zaten bu cevapta geliyor.
-     */
-    const sportScoreData =
-      await getMatches(limit);
-
-    const sourceMatches =
-      Array.isArray(
-        sportScoreData?.matches
-      )
-        ? sportScoreData.matches
-        : [];
-
-    const normalizedMatches =
-      sourceMatches
-        .map(normalizeMatch)
-        .filter(Boolean);
-
-    /*
-     * SportScore'dan gelen bütün maçları
-     * Supabase'e kaydediyoruz.
-     */
-    if (
-      normalizedMatches.length > 0
-    ) {
-      const {
-        error: upsertError,
-      } = await supabase
-        .from("matches")
-        .upsert(
-          normalizedMatches,
-          {
-            onConflict:
-              "external_id",
-          }
-        );
-
-      if (upsertError) {
-        console.error(
-          "Matches upsert error:",
-          upsertError
-        );
-
-        return NextResponse.json(
-          {
-            success: false,
-            error:
-              upsertError.message,
-          },
-          {
-            status: 500,
-          }
-        );
-      }
-    }
-
-    /*
-     * Veriyi Supabase'den tekrar okuyoruz.
-     */
-    let query =
-      supabase
-        .from("matches")
-        .select(`
-          id,
-          external_id,
-          league,
-          league_logo,
-          home_team,
-          away_team,
-          home_logo,
-          away_logo,
-          match_date,
-          status,
-          home_score,
-          away_score,
-          created_at,
-          updated_at
-        `)
-        .order(
-          "match_date",
-          {
-            ascending: true,
-          }
-        )
-        .limit(limit);
-
-    if (matchId) {
-      query =
-        query.eq(
-          "id",
-          matchId
-        );
-    }
-
-    if (status) {
-      query =
-        query.eq(
-          "status",
-          status
-        );
-    }
-
-    const {
-      data,
-      error,
-    } = await query;
-
-    if (error) {
-      console.error(
-        "Matches select error:",
-        error
-      );
-
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            error.message,
-        },
-        {
-          status: 500,
-        }
-      );
-    }
+    const matches = Array.isArray(data?.matches)
+      ? data.matches
+      : [];
 
     return NextResponse.json(
       {
         success: true,
-        matches:
-          data || [],
-        source:
-          "SportScore",
-        source_count:
-          sourceMatches.length,
+
+        total: matches.length,
+
+        first_matches: matches.slice(0, 10).map((match) => ({
+          home: match.home,
+          away: match.away,
+          home_score: match.home_score,
+          away_score: match.away_score,
+          status: match.status,
+          status_text: match.status_text,
+          time: match.time,
+          competition: match.competition,
+          url: match.url,
+        })),
+
+        raw_first_match:
+          matches.length > 0
+            ? matches[0]
+            : null,
       },
       {
         headers: {
           "Cache-Control":
             "no-store, no-cache, must-revalidate, proxy-revalidate",
-          Pragma:
-            "no-cache",
-          Expires:
-            "0",
+          Pragma: "no-cache",
+          Expires: "0",
         },
       }
     );
   } catch (error) {
-    console.error(
-      "Matches GET error:",
-      error
-    );
+    console.error("SportScore debug error:", error);
 
     return NextResponse.json(
       {
         success: false,
         error:
           error?.message ||
-          "Maçlar alınırken hata oluştu.",
-      },
-      {
-        status: 500,
-      }
-    );
-  }
-}
-
-export async function POST(request) {
-  try {
-    const body =
-      await request.json();
-
-    const {
-      external_id,
-      league,
-      league_logo,
-      home_team,
-      away_team,
-      home_logo,
-      away_logo,
-      match_date,
-      status = "scheduled",
-      home_score,
-      away_score,
-    } = body || {};
-
-    if (
-      !home_team ||
-      !away_team ||
-      !match_date
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Ev sahibi, deplasman ve maç tarihi zorunludur.",
-        },
-        {
-          status: 400,
-        }
-      );
-    }
-
-    const parsedDate =
-      new Date(match_date);
-
-    if (
-      Number.isNaN(
-        parsedDate.getTime()
-      )
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Geçersiz maç tarihi.",
-        },
-        {
-          status: 400,
-        }
-      );
-    }
-
-    const validStatuses = [
-      "scheduled",
-      "upcoming",
-      "live",
-      "finished",
-      "postponed",
-      "cancelled",
-    ];
-
-    if (
-      !validStatuses.includes(
-        status
-      )
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Geçersiz maç durumu.",
-        },
-        {
-          status: 400,
-        }
-      );
-    }
-
-    const supabase =
-      getSupabase();
-
-    const matchData = {
-      external_id:
-        external_id || null,
-
-      league:
-        league || null,
-
-      league_logo:
-        league_logo || null,
-
-      home_team:
-        String(
-          home_team
-        ).trim(),
-
-      away_team:
-        String(
-          away_team
-        ).trim(),
-
-      home_logo:
-        home_logo || null,
-
-      away_logo:
-        away_logo || null,
-
-      match_date:
-        parsedDate.toISOString(),
-
-      status,
-
-      home_score:
-        toScore(home_score),
-
-      away_score:
-        toScore(away_score),
-    };
-
-    let result;
-
-    if (external_id) {
-      result =
-        await supabase
-          .from("matches")
-          .upsert(
-            matchData,
-            {
-              onConflict:
-                "external_id",
-            }
-          )
-          .select(`
-            id,
-            external_id,
-            league,
-            league_logo,
-            home_team,
-            away_team,
-            home_logo,
-            away_logo,
-            match_date,
-            status,
-            home_score,
-            away_score,
-            created_at,
-            updated_at
-          `)
-          .single();
-    } else {
-      result =
-        await supabase
-          .from("matches")
-          .insert(
-            matchData
-          )
-          .select(`
-            id,
-            external_id,
-            league,
-            league_logo,
-            home_team,
-            away_team,
-            home_logo,
-            away_logo,
-            match_date,
-            status,
-            home_score,
-            away_score,
-            created_at,
-            updated_at
-          `)
-          .single();
-    }
-
-    if (result.error) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            result.error.message,
-        },
-        {
-          status: 500,
-        }
-      );
-    }
-
-    return NextResponse.json(
-      {
-        success: true,
-        match:
-          result.data,
-      },
-      {
-        status: 201,
-      }
-    );
-  } catch (error) {
-    console.error(
-      "Matches POST error:",
-      error
-    );
-
-    return NextResponse.json(
-      {
-        success: false,
-        error:
-          error?.message ||
-          "Maç kaydedilirken hata oluştu.",
+          "SportScore verisi alınamadı.",
       },
       {
         status: 500,
