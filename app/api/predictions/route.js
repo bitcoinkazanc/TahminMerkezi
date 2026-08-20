@@ -38,6 +38,8 @@ export async function GET(request) {
         created_at,
         user_id,
         match_id,
+        result,
+        points,
         users (
           id,
           telegram_id,
@@ -348,6 +350,8 @@ export async function POST(request) {
         created_at,
         user_id,
         match_id,
+        result,
+        points,
         users (
           id,
           telegram_id,
