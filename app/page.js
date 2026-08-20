@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import MatchList from "../components/MatchList";
 import Loading from "../components/Loading";
 
@@ -114,28 +115,28 @@ export default function HomePage() {
       <main className="page">
         <div className="page-container">
           <div className="empty-state">
-            <div className="empty-icon">
-              ⚠️
-            </div>
+            <div className="empty-icon">⚠️</div>
 
             <h1>Telegram Giriş Hatası</h1>
 
             <p>{authError}</p>
 
-            <button
-              type="button"
+            <Link
+              href="/"
               className="primary-button"
-              onClick={() => {
-                window.location.reload();
-              }}
             >
               Tekrar Dene
-            </button>
+            </Link>
           </div>
         </div>
       </main>
     );
   }
+
+  const displayName =
+    user?.first_name ||
+    user?.username ||
+    "";
 
   const leaguePriority = [
     "Turkish Super League",
@@ -205,36 +206,69 @@ export default function HomePage() {
 
   const hasMoreMatches =
     visibleCount <
-    sortedMatches.length;
+    sortedMatches.length &&
+    visibleCount < 50;
 
   return (
     <main className="page">
       <div className="page-container">
+        <section className="home-hero">
+          <div className="home-hero-title">
+            <span className="home-hero-decoration">
+              ✦
+            </span>
+
+            <h1>
+              Başarı oranın ne kadar yüksekse,
+              sesin o kadar gür çıkar
+            </h1>
+
+            <span className="home-hero-decoration">
+              ✦
+            </span>
+          </div>
+
+          {displayName ? (
+            <div className="home-welcome">
+              Hoş geldin,{" "}
+              <strong>{displayName}</strong>!
+            </div>
+          ) : null}
+
+          <p className="home-hero-text">
+            Unutma, en büyük analizciler de tek bir
+            doğru tahminle başladı. Sahadaki heyecana
+            ortak ol, bilgini konuştur ve liderlik
+            kürsüsüne doğru ilk adımını at. 🏆
+          </p>
+        </section>
 
         <section className="section-card">
-
           <div className="section-title home-matches-title">
-            <h2>Maçlar</h2>
+            <h2>Günün maçları seni bekliyor</h2>
           </div>
 
           {loading ? (
             <Loading />
           ) : sortedMatches.length === 0 ? (
             <div className="empty-state small">
-
               <div className="empty-icon">
                 ⚽
               </div>
 
-              <h3>
-                Henüz maç yok
-              </h3>
+              <h3>Henüz maç yok</h3>
 
               <p>
-                Maçlar sisteme eklendiğinde
-                burada görünecek.
+                Maçlar sisteme eklendiğinde burada
+                görünecek.
               </p>
 
+              <Link
+                href="/maclar"
+                className="primary-button"
+              >
+                Tüm Maçlar
+              </Link>
             </div>
           ) : (
             <>
@@ -256,7 +290,10 @@ export default function HomePage() {
                     onClick={() =>
                       setVisibleCount(
                         (current) =>
-                          current + 10
+                          Math.min(
+                            current + 10,
+                            50
+                          )
                       )
                     }
                   >
@@ -266,18 +303,14 @@ export default function HomePage() {
               ) : null}
 
               <div className="home-disclaimer">
-                <strong>
-                  ❗ Sorumluluk Reddi:
-                </strong>{" "}
-                Tahminler yalnızca eğlence ve
-                bilgi amaçlıdır. Gerçek para ile
-                bahis veya kazanç garantisi içermez.
+                <strong>❗ Sorumluluk Reddi:</strong>{" "}
+                Tahminler yalnızca eğlence ve bilgi
+                amaçlıdır. Gerçek para ile bahis veya
+                kazanç garantisi içermez.
               </div>
             </>
           )}
-
         </section>
-
       </div>
     </main>
   );
