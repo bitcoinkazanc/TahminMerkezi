@@ -54,6 +54,10 @@ export default function PredictionMessage({
         })
       : "";
 
+  const matchName = match
+    ? `${match.home_team} - ${match.away_team}`
+    : "Maç bilgisi yok";
+
   return (
     <article className="prediction-message">
       <div className="prediction-message-main">
@@ -76,27 +80,118 @@ export default function PredictionMessage({
             <strong>{username}</strong>
           </div>
 
-          <div className="prediction-message-result">
-            <span className="prediction-badge">
-              {predictionLabel}
+          {match ? (
+            <div
+              style={{
+                marginTop: "8px",
+                marginBottom: "10px",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "14px",
+                  fontWeight: 800,
+                  color: "var(--text)",
+                  lineHeight: 1.35,
+                }}
+              >
+                ⚽ {matchName}
+              </div>
+
+              {match.league ? (
+                <div
+                  style={{
+                    marginTop: "3px",
+                    fontSize: "11px",
+                    color: "var(--muted)",
+                  }}
+                >
+                  🏆 {match.league}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              flexWrap: "wrap",
+              marginBottom: "8px",
+            }}
+          >
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                padding: "6px 10px",
+                borderRadius: "8px",
+                background: "var(--primary)",
+                color: "#fff",
+                fontSize: "12px",
+                fontWeight: 800,
+              }}
+            >
+              🎯 Tahmin: {predictionLabel}
             </span>
 
             {prediction.confidence != null ? (
-              <span className="prediction-confidence-value">
-                Güven %{prediction.confidence}
+              <span
+                style={{
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  color: "var(--text)",
+                }}
+              >
+                📊 Güven: %{prediction.confidence}
               </span>
             ) : null}
           </div>
 
           {prediction.message ? (
-            <p className="prediction-message-text">
-              {prediction.message}
-            </p>
+            <div
+              style={{
+                marginTop: "8px",
+                padding: "10px 12px",
+                borderRadius: "10px",
+                background: "var(--surface-soft)",
+                border: "1px solid var(--border)",
+              }}
+            >
+              <div
+                style={{
+                  marginBottom: "4px",
+                  fontSize: "11px",
+                  fontWeight: 800,
+                  color: "var(--muted)",
+                }}
+              >
+                📝 Analiz
+              </div>
+
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: "12px",
+                  lineHeight: 1.5,
+                  color: "var(--text)",
+                }}
+              >
+                {prediction.message}
+              </p>
+            </div>
           ) : null}
 
           {formattedDate ? (
-            <div className="prediction-message-date">
-              {formattedDate} · {formattedTime}
+            <div
+              style={{
+                marginTop: "8px",
+                fontSize: "10px",
+                color: "var(--muted)",
+              }}
+            >
+              🕐 {formattedDate} · {formattedTime}
             </div>
           ) : null}
         </div>
@@ -109,8 +204,7 @@ export default function PredictionMessage({
             gap: "8px",
             marginTop: "12px",
             paddingTop: "10px",
-            borderTop:
-              "1px solid var(--border)",
+            borderTop: "1px solid var(--border)",
           }}
         >
           {user?.id ? (
@@ -125,11 +219,9 @@ export default function PredictionMessage({
                 justifyContent: "center",
                 minHeight: "34px",
                 padding: "7px 10px",
-                border:
-                  "1px solid var(--border)",
+                border: "1px solid var(--border)",
                 borderRadius: "9px",
-                background:
-                  "var(--surface-soft)",
+                background: "var(--surface-soft)",
                 color: "var(--text)",
                 fontSize: "11px",
                 fontWeight: 800,
@@ -149,11 +241,9 @@ export default function PredictionMessage({
               justifyContent: "center",
               minHeight: "34px",
               padding: "7px 10px",
-              border:
-                "1px solid var(--primary)",
+              border: "1px solid var(--primary)",
               borderRadius: "9px",
-              background:
-                "var(--primary)",
+              background: "var(--primary)",
               color: "#fff",
               fontSize: "11px",
               fontWeight: 800,
