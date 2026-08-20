@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import Link from "next/link";
 import PredictionBox from "../../../components/PredictionBox";
 import PredictionMessage from "../../../components/PredictionMessage";
 import ChatBox from "../../../components/ChatBox";
@@ -17,15 +16,20 @@ export default function MatchDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  async function loadMatch() {
+  async function loadMatch(showLoading = true) {
     if (!matchId) return;
 
     try {
-      setLoading(true);
+      if (showLoading) {
+        setLoading(true);
+      }
+
       setError("");
 
       const response = await fetch(
-        `/api/matches?id=${encodeURIComponent(matchId)}`,
+        `/api/matches?id=${encodeURIComponent(
+          matchId
+        )}`,
         {
           cache: "no-store",
         }
@@ -35,25 +39,34 @@ export default function MatchDetailPage() {
 
       if (!response.ok || !result.success) {
         throw new Error(
-          result.error || "Maç bilgileri alınamadı."
+          result.error ||
+            "Maç bilgileri alınamadı."
         );
       }
 
-      const foundMatch = result.matches?.[0];
+      const foundMatch =
+        result.matches?.[0];
 
       if (!foundMatch) {
-        throw new Error("Maç bulunamadı.");
+        throw new Error(
+          "Maç bulunamadı."
+        );
       }
 
       setMatch(foundMatch);
     } catch (err) {
       console.error(err);
 
-      setError(
-        err.message || "Maç yüklenirken hata oluştu."
-      );
+      if (showLoading) {
+        setError(
+          err.message ||
+            "Maç yüklenirken hata oluştu."
+        );
+      }
     } finally {
-      setLoading(false);
+      if (showLoading) {
+        setLoading(false);
+      }
     }
   }
 
@@ -70,13 +83,19 @@ export default function MatchDetailPage() {
         }
       );
 
-      const result = await response.json();
+      const result =
+        await response.json();
 
-      if (!response.ok || !result.success) {
+      if (
+        !response.ok ||
+        !result.success
+      ) {
         return;
       }
 
-      setPredictions(result.predictions || []);
+      setPredictions(
+        result.predictions || []
+      );
     } catch (err) {
       console.error(
         "Predictions loading error:",
@@ -90,19 +109,37 @@ export default function MatchDetailPage() {
     loadPredictions();
   }, [matchId]);
 
-  function handlePredictionCreated(newPrediction) {
+  useEffect(() => {
+    if (!matchId) return;
+
+    const interval = setInterval(() => {
+      loadMatch(false);
+    }, 30000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [matchId]);
+
+  function handlePredictionCreated(
+    newPrediction
+  ) {
     if (!newPrediction) return;
 
     setPredictions((current) => {
       const exists = current.some(
-        (item) => item.id === newPrediction.id
+        (item) =>
+          item.id === newPrediction.id
       );
 
       if (exists) {
         return current;
       }
 
-      return [newPrediction, ...current];
+      return [
+        newPrediction,
+        ...current,
+      ];
     });
   }
 
@@ -115,7 +152,9 @@ export default function MatchDetailPage() {
       <main className="page">
         <div className="page-container">
           <div className="error-box">
-            <h2>Bir sorun oluştu</h2>
+            <h2>
+              Bir sorun oluştu
+            </h2>
 
             <p>{error}</p>
 
@@ -140,10 +179,13 @@ export default function MatchDetailPage() {
       <main className="page">
         <div className="page-container">
           <div className="empty-state">
-            <h2>Maç bulunamadı</h2>
+            <h2>
+              Maç bulunamadı
+            </h2>
 
             <p>
-              Aradığınız maç artık mevcut değil.
+              Aradığınız maç artık
+              mevcut değil.
             </p>
           </div>
         </div>
@@ -151,25 +193,61 @@ export default function MatchDetailPage() {
     );
   }
 
-  const matchDate = new Date(match.match_date);
+  const matchDate =
+    new Date(match.match_date);
 
   const formattedDate =
-    matchDate.toLocaleDateString("tr-TR", {
-      day: "2-digit",
-      month: "long",
-      year: "numeric",
-    });
+    matchDate.toLocaleDateString(
+      "tr-TR",
+      {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      }
+    );
 
   const formattedTime =
-    matchDate.toLocaleTimeString("tr-TR", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    matchDate.toLocaleTimeString(
+      "tr-TR",
+      {
+        hour: "2-digit",
+        minute: "2-digit",
+      }
+    );
+
+  const isLive =
+    match.status === "live";
+
+  const isFinished =
+    match.status === "finished";
+
+  const hasScore =
+    isLive || isFinished;
+
+  const homeScore =
+    match.home_score !== null &&
+    match.home_score !== undefined
+      ? match.home_score
+      : 0;
+
+  const awayScore =
+    match.away_score !== null &&
+    match.away_score !== undefined
+      ? match.away_score
+      : 0;
 
   return (
     <main className="page">
       <div className="page-container">
-        <section className="match-detail-card">
+
+        <section
+          className="match-detail-card"
+          style={{
+            textAlign: "center",
+            padding: "20px 14px",
+          }}
+        >
+
           <div className="match-detail-league">
             {match.league_logo ? (
               <img
@@ -180,20 +258,65 @@ export default function MatchDetailPage() {
             ) : null}
 
             <span>
-              {match.league || "Futbol"}
+              {match.league ||
+                "Futbol"}
             </span>
           </div>
 
-          <div className="match-detail-date">
-            {formattedDate} • {formattedTime}
+          <div
+            className="match-detail-date"
+            style={{
+              marginTop: "8px",
+            }}
+          >
+            {formattedDate} •{" "}
+            {formattedTime}
           </div>
 
-          <div className="teams-detail">
-            <div className="team-detail">
+          <div
+            className="match-status"
+            style={{
+              display: "inline-block",
+              marginTop: "14px",
+              marginBottom: "20px",
+            }}
+          >
+            {isLive
+              ? "🔴 CANLI"
+              : isFinished
+                ? "🏁 MAÇ BİTTİ"
+                : match.status ===
+                    "postponed"
+                  ? "⏸ ERTELENDİ"
+                  : match.status ===
+                      "cancelled"
+                    ? "❌ İPTAL"
+                    : "🕐 YAKLAŞIYOR"}
+          </div>
+
+          <div
+            className="teams-detail"
+            style={{
+              display: "grid",
+              gridTemplateColumns:
+                "1fr 100px 1fr",
+              alignItems: "center",
+              gap: "10px",
+            }}
+          >
+
+            <div
+              className="team-detail"
+              style={{
+                textAlign: "center",
+              }}
+            >
               {match.home_logo ? (
                 <img
                   src={match.home_logo}
-                  alt={match.home_team}
+                  alt={
+                    match.home_team
+                  }
                   className="team-logo-large"
                 />
               ) : (
@@ -202,18 +325,60 @@ export default function MatchDetailPage() {
                 </div>
               )}
 
-              <strong>{match.home_team}</strong>
+              <strong>
+                {match.home_team}
+              </strong>
             </div>
 
-            <div className="match-vs">
-              <span>VS</span>
+            <div
+              className="match-vs"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent:
+                  "center",
+                minHeight: "70px",
+              }}
+            >
+              {hasScore ? (
+                <span
+                  style={{
+                    fontSize: "36px",
+                    fontWeight: "900",
+                    letterSpacing:
+                      "2px",
+                    whiteSpace:
+                      "nowrap",
+                  }}
+                >
+                  {homeScore} -{" "}
+                  {awayScore}
+                </span>
+              ) : (
+                <span
+                  style={{
+                    fontSize: "18px",
+                    fontWeight: "800",
+                    color: "#9ca3af",
+                  }}
+                >
+                  VS
+                </span>
+              )}
             </div>
 
-            <div className="team-detail">
+            <div
+              className="team-detail"
+              style={{
+                textAlign: "center",
+              }}
+            >
               {match.away_logo ? (
                 <img
                   src={match.away_logo}
-                  alt={match.away_team}
+                  alt={
+                    match.away_team
+                  }
                   className="team-logo-large"
                 />
               ) : (
@@ -222,30 +387,38 @@ export default function MatchDetailPage() {
                 </div>
               )}
 
-              <strong>{match.away_team}</strong>
+              <strong>
+                {match.away_team}
+              </strong>
             </div>
+
           </div>
 
-          <div className="match-status">
-            {match.status === "live"
-              ? "🔴 Canlı"
-              : match.status === "finished"
-                ? "🏁 Tamamlandı"
-                : match.status === "postponed"
-                  ? "⏸ Ertelendi"
-                  : match.status === "cancelled"
-                    ? "❌ İptal"
-                    : "🕐 Yaklaşan Maç"}
-          </div>
+          {isLive ? (
+            <div
+              style={{
+                marginTop: "16px",
+                fontSize: "12px",
+                color: "#dc2626",
+                fontWeight: "700",
+              }}
+            >
+              🔄 Canlı skor otomatik
+              olarak güncelleniyor
+            </div>
+          ) : null}
+
         </section>
 
         <section className="section-card">
           <div className="section-title">
-            <h2>Tahminini Yap</h2>
+            <h2>
+              Tahminini Yap
+            </h2>
 
             <p>
-              Bu maç için tahminini seç ve
-              toplulukla paylaş.
+              Bu maç için tahminini
+              seç ve toplulukla paylaş.
             </p>
           </div>
 
@@ -259,48 +432,64 @@ export default function MatchDetailPage() {
 
         <section className="section-card">
           <div className="section-title">
-            <h2>Tahminler</h2>
+            <h2>
+              Tahminler
+            </h2>
 
             <p>
-              Bu maç için yapılan topluluk
-              tahminleri.
+              Bu maç için yapılan
+              topluluk tahminleri.
             </p>
           </div>
 
-          {predictions.length === 0 ? (
+          {predictions.length ===
+          0 ? (
             <div className="empty-state small">
               <p>
-                Henüz bu maç için tahmin
-                yapılmamış.
+                Henüz bu maç için
+                tahmin yapılmamış.
               </p>
 
               <span>
-                İlk tahmini sen yapabilirsin.
+                İlk tahmini sen
+                yapabilirsin.
               </span>
             </div>
           ) : (
             <div className="prediction-list">
-              {predictions.map((prediction) => (
-                <PredictionMessage
-                  key={prediction.id}
-                  prediction={prediction}
-                />
-              ))}
+              {predictions.map(
+                (prediction) => (
+                  <PredictionMessage
+                    key={
+                      prediction.id
+                    }
+                    prediction={
+                      prediction
+                    }
+                  />
+                )
+              )}
             </div>
           )}
         </section>
 
         <section className="section-card">
           <div className="section-title">
-            <h2>Maç Sohbeti</h2>
+            <h2>
+              Maç Sohbeti
+            </h2>
 
             <p>
-              Bu maç hakkında toplulukla konuş.
+              Bu maç hakkında
+              toplulukla konuş.
             </p>
           </div>
 
-          <ChatBox matchId={match.id} />
+          <ChatBox
+            matchId={match.id}
+          />
         </section>
+
       </div>
     </main>
   );
