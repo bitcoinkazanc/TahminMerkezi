@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 export async function GET() {
   const url =
-    "https://local-global.flashscore.ninja/2/x/feed/f_1_0_3_en_1";
+    "https://local-global.flashscore.ninja/2/x/feed/r_1_1";
 
   try {
     const response =
@@ -24,91 +24,22 @@ export async function GET() {
     const text =
       await response.text();
 
-    if (!response.ok) {
-      return NextResponse.json({
-        success: false,
-        status: response.status,
-        error:
-          text.substring(0, 1000),
-      });
-    }
-
-    const turkeyIndex =
-      text.indexOf("ZY÷Turkey");
-
-    const turkeyStart =
-      text.lastIndexOf(
-        "¬~ZA÷",
-        turkeyIndex
-      );
-
-    const nextCompetition =
-      text.indexOf(
-        "¬~ZA÷",
-        turkeyIndex + 10
-      );
-
-    const turkeyEnd =
-      nextCompetition === -1
-        ? text.length
-        : nextCompetition;
-
-    const turkeySection =
-      text.substring(
-        turkeyStart,
-        turkeyEnd
-      );
-
-    const aaMatches = [
-      ...turkeySection.matchAll(
-        /AA÷([^¬]+)/g
-      ),
-    ];
-
-    const samples =
-      aaMatches
-        .slice(0, 10)
-        .map((match) => {
-          const index =
-            match.index;
-
-          return {
-            matchId:
-              match[1],
-            index,
-            before:
-              turkeySection.substring(
-                Math.max(
-                  0,
-                  index - 30
-                ),
-                index
-              ),
-            after:
-              turkeySection.substring(
-                index,
-                Math.min(
-                  turkeySection.length,
-                  index + 500
-                )
-              ),
-          };
-        });
-
     return NextResponse.json({
-      success: true,
+      success: response.ok,
       status: response.status,
-
-      totalDataLength:
-        text.length,
-
-      turkeySectionLength:
-        turkeySection.length,
-
-      aaCount:
-        aaMatches.length,
-
-      samples,
+      dataLength: text.length,
+      containsTurkey:
+        text
+          .toLowerCase()
+          .includes("turkey"),
+      containsSuperLig:
+        text
+          .toLowerCase()
+          .includes("super lig"),
+      containsLiveStatus:
+        text.includes("AB÷2"),
+      preview:
+        text.substring(0, 5000),
     });
 
   } catch (error) {
