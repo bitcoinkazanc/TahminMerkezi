@@ -1,107 +1,302 @@
 import { NextResponse } from "next/server";
 
+function getField(text, field) {
+  const match =
+    text.match(
+      new RegExp(
+        `(?:^|¬)${field}÷([^¬]+)`
+      )
+    );
+
+  return match
+    ? match[1]
+    : null;
+}
+
+function parseMatch(matchText) {
+  const matchId =
+    getField(matchText, "AA");
+
+  const timestamp =
+    getField(matchText, "AD");
+
+  const status =
+    getField(matchText, "AB");
+
+  const home =
+    getField(matchText, "CX");
+
+  const away =
+    getField(matchText, "AF");
+
+  const homeScore =
+    getField(matchText, "AG");
+
+  const awayScore =
+    getField(matchText, "AH");
+
+  const minute =
+    getField(matchText, "BA");
+
+  const period =
+    getField(matchText, "BC");
+
+  if (
+    !matchId ||
+    !home ||
+    !away
+  ) {
+    return null;
+  }
+
+  return {
+    matchId,
+    timestamp:
+      timestamp
+        ? Number(timestamp)
+        : null,
+
+    status,
+
+    home,
+    away,
+
+    homeScore,
+    awayScore,
+
+    minute,
+    period,
+
+    live:
+      status === "2",
+
+    finished:
+      status === "3",
+
+    scheduled:
+      status === "1",
+  };
+}
+
+function parseCompetition(
+  competitionSection
+) {
+  const competitionName =
+    getField(
+      competitionSection,
+      "ZA"
+    );
+
+  const country =
+    getField(
+      competitionSection,
+      "ZY"
+    );
+
+  const leagueSlug =
+    getField(
+      competitionSection,
+      "ZL"
+    );
+
+  const matches = [];
+
+  const matchParts =
+    competitionSection.split(
+      "¬~AA÷"
+    );
+
+  for (
+    let i = 1;
+    i < matchParts.length;
+    i++
+  ) {
+    const matchText =
+      "AA÷" +
+      matchParts[i];
+
+    const match =
+      parseMatch(matchText);
+
+    if (!match) {
+      continue;
+    }
+
+    matches.push({
+      ...match,
+
+      competition:
+        competitionName,
+
+      country,
+
+      leagueSlug,
+    });
+  }
+
+  return {
+    competition:
+      competitionName,
+
+    country,
+
+    leagueSlug,
+
+    matches,
+  };
+}
+
 export async function GET() {
-  const liveUrl =
-    "https://local-global.flashscore.ninja/2/x/feed/r_1_1";
+  const url =
+    "https://local-global.flashscore.ninja/2/x/feed/f_1_0_3_en_1";
 
   try {
-    const liveResponse =
-      await fetch(liveUrl, {
+    const response =
+      await fetch(url, {
         method: "GET",
+
         headers: {
           "User-Agent":
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36",
+
           "Accept":
             "*/*",
+
           "Referer":
             "https://www.flashscore.com/",
+
           "x-fsign":
             "SW9D1eZo",
         },
+
         cache: "no-store",
       });
 
-    const liveText =
-      await liveResponse.text();
+    const text =
+      await response.text();
 
-    if (!liveResponse.ok) {
+    if (!response.ok) {
       return NextResponse.json({
         success: false,
-        step: "live_feed",
-        status: liveResponse.status,
-        preview:
-          liveText.substring(0, 1000),
+
+        status:
+          response.status,
+
+        error:
+          text.substring(
+            0,
+            1000
+          ),
       });
     }
 
-    const idMatch =
-      liveText.match(
-        /AA÷([^¬~]+)/
+    const sections =
+      text.split(
+        "¬~ZA÷"
       );
 
-    if (!idMatch) {
-      return NextResponse.json({
-        success: true,
-        step: "live_feed",
-        dataLength:
-          liveText.length,
-        message:
-          "Live feed içinde maç ID bulunamadı.",
-        preview:
-          liveText.substring(0, 1000),
-      });
+    const competitions = [];
+
+    for (
+      let i = 1;
+      i < sections.length;
+      i++
+    ) {
+      const section =
+        "ZA÷" +
+        sections[i];
+
+      const competition =
+        parseCompetition(
+          section
+        );
+
+      if (
+        competition.matches
+          .length > 0
+      ) {
+        competitions.push(
+          competition
+        );
+      }
     }
 
-    const matchId =
-      idMatch[1];
+    const allMatches =
+      competitions.flatMap(
+        (competition) =>
+          competition.matches
+      );
 
-    const matchUrl =
-      `https://local-global.flashscore.ninja/2/x/feed/df_sui_1_${matchId}`;
+    const turkeyMatches =
+      allMatches.filter(
+        (match) =>
+          String(
+            match.country || ""
+          ).toLowerCase() ===
+            "turkey" ||
+          String(
+            match.competition || ""
+          )
+            .toLowerCase()
+            .includes("turkey")
+      );
 
-    const matchResponse =
-      await fetch(matchUrl, {
-        method: "GET",
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36",
-          "Accept":
-            "*/*",
-          "Referer":
-            "https://www.flashscore.com/",
-          "x-fsign":
-            "SW9D1eZo",
-        },
-        cache: "no-store",
-      });
+    const liveMatches =
+      allMatches.filter(
+        (match) =>
+          match.status === "2"
+      );
 
-    const matchText =
-      await matchResponse.text();
+    const liveTurkeyMatches =
+      turkeyMatches.filter(
+        (match) =>
+          match.status === "2"
+      );
 
     return NextResponse.json({
-      success:
-        matchResponse.ok,
-      step:
-        "match_detail",
-      liveFeedStatus:
-        liveResponse.status,
-      liveFeedLength:
-        liveText.length,
-      matchId,
-      matchStatus:
-        matchResponse.status,
-      matchDataLength:
-        matchText.length,
-      preview:
-        matchText.substring(0, 5000),
+      success: true,
+
+      sourceStatus:
+        response.status,
+
+      totalDataLength:
+        text.length,
+
+      competitionCount:
+        competitions.length,
+
+      totalMatchCount:
+        allMatches.length,
+
+      liveMatchCount:
+        liveMatches.length,
+
+      turkeyMatchCount:
+        turkeyMatches.length,
+
+      liveTurkeyMatchCount:
+        liveTurkeyMatches.length,
+
+      turkeyMatches,
+
+      liveTurkeyMatches,
+
+      sampleMatches:
+        allMatches.slice(
+          0,
+          20
+        ),
     });
 
   } catch (error) {
     return NextResponse.json(
       {
         success: false,
+
         error:
           error.message,
       },
+
       {
         status: 500,
       }
