@@ -7,6 +7,38 @@ export const revalidate = 0;
 const MACKOLIK_MATCH_URL =
   "https://www.mackolik.com/mac/erzurumspor-fk-vs-galatasaray/iddaa/c8xvpz70pwcqq45ptmigb5las";
 
+const MARKET_NAMES = [
+  "Maç Sonucu",
+  "Devre Sonucu",
+  "Altı/Üstü",
+  "Çifte Şans",
+  "İlk Yarı/Maç Sonucu",
+  "Toplam Gol",
+  "Maç Skoru",
+  "Tek/Çift",
+  "Karşılıklı Gol",
+];
+
+function cleanText(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function containsMarketName(text: string): string | null {
+  const normalized = cleanText(text).toLocaleLowerCase("tr-TR");
+
+  for (const market of MARKET_NAMES) {
+    if (
+      normalized.includes(
+        market.toLocaleLowerCase("tr-TR")
+      )
+    ) {
+      return market;
+    }
+  }
+
+  return null;
+}
+
 export async function GET() {
   try {
     const response = await fetch(MACKOLIK_MATCH_URL, {
@@ -14,10 +46,14 @@ export async function GET() {
       headers: {
         Accept:
           "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36",
-        Referer: "https://www.mackolik.com/",
+
+        Referer:
+          "https://www.mackolik.com/",
       },
+
       cache: "no-store",
     });
 
@@ -27,14 +63,11 @@ export async function GET() {
       return NextResponse.json(
         {
           success: false,
-          test: "mackolik-iddaa-detail",
-          mackolik: {
-            status: response.status,
-            statusText: response.statusText,
-          },
-          error: "Mackolik maç detay sayfası alınamadı.",
+          test: "mackolik-market-html-extraction",
+          status: response.status,
+          statusText: response.statusText,
           rawLength: html.length,
-          rawPreview: html.slice(0, 3000),
+          rawPreview: html.slice(0, 5000),
         },
         {
           status: response.status,
@@ -44,134 +77,150 @@ export async function GET() {
 
     const $ = cheerio.load(html);
 
-    const pageTitle = $("title").first().text().trim();
-
-    const marketSections: Array<{
+    const detectedElements: Array<{
       market: string;
-      code: string | null;
-      mbs: string | null;
-      selections: Array<{
-        name: string;
-        odd: string;
-      }>;
+      tag: string;
+      className: string;
+      id: string;
+      text: string;
+      html: string;
     }> = [];
 
-    $(".widget-iddaa-markets__markets-list > *").each(
-      (_, element) => {
-        const section = $(element);
+    const seen = new Set<string>();
 
-        const text = section
-          .text()
-          .replace(/\s+/g, " ")
-          .trim();
+    $("*").each((_, element) => {
+      const node = $(element);
 
-        if (!text) {
+      const text = cleanText(
+        node.clone().children().remove().end().text()
+      );
+
+      if (!text) {
+        return;
+      }
+
+      const market = containsMarketName(text);
+
+      if (!market) {
+        return;
+      }
+
+      const tag = element.tagName || "";
+
+      const className =
+        typeof element.attribs?.class === "string"
+          ? element.attribs.class
+          : "";
+
+      const id =
+        typeof element.attribs?.id === "string"
+          ? element.attribs.id
+          : "";
+
+      const key =
+        `${market}|${tag}|${className}|${id}|${text}`;
+
+      if (seen.has(key)) {
+        return;
+      }
+
+      seen.add(key);
+
+      detectedElements.push({
+        market,
+        tag,
+        className,
+        id,
+        text: text.slice(0, 500),
+        html: $.html(element).slice(0, 5000),
+      });
+    });
+
+    const marketContainers: Array<{
+      market: string;
+      tag: string;
+      className: string;
+      id: string;
+      text: string;
+      html: string;
+    }> = [];
+
+    const seenContainers = new Set<string>();
+
+    for (const item of detectedElements) {
+      const selectorParts: string[] = [];
+
+      if (item.id) {
+        selectorParts.push(`#${CSS.escape(item.id)}`);
+      }
+
+      if (item.className) {
+        const classes = item.className
+          .split(/\s+/)
+          .filter(Boolean)
+          .map((className) => `.${CSS.escape(className)}`)
+          .join("");
+
+        if (classes) {
+          selectorParts.push(`${item.tag}${classes}`);
+        }
+      }
+
+      if (!selectorParts.length) {
+        selectorParts.push(item.tag);
+      }
+
+      const selector = selectorParts[0];
+
+      $(selector).each((_, element) => {
+        const container = $(element);
+
+        const containerText = cleanText(
+          container.text()
+        );
+
+        if (
+          !containerText ||
+          containerText.length > 20000
+        ) {
           return;
         }
 
-        const marketName =
-          section
-            .find(
-              ".widget-iddaa-markets__market-name, .market-name"
-            )
-            .first()
-            .text()
-            .replace(/\s+/g, " ")
-            .trim() || null;
+        const key =
+          `${item.market}|${element.tagName}|${containerText}`;
 
-        const selections: Array<{
-          name: string;
-          odd: string;
-        }> = [];
-
-        section
-          .find(
-            ".widget-iddaa-markets__market-item, .market-item"
-          )
-          .each((__, item) => {
-            const itemElement = $(item);
-
-            const itemText = itemElement
-              .text()
-              .replace(/\s+/g, " ")
-              .trim();
-
-            if (!itemText) {
-              return;
-            }
-
-            const odd =
-              itemElement
-                .find(
-                  ".widget-iddaa-markets__odd, .odd"
-                )
-                .first()
-                .text()
-                .replace(/\s+/g, " ")
-                .trim() || "";
-
-            const name =
-              itemElement
-                .find(
-                  ".widget-iddaa-markets__selection, .selection, .name"
-                )
-                .first()
-                .text()
-                .replace(/\s+/g, " ")
-                .trim() ||
-              itemText;
-
-            selections.push({
-              name,
-              odd,
-            });
-          });
-
-        if (
-          marketName ||
-          selections.length > 0
-        ) {
-          marketSections.push({
-            market:
-              marketName ||
-              text.slice(0, 150),
-            code: null,
-            mbs: null,
-            selections,
-          });
+        if (seenContainers.has(key)) {
+          return;
         }
-      }
-    );
 
-    const bodyText = $("body")
-      .text()
-      .replace(/\s+/g, " ")
-      .trim();
+        seenContainers.add(key);
 
-    const knownMarkets = [
-      "Maç Sonucu",
-      "Devre Sonucu",
-      "Altı/Üstü",
-      "Çifte Şans",
-      "İlk Yarı/Maç Sonucu",
-      "Toplam Gol",
-      "Maç Skoru",
-      "Tek/Çift",
-      "Karşılıklı Gol",
-    ];
+        marketContainers.push({
+          market: item.market,
+          tag: element.tagName || "",
+          className:
+            typeof element.attribs?.class === "string"
+              ? element.attribs.class
+              : "",
+          id:
+            typeof element.attribs?.id === "string"
+              ? element.attribs.id
+              : "",
+          text: containerText.slice(0, 5000),
+          html: $.html(element).slice(0, 15000),
+        });
+      });
+    }
 
-    const detectedMarkets = knownMarkets.filter(
-      (market) =>
-        bodyText
-          .toLocaleLowerCase("tr-TR")
-          .includes(
-            market.toLocaleLowerCase("tr-TR")
-          )
+    const pageTitle = cleanText(
+      $("title").first().text()
     );
 
     return NextResponse.json({
       success: true,
-      test: "mackolik-iddaa-detail",
+
+      test:
+        "mackolik-market-html-extraction",
 
       request: {
         url: MACKOLIK_MATCH_URL,
@@ -184,49 +233,33 @@ export async function GET() {
           response.headers.get("content-type") || "",
       },
 
-      match: {
+      page: {
         title: pageTitle,
-        expectedMatch:
-          "Erzurumspor FK vs Galatasaray",
-        id: "c8xvpz70pwcqq45ptmigb5las",
-        iddaaCode: "3074731",
+        htmlLength: html.length,
       },
 
       summary: {
-        htmlLength: html.length,
-        detectedMarketsCount:
-          detectedMarkets.length,
-        detectedMarkets,
-        parsedMarketSections:
-          marketSections.length,
+        detectedElements:
+          detectedElements.length,
+
+        marketContainers:
+          marketContainers.length,
       },
 
-      marketSections,
+      detectedElements:
+        detectedElements.slice(0, 30),
 
-      rawCheck: {
-        hasIddaaText:
-          bodyText
-            .toLocaleLowerCase("tr-TR")
-            .includes("iddaa"),
-        hasMatchResult:
-          bodyText
-            .toLocaleLowerCase("tr-TR")
-            .includes("maç sonucu"),
-        hasDoubleChance:
-          bodyText
-            .toLocaleLowerCase("tr-TR")
-            .includes("çifte şans"),
-        hasOverUnder:
-          bodyText
-            .toLocaleLowerCase("tr-TR")
-            .includes("altı/üstü"),
-      },
+      marketContainers:
+        marketContainers.slice(0, 20),
     });
   } catch (error) {
     return NextResponse.json(
       {
         success: false,
-        test: "mackolik-iddaa-detail",
+
+        test:
+          "mackolik-market-html-extraction",
+
         error:
           error instanceof Error
             ? error.message
