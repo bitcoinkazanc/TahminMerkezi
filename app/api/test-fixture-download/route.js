@@ -1,134 +1,274 @@
 import { NextResponse } from "next/server";
 
-export async function GET() {
-  const today =
-    new Date();
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+const MACKOLIK_BASE_URL =
+  "https://www.mackolik.com";
+
+const MACKOLIK_LIVESCORES_PATH =
+  "/perform/p0/ajax/components/competition/livescores/json";
+
+function formatDate(
+  date = new Date()
+) {
+  const parts =
+    new Intl.DateTimeFormat(
+      "en-CA",
+      {
+        timeZone:
+          "Europe/Istanbul",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }
+    ).formatToParts(date);
 
   const year =
-    today.getFullYear();
+    parts.find(
+      (part) =>
+        part.type === "year"
+    )?.value;
 
   const month =
-    String(
-      today.getMonth() + 1
-    ).padStart(2, "0");
+    parts.find(
+      (part) =>
+        part.type === "month"
+    )?.value;
 
   const day =
-    String(
-      today.getDate()
-    ).padStart(2, "0");
+    parts.find(
+      (part) =>
+        part.type === "day"
+    )?.value;
 
+  return `${year}-${month}-${day}`;
+}
+
+async function getMackolikData(
+  sport
+) {
   const matchDate =
-    `${year}-${month}-${day}`;
+    formatDate();
 
   const url =
-    "https://www.mackolik.com/perform/p0/ajax/components/competition/livescores/json" +
-    `?matchDate=${matchDate}` +
-    "&sports[]=Basketball";
+    new URL(
+      `${MACKOLIK_BASE_URL}${MACKOLIK_LIVESCORES_PATH}`
+    );
 
-  try {
-    const response =
-      await fetch(url, {
+  url.searchParams.set(
+    "matchDate",
+    matchDate
+  );
+
+  url.searchParams.append(
+    "sports[]",
+    sport
+  );
+
+  const response =
+    await fetch(
+      url.toString(),
+      {
         method: "GET",
         headers: {
           Accept:
             "application/json, text/plain, */*",
+
           "User-Agent":
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36",
+
           Referer:
             "https://www.mackolik.com/",
+
           Origin:
-            "https://www.mackolik.com"
+            "https://www.mackolik.com",
         },
-        cache: "no-store"
-      });
 
-    const data =
-      await response.json();
+        cache: "no-store",
+      }
+    );
 
-    const matches =
-      Object.values(
-        data?.data?.matches || {}
+  if (!response.ok) {
+    throw new Error(
+      `Maçkolik API hatası: ${response.status}`
+    );
+  }
+
+  const data =
+    await response.json();
+
+  if (
+    data?.status !==
+    "success"
+  ) {
+    throw new Error(
+      "Maçkolik veri kaynağı başarısız cevap döndürdü."
+    );
+  }
+
+  return data;
+}
+
+function findLiveMatches(
+  data,
+  sport
+) {
+  const matches =
+    Object.values(
+      data?.data?.matches ||
+        {}
+    );
+
+  return matches
+    .filter(
+      (match) =>
+        match?.state ===
+        "live"
+    )
+    .map(
+      (match) => ({
+        sport,
+
+        id:
+          match?.id ||
+          null,
+
+        matchName:
+          match?.matchName ||
+          null,
+
+        homeTeam:
+          match?.homeTeam ||
+          null,
+
+        awayTeam:
+          match?.awayTeam ||
+          null,
+
+        competitionId:
+          match?.competitionId ||
+          null,
+
+        status:
+          match?.status ||
+          null,
+
+        state:
+          match?.state ||
+          null,
+
+        substate:
+          match?.substate ||
+          null,
+
+        score:
+          match?.score ||
+          null,
+
+        iddaaCode:
+          match?.iddaaCode ??
+          null,
+
+        liveBetting:
+          match?.liveBetting ??
+          null,
+
+        statusBoxContent:
+          match?.statusBoxContent ||
+          null,
+
+        mstUtc:
+          match?.mstUtc ||
+          null,
+
+        rawKeys:
+          Object.keys(
+            match || {}
+          ),
+      })
+    );
+}
+
+export async function GET() {
+  try {
+    const [
+      footballData,
+      basketballData,
+    ] = await Promise.all([
+      getMackolikData(
+        "Soccer"
+      ),
+      getMackolikData(
+        "Basketball"
+      ),
+    ]);
+
+    const footballLive =
+      findLiveMatches(
+        footballData,
+        "football"
       );
 
-    const liveCandidates =
-      matches
-        .filter(
-          (match) =>
-            match?.state !== "pre" &&
-            match?.substate !== "fullTime" &&
-            match?.substate !== "postponed"
-        )
-        .map(
-          (match) => {
+    const basketballLive =
+      findLiveMatches(
+        basketballData,
+        "basketball"
+      );
 
-            const competition =
-              data?.data?.competitions?.[
-                match?.competitionId
-              ];
+    const liveMatches = [
+      ...footballLive,
+      ...basketballLive,
+    ];
 
-            return {
-              id:
-                match.id,
+    return NextResponse.json(
+      {
+        success: true,
 
-              matchName:
-                match.matchName,
+        matchDate:
+          formatDate(),
 
-              competition:
-                competition?.name || "",
+        totalLive:
+          liveMatches.length,
 
-              country:
-                competition?.country?.name ||
-                "",
+        footballLive:
+          footballLive.length,
 
-              state:
-                match.state,
+        basketballLive:
+          basketballLive.length,
 
-              status:
-                match.status,
+        matches:
+          liveMatches,
+      },
+      {
+        headers: {
+          "Cache-Control":
+            "no-store, no-cache, must-revalidate, proxy-revalidate",
 
-              substate:
-                match.substate,
+          Pragma:
+            "no-cache",
 
-              score:
-                match.score,
-
-              statusBoxContent:
-                match.statusBoxContent,
-
-              lastUpdated:
-                match.lastUpdated,
-
-              liveBetting:
-                match.liveBetting
-            };
-          }
-        );
-
-    return NextResponse.json({
-      success: true,
-
-      matchDate,
-
-      totalMatches:
-        matches.length,
-
-      liveCandidateCount:
-        liveCandidates.length,
-
-      liveCandidates
-    });
-
+          Expires:
+            "0",
+        },
+      }
+    );
   } catch (error) {
+    console.error(
+      "Mackolik test error:",
+      error
+    );
+
     return NextResponse.json(
       {
         success: false,
 
         error:
           error?.message ||
-          "Bilinmeyen hata"
+          "Maçkolik verisi alınamadı.",
       },
       {
-        status: 500
+        status: 500,
       }
     );
   }
