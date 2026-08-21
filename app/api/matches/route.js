@@ -112,7 +112,9 @@ function normalizeMatch(match) {
   };
 }
 
-function getSourceSport(match) {
+function getSourceSport(
+  match
+) {
   if (
     match?.sport ===
     "basketball"
@@ -246,14 +248,6 @@ export async function GET(request) {
       }
     }
 
-    const sourceExternalIds =
-      filteredSourceMatches
-        .map(
-          (match) =>
-            String(match.id)
-        )
-        .filter(Boolean);
-
     let query =
       supabase
         .from("matches")
@@ -279,22 +273,6 @@ export async function GET(request) {
             ascending: true,
           }
         );
-
-    if (
-      sourceExternalIds.length > 0
-    ) {
-      query =
-        query.in(
-          "external_id",
-          sourceExternalIds
-        );
-    } else {
-      query =
-        query.in(
-          "external_id",
-          ["__no_matches__"]
-        );
-    }
 
     if (matchId) {
       query =
@@ -464,7 +442,9 @@ export async function GET(request) {
   }
 }
 
-export async function POST(request) {
+export async function POST(
+  request
+) {
   try {
     const body =
       await request.json();
