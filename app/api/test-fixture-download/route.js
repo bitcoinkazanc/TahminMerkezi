@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 
 export async function GET() {
   const url =
-    "https://www.mackolik.com/perform/p0/ajax/components/competition/livescores/json";
+    "https://www.mackolik.com/perform/p0/ajax/components/competition/livescores/json" +
+    "?matchDate=21-08-2026" +
+    "&sports[]=Soccer";
 
   try {
     const response =
@@ -33,7 +35,7 @@ export async function GET() {
         ),
       dataLength: text.length,
       preview:
-        text.substring(0, 5000),
+        text.substring(0, 10000),
     });
 
   } catch (error) {
