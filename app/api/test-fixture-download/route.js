@@ -28,96 +28,51 @@ export async function GET() {
       return NextResponse.json({
         success: false,
         status: response.status,
-        error: text.substring(0, 1000),
+        error:
+          text.substring(0, 1000),
       });
     }
 
-    const sections =
-      text.split("¬~ZA÷");
+    const turkeyIndex =
+      text.indexOf("ZY÷Turkey");
 
-    const turkeySections =
-      sections.filter((section) =>
-        section.includes("ZY÷Turkey")
-      );
-
-    const turkeyMatches = [];
-
-    for (const section of turkeySections) {
-      const competitionNameMatch =
-        section.match(/^([^¬]+)¬/);
-
-      const competitionName =
-        competitionNameMatch
-          ? competitionNameMatch[1]
-          : "Bilinmeyen lig";
-
-      const matches =
-        section.split("¬~AA÷");
-
-      for (const match of matches) {
-        if (!match.includes("AA÷")) {
-          continue;
-        }
-
-        const homeMatch =
-          match.match(/¬CX÷([^¬]+)/);
-
-        const awayMatch =
-          match.match(/¬AF÷([^¬]+)/);
-
-        const statusMatch =
-          match.match(/¬AB÷([^¬]+)/);
-
-        const matchIdMatch =
-          match.match(/AA÷([^¬]+)/);
-
-        const timestampMatch =
-          match.match(/¬AD÷([^¬]+)/);
-
-        const home =
-          homeMatch
-            ? homeMatch[1]
-            : null;
-
-        const away =
-          awayMatch
-            ? awayMatch[1]
-            : null;
-
-        const status =
-          statusMatch
-            ? statusMatch[1]
-            : null;
-
-        const matchId =
-          matchIdMatch
-            ? matchIdMatch[1]
-            : null;
-
-        const timestamp =
-          timestampMatch
-            ? timestampMatch[1]
-            : null;
-
-        if (home && away) {
-          turkeyMatches.push({
-            competition:
-              competitionName,
-            matchId,
-            home,
-            away,
-            status,
-            timestamp,
-            live:
-              status === "2",
-          });
-        }
-      }
+    if (turkeyIndex === -1) {
+      return NextResponse.json({
+        success: false,
+        status: response.status,
+        error:
+          "Turkey bölümü bulunamadı.",
+        totalDataLength:
+          text.length,
+      });
     }
 
-    const liveTurkeyMatches =
-      turkeyMatches.filter(
-        (match) => match.live
+    const beforeTurkey =
+      text.lastIndexOf(
+        "¬~ZA÷",
+        turkeyIndex
+      );
+
+    const afterTurkey =
+      text.indexOf(
+        "¬~ZA÷",
+        turkeyIndex + 10
+      );
+
+    const start =
+      beforeTurkey >= 0
+        ? beforeTurkey
+        : turkeyIndex;
+
+    const end =
+      afterTurkey >= 0
+        ? afterTurkey
+        : text.length;
+
+    const turkeySection =
+      text.substring(
+        start,
+        end
       );
 
     return NextResponse.json({
@@ -127,25 +82,40 @@ export async function GET() {
       totalDataLength:
         text.length,
 
-      turkeySectionCount:
-        turkeySections.length,
+      turkeyStart:
+        start,
 
-      turkeyMatchCount:
-        turkeyMatches.length,
+      turkeyLength:
+        turkeySection.length,
 
-      liveTurkeyMatchCount:
-        liveTurkeyMatches.length,
+      containsAA:
+        turkeySection.includes("AA÷"),
 
-      turkeyMatches,
+      containsCX:
+        turkeySection.includes("CX÷"),
 
-      liveTurkeyMatches,
+      containsAF:
+        turkeySection.includes("AF÷"),
+
+      containsAB:
+        turkeySection.includes("AB÷"),
+
+      containsAD:
+        turkeySection.includes("AD÷"),
+
+      preview:
+        turkeySection.substring(
+          0,
+          15000
+        ),
     });
 
   } catch (error) {
     return NextResponse.json(
       {
         success: false,
-        error: error.message,
+        error:
+          error.message,
       },
       {
         status: 500,
