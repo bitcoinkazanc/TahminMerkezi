@@ -48,16 +48,16 @@ function toScore(value) {
 function normalizeMatch(match) {
   if (
     !match ||
-    !match.home ||
-    !match.away ||
-    !match.time ||
-    !match.url
+    !match.home_team ||
+    !match.away_team ||
+    !match.match_date ||
+    !match.id
   ) {
     return null;
   }
 
   const parsedDate =
-    new Date(match.time);
+    new Date(match.match_date);
 
   if (
     Number.isNaN(
@@ -69,19 +69,23 @@ function normalizeMatch(match) {
 
   return {
     external_id:
-      String(match.url),
+      String(match.id),
 
     league:
-      match.competition || null,
+      match.league || null,
 
     league_logo:
-      match.competition_logo || null,
+      match.league_logo || null,
 
     home_team:
-      String(match.home).trim(),
+      String(
+        match.home_team
+      ).trim(),
 
     away_team:
-      String(match.away).trim(),
+      String(
+        match.away_team
+      ).trim(),
 
     home_logo:
       match.home_logo || null,
@@ -93,73 +97,32 @@ function normalizeMatch(match) {
       parsedDate.toISOString(),
 
     status:
-      match.status || "scheduled",
+      match.status ||
+      "scheduled",
 
     home_score:
-      toScore(match.home_score),
+      toScore(
+        match.home_score
+      ),
 
     away_score:
-      toScore(match.away_score),
+      toScore(
+        match.away_score
+      ),
   };
 }
 
-function getSlugFromMatchUrl(matchUrl) {
-  if (!matchUrl) {
-    return null;
-  }
-
-  const parts =
-    String(matchUrl)
-      .split("/")
-      .filter(Boolean);
-
-  return parts.length > 0
-    ? parts[parts.length - 1]
-    : null;
-}
-
-async function getLiveMinute(match) {
+function getSourceSport(
+  match
+) {
   if (
-    !match ||
-    match.status !== "live" ||
-    !match.url
+    match?.sport ===
+    "basketball"
   ) {
-    return null;
+    return "basketball";
   }
 
-  const slug =
-    getSlugFromMatchUrl(
-      match.url
-    );
-
-  if (!slug) {
-    return null;
-  }
-
-  try {
-    const detail =
-      await getMatch(slug);
-
-    const liveMinute =
-      detail?.match?.live_minute;
-
-    if (
-      liveMinute === undefined ||
-      liveMinute === null ||
-      liveMinute === ""
-    ) {
-      return null;
-    }
-
-    return String(liveMinute);
-  } catch (error) {
-    console.error(
-      "Live minute loading error:",
-      error
-    );
-
-    return null;
-  }
+  return "football";
 }
 
 export async function GET(request) {
@@ -176,32 +139,66 @@ export async function GET(request) {
     const status =
       searchParams.get("status");
 
+    const sport =
+      searchParams.get("sport");
+
+    const limitParam =
+      searchParams.get("limit");
+
     const requestedLimit =
-      Number(
-        searchParams.get("limit") || 50
-      );
+      limitParam
+        ? Number(limitParam)
+        : null;
 
     const limit =
-      Math.min(
-        Math.max(
-          requestedLimit,
-          1
-        ),
-        50
-      );
-
-    const sportScoreData =
-      await getMatches(limit);
+      requestedLimit !== null &&
+      Number.isFinite(
+        requestedLimit
+      ) &&
+      requestedLimit > 0
+        ? Math.floor(
+            requestedLimit
+          )
+        : null;
 
     const sourceMatches =
-      Array.isArray(
-        sportScoreData?.matches
-      )
-        ? sportScoreData.matches
-        : [];
+      await getMatches();
+
+    const filteredSourceMatches =
+      sourceMatches.filter(
+        (match) => {
+          if (
+            sport &&
+            match?.sport !==
+              sport
+          ) {
+            return false;
+          }
+
+          if (
+            status &&
+            match?.status !==
+              status
+          ) {
+            return false;
+          }
+
+          if (
+            matchId &&
+            String(
+              match?.id
+            ) !==
+              String(matchId)
+          ) {
+            return false;
+          }
+
+          return true;
+        }
+      );
 
     const normalizedMatches =
-      sourceMatches
+      filteredSourceMatches
         .map(normalizeMatch)
         .filter(Boolean);
 
@@ -273,10 +270,9 @@ export async function GET(request) {
         .order(
           "match_date",
           {
-            ascending: false,
+            ascending: true,
           }
-        )
-        .limit(limit);
+        );
 
     if (matchId) {
       query =
@@ -292,6 +288,11 @@ export async function GET(request) {
           "status",
           status
         );
+    }
+
+    if (limit !== null) {
+      query =
+        query.limit(limit);
     }
 
     const {
@@ -320,6 +321,41 @@ export async function GET(request) {
     let matches =
       data || [];
 
+    const sourceSportMap =
+      new Map();
+
+    filteredSourceMatches.forEach(
+      (sourceMatch) => {
+        if (!sourceMatch?.id) {
+          return;
+        }
+
+        sourceSportMap.set(
+          String(
+            sourceMatch.id
+          ),
+          getSourceSport(
+            sourceMatch
+          )
+        );
+      }
+    );
+
+    matches =
+      matches.map(
+        (match) => ({
+          ...match,
+
+          sport:
+            sourceSportMap.get(
+              String(
+                match.external_id
+              )
+            ) ||
+            "football",
+        })
+      );
+
     if (
       matchId &&
       matches.length > 0
@@ -331,32 +367,31 @@ export async function GET(request) {
         currentMatch.status ===
         "live"
       ) {
-        const sourceMatch =
-          sourceMatches.find(
-            (item) =>
-              String(
-                item?.url || ""
-              ) ===
-              String(
-                currentMatch.external_id ||
-                  ""
-              )
+        try {
+          const detail =
+            await getMatch(
+              currentMatch.external_id
+            );
+
+          if (detail) {
+            const liveMinute =
+              detail?.live_minute ||
+              null;
+
+            matches =
+              matches.map(
+                (item) => ({
+                  ...item,
+                  live_minute:
+                    liveMinute,
+                })
+              );
+          }
+        } catch (error) {
+          console.error(
+            "Live match detail error:",
+            error
           );
-
-        if (sourceMatch) {
-          const liveMinute =
-            await getLiveMinute(
-              sourceMatch
-            );
-
-          matches =
-            matches.map(
-              (item) => ({
-                ...item,
-                live_minute:
-                  liveMinute,
-              })
-            );
         }
       }
     }
@@ -364,10 +399,16 @@ export async function GET(request) {
     return NextResponse.json(
       {
         success: true,
+
         matches,
+
         source:
-          "SportScore",
+          "Mackolik",
+
         source_count:
+          filteredSourceMatches.length,
+
+        total_source_matches:
           sourceMatches.length,
       },
       {
@@ -401,7 +442,9 @@ export async function GET(request) {
   }
 }
 
-export async function POST(request) {
+export async function POST(
+  request
+) {
   try {
     const body =
       await request.json();
@@ -518,10 +561,14 @@ export async function POST(request) {
       status,
 
       home_score:
-        toScore(home_score),
+        toScore(
+          home_score
+        ),
 
       away_score:
-        toScore(away_score),
+        toScore(
+          away_score
+        ),
     };
 
     let result;
