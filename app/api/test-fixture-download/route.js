@@ -1,9 +1,28 @@
 import { NextResponse } from "next/server";
 
 export async function GET() {
+  const today =
+    new Date();
+
+  const year =
+    today.getFullYear();
+
+  const month =
+    String(
+      today.getMonth() + 1
+    ).padStart(2, "0");
+
+  const day =
+    String(
+      today.getDate()
+    ).padStart(2, "0");
+
+  const matchDate =
+    `${year}-${month}-${day}`;
+
   const url =
     "https://www.mackolik.com/perform/p0/ajax/components/competition/livescores/json" +
-    "?matchDate=21-08-2026" +
+    `?matchDate=${matchDate}` +
     "&sports[]=Soccer";
 
   try {
@@ -18,9 +37,9 @@ export async function GET() {
           Referer:
             "https://www.mackolik.com/",
           Origin:
-            "https://www.mackolik.com",
+            "https://www.mackolik.com"
         },
-        cache: "no-store",
+        cache: "no-store"
       });
 
     const data =
@@ -31,86 +50,80 @@ export async function GET() {
         data?.data?.matches || {}
       );
 
-    const stateCounts = {};
-    const statusCounts = {};
-    const substateCounts = {};
+    const liveMatches =
+      matches
+        .filter(
+          (match) =>
+            match?.state !== "pre" &&
+            match?.substate !== "fullTime" &&
+            match?.substate !== "postponed"
+        )
+        .map(
+          (match) => {
 
-    const turkeyMatches = [];
+            const competition =
+              data?.data?.competitions?.[
+                match?.competitionId
+              ];
 
-    for (const match of matches) {
+            return {
+              id:
+                match.id,
 
-      const state =
-        String(
-          match?.state || ""
+              matchName:
+                match.matchName,
+
+              competition:
+                competition?.name || "",
+
+              country:
+                competition?.country?.name ||
+                "",
+
+              state:
+                match.state,
+
+              status:
+                match.status,
+
+              substate:
+                match.substate,
+
+              score:
+                match.score,
+
+              statusBoxContent:
+                match.statusBoxContent,
+
+              lastUpdated:
+                match.lastUpdated,
+
+              liveBetting:
+                match.liveBetting
+            };
+          }
         );
-
-      const status =
-        String(
-          match?.status || ""
-        );
-
-      const substate =
-        String(
-          match?.substate || ""
-        );
-
-      stateCounts[state] =
-        (stateCounts[state] || 0) + 1;
-
-      statusCounts[status] =
-        (statusCounts[status] || 0) + 1;
-
-      substateCounts[substate] =
-        (substateCounts[substate] || 0) + 1;
-
-      const competition =
-        data?.data?.competitions?.[
-          match?.competitionId
-        ];
-
-      if (
-        competition?.country?.name ===
-          "Türkiye"
-      ) {
-        turkeyMatches.push({
-          id: match.id,
-          matchName: match.matchName,
-          competition:
-            competition.name,
-          state: match.state,
-          status: match.status,
-          substate: match.substate,
-          score: match.score,
-          statusBoxContent:
-            match.statusBoxContent,
-          lastUpdated:
-            match.lastUpdated,
-          liveBetting:
-            match.liveBetting
-        });
-      }
-    }
 
     return NextResponse.json({
       success: true,
 
+      matchDate,
+
       totalMatches:
         matches.length,
 
-      stateCounts,
-      statusCounts,
-      substateCounts,
+      liveCandidateCount:
+        liveMatches.length,
 
-      turkeyMatchCount:
-        turkeyMatches.length,
-
-      turkeyMatches
+      liveCandidates:
+        liveMatches
     });
 
   } catch (error) {
     return NextResponse.json(
       {
         success: false,
+
         error:
           error?.message ||
           "Bilinmeyen hata"
