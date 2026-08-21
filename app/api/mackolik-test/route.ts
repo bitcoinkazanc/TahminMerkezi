@@ -31,34 +31,6 @@ function getString(
   return null;
 }
 
-function getNestedString(
-  object: UnknownRecord,
-  paths: string[][]
-): string | null {
-  for (const path of paths) {
-    let current: unknown = object;
-
-    for (const key of path) {
-      if (!isRecord(current)) {
-        current = null;
-        break;
-      }
-
-      current = current[key];
-    }
-
-    if (typeof current === "string" && current.length > 0) {
-      return current;
-    }
-
-    if (typeof current === "number") {
-      return String(current);
-    }
-  }
-
-  return null;
-}
-
 function findMatchesContainer(
   data: UnknownRecord
 ): UnknownRecord | unknown[] | null {
@@ -103,56 +75,123 @@ function normalizeMatches(
   });
 }
 
-function buildMatchSummary(match: UnknownRecord) {
-  const homeTeam =
-    getString(match, "homeTeam", "home", "homeName") ||
-    getNestedString(match, [
-      ["teams", "home", "name"],
-      ["teamHome", "name"],
-      ["home", "name"],
-      ["participants", "home", "name"],
-    ]);
+function extractTeamName(
+  team: unknown
+): string | null {
+  if (typeof team === "string") {
+    return team;
+  }
 
-  const awayTeam =
-    getString(match, "awayTeam", "away", "awayName") ||
-    getNestedString(match, [
-      ["teams", "away", "name"],
-      ["teamAway", "name"],
-      ["away", "name"],
-      ["participants", "away", "name"],
-    ]);
+  if (!isRecord(team)) {
+    return null;
+  }
 
-  const matchName =
-    getString(match, "matchName", "name", "title") ||
-    (homeTeam && awayTeam ? `${homeTeam} - ${awayTeam}` : null);
+  return getString(
+    team,
+    "name",
+    "teamName",
+    "title",
+    "shortName"
+  );
+}
 
-  const scoreObject = isRecord(match["score"])
+function extractCompetitionName(
+  match: UnknownRecord
+): string | null {
+  const competition = match["competition"];
+
+  if (typeof competition === "string") {
+    return competition;
+  }
+
+  if (isRecord(competition)) {
+    return getString(
+      competition,
+      "name",
+      "competitionName",
+      "title"
+    );
+  }
+
+  return getString(
+    match,
+    "competitionName",
+    "leagueName"
+  );
+}
+
+function extractMatch(
+  match: UnknownRecord
+) {
+  const score = isRecord(match["score"])
     ? match["score"]
     : null;
 
-  const halfTimeObject =
-    scoreObject && isRecord(scoreObject["ht"])
-      ? scoreObject["ht"]
+  const halfTimeScore =
+    score && isRecord(score["ht"])
+      ? score["ht"]
       : null;
 
+  const homeTeam =
+    extractTeamName(match["home"]) ||
+    extractTeamName(match["homeTeam"]) ||
+    extractTeamName(match["teamHome"]);
+
+  const awayTeam =
+    extractTeamName(match["away"]) ||
+    extractTeamName(match["awayTeam"]) ||
+    extractTeamName(match["teamAway"]);
+
   const homeScore =
-    scoreObject && getString(scoreObject, "home", "homeScore");
+    score
+      ? getString(score, "home")
+      : null;
 
   const awayScore =
-    scoreObject && getString(scoreObject, "away", "awayScore");
+    score
+      ? getString(score, "away")
+      : null;
 
   const halfTimeHome =
-    halfTimeObject && getString(halfTimeObject, "home");
+    halfTimeScore
+      ? getString(halfTimeScore, "home")
+      : null;
 
   const halfTimeAway =
-    halfTimeObject && getString(halfTimeObject, "away");
+    halfTimeScore
+      ? getString(halfTimeScore, "away")
+      : null;
 
   return {
-    id: getString(match, "id", "key", "matchId") || null,
-    objectKey: getString(match, "_objectKey"),
-    matchName,
+    id:
+      getString(
+        match,
+        "id",
+        "key",
+        "matchId"
+      ) ||
+      getString(match, "_objectKey"),
+
+    matchName:
+      getString(
+        match,
+        "matchName",
+        "name",
+        "title"
+      ) ||
+      (
+        homeTeam && awayTeam
+          ? `${homeTeam} - ${awayTeam}`
+          : null
+      ),
+
     homeTeam,
+
     awayTeam,
+
+    competition:
+      extractCompetitionName(match),
+
     dateTime:
       getString(
         match,
@@ -161,31 +200,41 @@ function buildMatchSummary(match: UnknownRecord) {
         "matchDate",
         "date",
         "dateTime"
-      ) || null,
+      ),
+
     status:
       getString(
         match,
         "status",
         "matchStatus",
         "state"
-      ) || null,
+      ),
+
     minute:
       getString(
         match,
         "minute",
         "matchMinute",
         "elapsed"
-      ) || null,
+      ),
+
     score: {
       home: homeScore,
       away: awayScore,
     },
+
     halfTimeScore: {
       home: halfTimeHome,
       away: halfTimeAway,
     },
+
     iddaaCode:
-      getString(match, "iddaaCode", "iddaa", "betCode") || null,
+      getString(
+        match,
+        "iddaaCode",
+        "iddaa",
+        "betCode"
+      ),
   };
 }
 
@@ -199,146 +248,202 @@ export async function GET(request: Request) {
 
     const targetUrl = new URL(MACKOLIK_URL);
 
-    targetUrl.searchParams.append("sports[]", "Soccer");
-    targetUrl.searchParams.set("matchDate", requestedDate);
+    targetUrl.searchParams.append(
+      "sports[]",
+      "Soccer"
+    );
 
-    const response = await fetch(targetUrl.toString(), {
-      method: "GET",
-      headers: {
-        Accept: "application/json, text/plain, */*",
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36",
-        Referer: "https://www.mackolik.com/canli-sonuclar",
-        Origin: "https://www.mackolik.com",
-      },
-      cache: "no-store",
-    });
+    targetUrl.searchParams.set(
+      "matchDate",
+      requestedDate
+    );
 
-    const contentType = response.headers.get("content-type") || "";
-    const rawText = await response.text();
+    const response = await fetch(
+      targetUrl.toString(),
+      {
+        method: "GET",
+
+        headers: {
+          Accept:
+            "application/json, text/plain, */*",
+
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36",
+
+          Referer:
+            "https://www.mackolik.com/canli-sonuclar",
+
+          Origin:
+            "https://www.mackolik.com",
+        },
+
+        cache: "no-store",
+      }
+    );
+
+    const contentType =
+      response.headers.get("content-type") ||
+      "";
+
+    const rawText =
+      await response.text();
 
     let parsedData: unknown = null;
 
     try {
-      parsedData = JSON.parse(rawText);
+      parsedData =
+        JSON.parse(rawText);
     } catch {
       parsedData = null;
     }
 
-    if (!parsedData || !isRecord(parsedData)) {
+    if (
+      !parsedData ||
+      !isRecord(parsedData)
+    ) {
       return NextResponse.json(
         {
           success: false,
-          test: "mackolik",
+
+          test: "mackolik-match-extraction",
+
           request: {
             date: requestedDate,
             url: targetUrl.toString(),
           },
+
           mackolik: {
             status: response.status,
             statusText: response.statusText,
             contentType,
           },
+
           response: {
             isJson: false,
             rawLength: rawText.length,
-            rawPreview: rawText.slice(0, 5000),
+            rawPreview:
+              rawText.slice(0, 5000),
           },
         },
+
         {
-          status: response.ok ? 200 : response.status,
+          status:
+            response.ok
+              ? 200
+              : response.status,
         }
       );
     }
 
-    const rootData = isRecord(parsedData["data"])
-      ? parsedData["data"]
-      : parsedData;
+    const rootData =
+      isRecord(parsedData["data"])
+        ? parsedData["data"]
+        : parsedData;
 
-    const competitions = isRecord(rootData["competitions"])
-      ? rootData["competitions"]
-      : {};
+    const matchesContainer =
+      findMatchesContainer(parsedData);
 
-    const competitionList = Object.entries(competitions).map(
-      ([key, value]) => {
-        if (!isRecord(value)) {
-          return {
-            id: key,
-            name: null,
-            country: null,
-            code: null,
-          };
+    if (!matchesContainer) {
+      return NextResponse.json(
+        {
+          success: false,
+
+          test:
+            "mackolik-match-extraction",
+
+          request: {
+            date: requestedDate,
+            url: targetUrl.toString(),
+          },
+
+          mackolik: {
+            status: response.status,
+            statusText: response.statusText,
+            contentType,
+          },
+
+          error:
+            "Mackolik cevabında matches alanı bulunamadı.",
+
+          availableRootKeys:
+            Object.keys(rootData),
+
+          availableTopLevelKeys:
+            Object.keys(parsedData),
+        },
+
+        {
+          status: 500,
         }
+      );
+    }
 
-        const country = isRecord(value["country"])
-          ? value["country"]
-          : null;
+    const allMatches =
+      normalizeMatches(matchesContainer);
 
-        return {
-          id: getString(value, "id") || key,
-          name: getString(value, "name"),
-          country: country
-            ? getString(country, "name")
-            : null,
-          code: getString(value, "code"),
-          slug: getString(value, "competitionSlug"),
-          format: getString(value, "competitionFormat"),
-        };
-      }
-    );
+    const extractedMatches =
+      allMatches.map(extractMatch);
 
-    const matchesContainer = findMatchesContainer(
-      parsedData
-    );
+    const firstTenMatches =
+      extractedMatches.slice(0, 10);
 
-    const normalizedMatches = matchesContainer
-      ? normalizeMatches(matchesContainer)
-      : [];
+    const firstThreeRawMatches =
+      allMatches.slice(0, 3);
 
-    const matchSummaries = normalizedMatches.map(
-      buildMatchSummary
-    );
+    return NextResponse.json({
+      success: response.ok,
 
-    const sampleRawMatches = normalizedMatches
-      .slice(0, 3)
-      .map((match) => match);
+      test:
+        "mackolik-match-extraction",
 
-    return NextResponse.json(
-      {
-        success: response.ok,
-        test: "mackolik",
-        request: {
-          date: requestedDate,
-          url: targetUrl.toString(),
-        },
-        mackolik: {
-          status: response.status,
-          statusText: response.statusText,
-          contentType,
-        },
-        summary: {
-          rawResponseLength: rawText.length,
-          competitionsCount: competitionList.length,
-          matchesFound: matchSummaries.length,
-        },
-        competitions: competitionList,
-        matches: matchSummaries,
-        sampleRawMatches,
+      request: {
+        date: requestedDate,
+        url: targetUrl.toString(),
       },
-      {
-        status: response.ok ? 200 : response.status,
-      }
-    );
+
+      mackolik: {
+        status: response.status,
+        statusText: response.statusText,
+        contentType,
+      },
+
+      summary: {
+        rawResponseLength:
+          rawText.length,
+
+        totalMatches:
+          allMatches.length,
+
+        extractedMatches:
+          extractedMatches.length,
+
+        showingFirst:
+          firstTenMatches.length,
+
+        showingRawExamples:
+          firstThreeRawMatches.length,
+      },
+
+      matches:
+        firstTenMatches,
+
+      rawExamples:
+        firstThreeRawMatches,
+    });
   } catch (error) {
     return NextResponse.json(
       {
         success: false,
-        test: "mackolik",
+
+        test:
+          "mackolik-match-extraction",
+
         error:
           error instanceof Error
             ? error.message
             : "Bilinmeyen hata",
       },
+
       {
         status: 500,
       }
