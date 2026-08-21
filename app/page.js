@@ -12,6 +12,12 @@ export default function HomePage() {
   const [authError, setAuthError] = useState("");
   const [visibleCount, setVisibleCount] = useState(10);
 
+  const [showFootball, setShowFootball] =
+    useState(true);
+
+  const [showBasketball, setShowBasketball] =
+    useState(true);
+
   useEffect(() => {
     async function initializeApp() {
       try {
@@ -110,6 +116,30 @@ export default function HomePage() {
     }
   }
 
+  function toggleFootball() {
+    if (showFootball && !showBasketball) {
+      return;
+    }
+
+    setShowFootball(
+      (current) => !current
+    );
+
+    setVisibleCount(10);
+  }
+
+  function toggleBasketball() {
+    if (showBasketball && !showFootball) {
+      return;
+    }
+
+    setShowBasketball(
+      (current) => !current
+    );
+
+    setVisibleCount(10);
+  }
+
   if (authError) {
     return (
       <main className="page">
@@ -164,11 +194,34 @@ export default function HomePage() {
           match?.status || ""
         ).toLowerCase();
 
-      return (
-        status === "live" ||
-        status === "scheduled" ||
-        status === "upcoming"
-      );
+      if (
+        status !== "live" &&
+        status !== "scheduled" &&
+        status !== "upcoming"
+      ) {
+        return false;
+      }
+
+      const sport =
+        String(
+          match?.sport || ""
+        ).toLowerCase();
+
+      if (
+        sport === "football" &&
+        !showFootball
+      ) {
+        return false;
+      }
+
+      if (
+        sport === "basketball" &&
+        !showBasketball
+      ) {
+        return false;
+      }
+
+      return true;
     });
 
   const sortedMatches = [
@@ -230,8 +283,7 @@ export default function HomePage() {
 
   const hasMoreMatches =
     visibleCount <
-      sortedMatches.length &&
-    visibleCount < 50;
+    sortedMatches.length;
 
   return (
     <main className="page">
@@ -275,6 +327,70 @@ export default function HomePage() {
             <h2>
               Günün maçları seni bekliyor
             </h2>
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns:
+                "1fr 1fr",
+              gap: "6px",
+              marginBottom: "10px",
+            }}
+          >
+            <button
+              type="button"
+              onClick={toggleFootball}
+              aria-pressed={showFootball}
+              style={{
+                minHeight: "42px",
+                border:
+                  showFootball
+                    ? "1px solid var(--primary)"
+                    : "1px solid var(--border)",
+                borderRadius: "7px",
+                background:
+                  showFootball
+                    ? "var(--primary)"
+                    : "var(--surface-soft)",
+                color:
+                  showFootball
+                    ? "#fff"
+                    : "var(--text)",
+                fontSize: "11px",
+                fontWeight: 800,
+                cursor: "pointer",
+              }}
+            >
+              ⚽ Futbol
+            </button>
+
+            <button
+              type="button"
+              onClick={toggleBasketball}
+              aria-pressed={showBasketball}
+              style={{
+                minHeight: "42px",
+                border:
+                  showBasketball
+                    ? "1px solid var(--primary)"
+                    : "1px solid var(--border)",
+                borderRadius: "7px",
+                background:
+                  showBasketball
+                    ? "var(--primary)"
+                    : "var(--surface-soft)",
+                color:
+                  showBasketball
+                    ? "#fff"
+                    : "var(--text)",
+                fontSize: "11px",
+                fontWeight: 800,
+                cursor: "pointer",
+              }}
+            >
+              🏀 Basketbol
+            </button>
           </div>
 
           {loading ? (
@@ -322,10 +438,7 @@ export default function HomePage() {
                     onClick={() =>
                       setVisibleCount(
                         (current) =>
-                          Math.min(
-                            current + 10,
-                            50
-                          )
+                          current + 10
                       )
                     }
                   >
