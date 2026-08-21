@@ -23,7 +23,7 @@ export async function GET() {
   const url =
     "https://www.mackolik.com/perform/p0/ajax/components/competition/livescores/json" +
     `?matchDate=${matchDate}` +
-    "&sports[]=Soccer";
+    "&sports[]=Basketball";
 
   try {
     const response =
@@ -50,7 +50,7 @@ export async function GET() {
         data?.data?.matches || {}
       );
 
-    const liveMatches =
+    const liveCandidates =
       matches
         .filter(
           (match) =>
@@ -113,10 +113,9 @@ export async function GET() {
         matches.length,
 
       liveCandidateCount:
-        liveMatches.length,
+        liveCandidates.length,
 
-      liveCandidates:
-        liveMatches
+      liveCandidates
     });
 
   } catch (error) {
