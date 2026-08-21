@@ -23,19 +23,44 @@ export async function GET() {
         cache: "no-store",
       });
 
-    const text =
-      await response.text();
+    const data =
+      await response.json();
+
+    const competitions =
+      data?.data?.competitions || {};
+
+    const competitionList =
+      Object.values(
+        competitions
+      ).map(
+        (competition) => ({
+          id:
+            competition.id,
+          name:
+            competition.name,
+          country:
+            competition.country?.name,
+          slug:
+            competition.competitionSlug,
+          code:
+            competition.code,
+        })
+      );
 
     return NextResponse.json({
-      success: response.ok,
+      success: true,
       status: response.status,
-      contentType:
-        response.headers.get(
-          "content-type"
+
+      competitionCount:
+        competitionList.length,
+
+      competitions:
+        competitionList,
+
+      dataKeys:
+        Object.keys(
+          data?.data || {}
         ),
-      dataLength: text.length,
-      preview:
-        text.substring(0, 10000),
     });
 
   } catch (error) {
