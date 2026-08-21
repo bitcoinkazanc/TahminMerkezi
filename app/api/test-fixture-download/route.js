@@ -36,15 +36,6 @@ export async function GET() {
     const turkeyIndex =
       text.indexOf("ZY÷Turkey");
 
-    if (turkeyIndex === -1) {
-      return NextResponse.json({
-        success: false,
-        status: response.status,
-        error:
-          "Turkey bölümü bulunamadı.",
-      });
-    }
-
     const turkeyStart =
       text.lastIndexOf(
         "¬~ZA÷",
@@ -68,151 +59,56 @@ export async function GET() {
         turkeyEnd
       );
 
-    const matchChunks =
-      turkeySection.split("¬~AA÷");
+    const aaMatches = [
+      ...turkeySection.matchAll(
+        /AA÷([^¬]+)/g
+      ),
+    ];
 
-    const turkeyMatches = [];
+    const samples =
+      aaMatches
+        .slice(0, 10)
+        .map((match) => {
+          const index =
+            match.index;
 
-    for (const chunk of matchChunks) {
-      if (!chunk.includes("AA÷")) {
-        continue;
-      }
-
-      const matchIdMatch =
-        chunk.match(
-          /^AA÷([^¬]+)/
-        );
-
-      const timestampMatch =
-        chunk.match(
-          /¬AD÷([^¬]+)/
-        );
-
-      const statusMatch =
-        chunk.match(
-          /¬AB÷([^¬]+)/
-        );
-
-      const homeMatch =
-        chunk.match(
-          /¬CX÷([^¬]+)/
-        );
-
-      const awayMatch =
-        chunk.match(
-          /¬AF÷([^¬]+)/
-        );
-
-      const homeScoreMatch =
-        chunk.match(
-          /¬AG÷([^¬]+)/
-        );
-
-      const awayScoreMatch =
-        chunk.match(
-          /¬AH÷([^¬]+)/
-        );
-
-      const minuteMatch =
-        chunk.match(
-          /¬BA÷([^¬]+)/
-        );
-
-      const periodMatch =
-        chunk.match(
-          /¬BC÷([^¬]+)/
-        );
-
-      const matchId =
-        matchIdMatch
-          ? matchIdMatch[1]
-          : null;
-
-      const timestamp =
-        timestampMatch
-          ? Number(timestampMatch[1])
-          : null;
-
-      const status =
-        statusMatch
-          ? statusMatch[1]
-          : null;
-
-      const home =
-        homeMatch
-          ? homeMatch[1]
-          : null;
-
-      const away =
-        awayMatch
-          ? awayMatch[1]
-          : null;
-
-      const homeScore =
-        homeScoreMatch
-          ? homeScoreMatch[1]
-          : null;
-
-      const awayScore =
-        awayScoreMatch
-          ? awayScoreMatch[1]
-          : null;
-
-      const minute =
-        minuteMatch
-          ? minuteMatch[1]
-          : null;
-
-      const period =
-        periodMatch
-          ? periodMatch[1]
-          : null;
-
-      if (
-        !matchId ||
-        !home ||
-        !away
-      ) {
-        continue;
-      }
-
-      turkeyMatches.push({
-        competition:
-          "Turkey: Super Lig",
-        matchId,
-        home,
-        away,
-        status,
-        homeScore,
-        awayScore,
-        minute,
-        period,
-        timestamp,
-        live:
-          status === "2",
-      });
-    }
+          return {
+            matchId:
+              match[1],
+            index,
+            before:
+              turkeySection.substring(
+                Math.max(
+                  0,
+                  index - 30
+                ),
+                index
+              ),
+            after:
+              turkeySection.substring(
+                index,
+                Math.min(
+                  turkeySection.length,
+                  index + 500
+                )
+              ),
+          };
+        });
 
     return NextResponse.json({
       success: true,
       status: response.status,
+
       totalDataLength:
         text.length,
+
       turkeySectionLength:
         turkeySection.length,
-      turkeyMatchCount:
-        turkeyMatches.length,
-      liveTurkeyMatchCount:
-        turkeyMatches.filter(
-          (match) =>
-            match.live
-        ).length,
-      turkeyMatches,
-      liveTurkeyMatches:
-        turkeyMatches.filter(
-          (match) =>
-            match.live
-        ),
+
+      aaCount:
+        aaMatches.length,
+
+      samples,
     });
 
   } catch (error) {
