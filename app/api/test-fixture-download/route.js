@@ -26,69 +26,85 @@ export async function GET() {
     const data =
       await response.json();
 
-    const rootKeys =
-      Object.keys(data || {});
-
-    const dataObject =
-      data?.data || {};
-
-    const dataKeys =
-      Object.keys(
-        dataObject
+    const matches =
+      Object.values(
+        data?.data?.matches || {}
       );
 
-    const structure = {};
+    const stateCounts = {};
+    const statusCounts = {};
+    const substateCounts = {};
 
-    for (
-      const key of dataKeys
-    ) {
-      const value =
-        dataObject[key];
+    const turkeyMatches = [];
 
-      structure[key] = {
-        type:
-          Array.isArray(value)
-            ? "array"
-            : typeof value,
+    for (const match of matches) {
 
-        length:
-          Array.isArray(value)
-            ? value.length
-            : value &&
-              typeof value === "object"
-              ? Object.keys(value).length
-              : null,
+      const state =
+        String(
+          match?.state || ""
+        );
 
-        sampleKeys:
-          value &&
-          typeof value === "object"
-          ? Object.keys(value)
-              .slice(0, 20)
-          : [],
+      const status =
+        String(
+          match?.status || ""
+        );
 
-        sample:
-          Array.isArray(value)
-            ? value.slice(0, 2)
-            : value &&
-              typeof value === "object"
-              ? Object.fromEntries(
-                  Object.entries(value)
-                    .slice(0, 2)
-                )
-              : value
-      };
+      const substate =
+        String(
+          match?.substate || ""
+        );
+
+      stateCounts[state] =
+        (stateCounts[state] || 0) + 1;
+
+      statusCounts[status] =
+        (statusCounts[status] || 0) + 1;
+
+      substateCounts[substate] =
+        (substateCounts[substate] || 0) + 1;
+
+      const competition =
+        data?.data?.competitions?.[
+          match?.competitionId
+        ];
+
+      if (
+        competition?.country?.name ===
+          "Türkiye"
+      ) {
+        turkeyMatches.push({
+          id: match.id,
+          matchName: match.matchName,
+          competition:
+            competition.name,
+          state: match.state,
+          status: match.status,
+          substate: match.substate,
+          score: match.score,
+          statusBoxContent:
+            match.statusBoxContent,
+          lastUpdated:
+            match.lastUpdated,
+          liveBetting:
+            match.liveBetting
+        });
+      }
     }
 
     return NextResponse.json({
       success: true,
-      httpStatus:
-        response.status,
 
-      rootKeys,
+      totalMatches:
+        matches.length,
 
-      dataKeys,
+      stateCounts,
+      statusCounts,
+      substateCounts,
 
-      structure
+      turkeyMatchCount:
+        turkeyMatches.length,
+
+      turkeyMatches
     });
 
   } catch (error) {
