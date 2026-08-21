@@ -39,23 +39,94 @@ function containsMarketName(text: string): string | null {
   return null;
 }
 
+function getTagName(element: unknown): string {
+  if (
+    typeof element === "object" &&
+    element !== null &&
+    "tagName" in element
+  ) {
+    const value = (element as { tagName?: unknown }).tagName;
+
+    return typeof value === "string" ? value : "";
+  }
+
+  return "";
+}
+
+function getClassName(element: unknown): string {
+  if (
+    typeof element === "object" &&
+    element !== null &&
+    "attribs" in element
+  ) {
+    const attribs = (
+      element as {
+        attribs?: Record<string, string>;
+      }
+    ).attribs;
+
+    if (
+      attribs &&
+      typeof attribs.class === "string"
+    ) {
+      return attribs.class;
+    }
+  }
+
+  return "";
+}
+
+function getId(element: unknown): string {
+  if (
+    typeof element === "object" &&
+    element !== null &&
+    "attribs" in element
+  ) {
+    const attribs = (
+      element as {
+        attribs?: Record<string, string>;
+      }
+    ).attribs;
+
+    if (
+      attribs &&
+      typeof attribs.id === "string"
+    ) {
+      return attribs.id;
+    }
+  }
+
+  return "";
+}
+
+function escapeCssIdentifier(value: string): string {
+  return value.replace(
+    /([!"#$%&'()*+,./:;<=>?@[\\\]^`{|}~])/g,
+    "\\$1"
+  );
+}
+
 export async function GET() {
   try {
-    const response = await fetch(MACKOLIK_MATCH_URL, {
-      method: "GET",
-      headers: {
-        Accept:
-          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    const response = await fetch(
+      MACKOLIK_MATCH_URL,
+      {
+        method: "GET",
 
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36",
+        headers: {
+          Accept:
+            "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
 
-        Referer:
-          "https://www.mackolik.com/",
-      },
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36",
 
-      cache: "no-store",
-    });
+          Referer:
+            "https://www.mackolik.com/",
+        },
+
+        cache: "no-store",
+      }
+    );
 
     const html = await response.text();
 
@@ -63,12 +134,22 @@ export async function GET() {
       return NextResponse.json(
         {
           success: false,
-          test: "mackolik-market-html-extraction",
+
+          test:
+            "mackolik-market-html-extraction",
+
           status: response.status,
-          statusText: response.statusText,
-          rawLength: html.length,
-          rawPreview: html.slice(0, 5000),
+
+          statusText:
+            response.statusText,
+
+          rawLength:
+            html.length,
+
+          rawPreview:
+            html.slice(0, 5000),
         },
+
         {
           status: response.status,
         }
@@ -92,30 +173,33 @@ export async function GET() {
       const node = $(element);
 
       const text = cleanText(
-        node.clone().children().remove().end().text()
+        node
+          .clone()
+          .children()
+          .remove()
+          .end()
+          .text()
       );
 
       if (!text) {
         return;
       }
 
-      const market = containsMarketName(text);
+      const market =
+        containsMarketName(text);
 
       if (!market) {
         return;
       }
 
-      const tag = element.tagName || "";
+      const tag =
+        getTagName(element);
 
       const className =
-        typeof element.attribs?.class === "string"
-          ? element.attribs.class
-          : "";
+        getClassName(element);
 
       const id =
-        typeof element.attribs?.id === "string"
-          ? element.attribs.id
-          : "";
+        getId(element);
 
       const key =
         `${market}|${tag}|${className}|${id}|${text}`;
@@ -132,7 +216,10 @@ export async function GET() {
         className,
         id,
         text: text.slice(0, 500),
-        html: $.html(element).slice(0, 5000),
+        html: $.html(element).slice(
+          0,
+          5000
+        ),
       });
     });
 
@@ -145,75 +232,101 @@ export async function GET() {
       html: string;
     }> = [];
 
-    const seenContainers = new Set<string>();
+    const seenContainers =
+      new Set<string>();
 
     for (const item of detectedElements) {
-      const selectorParts: string[] = [];
+      let selector = item.tag;
 
       if (item.id) {
-        selectorParts.push(`#${CSS.escape(item.id)}`);
-      }
-
-      if (item.className) {
+        selector += `#${escapeCssIdentifier(
+          item.id
+        )}`;
+      } else if (item.className) {
         const classes = item.className
           .split(/\s+/)
           .filter(Boolean)
-          .map((className) => `.${CSS.escape(className)}`)
+          .map(
+            (className) =>
+              `.${escapeCssIdentifier(
+                className
+              )}`
+          )
           .join("");
 
-        if (classes) {
-          selectorParts.push(`${item.tag}${classes}`);
-        }
+        selector += classes;
       }
 
-      if (!selectorParts.length) {
-        selectorParts.push(item.tag);
-      }
+      try {
+        $(selector).each(
+          (_, element) => {
+            const container = $(
+              element
+            );
 
-      const selector = selectorParts[0];
+            const containerText =
+              cleanText(
+                container.text()
+              );
 
-      $(selector).each((_, element) => {
-        const container = $(element);
+            if (
+              !containerText ||
+              containerText.length >
+                20000
+            ) {
+              return;
+            }
 
-        const containerText = cleanText(
-          container.text()
+            const key =
+              `${item.market}|${getTagName(
+                element
+              )}|${containerText}`;
+
+            if (
+              seenContainers.has(key)
+            ) {
+              return;
+            }
+
+            seenContainers.add(key);
+
+            marketContainers.push({
+              market: item.market,
+
+              tag:
+                getTagName(element),
+
+              className:
+                getClassName(
+                  element
+                ),
+
+              id:
+                getId(element),
+
+              text:
+                containerText.slice(
+                  0,
+                  5000
+                ),
+
+              html:
+                $.html(element).slice(
+                  0,
+                  15000
+                ),
+            });
+          }
         );
-
-        if (
-          !containerText ||
-          containerText.length > 20000
-        ) {
-          return;
-        }
-
-        const key =
-          `${item.market}|${element.tagName}|${containerText}`;
-
-        if (seenContainers.has(key)) {
-          return;
-        }
-
-        seenContainers.add(key);
-
-        marketContainers.push({
-          market: item.market,
-          tag: element.tagName || "",
-          className:
-            typeof element.attribs?.class === "string"
-              ? element.attribs.class
-              : "",
-          id:
-            typeof element.attribs?.id === "string"
-              ? element.attribs.id
-              : "",
-          text: containerText.slice(0, 5000),
-          html: $.html(element).slice(0, 15000),
-        });
-      });
+      } catch {
+        continue;
+      }
     }
 
     const pageTitle = cleanText(
-      $("title").first().text()
+      $("title")
+        .first()
+        .text()
     );
 
     return NextResponse.json({
@@ -228,14 +341,21 @@ export async function GET() {
 
       mackolik: {
         status: response.status,
-        statusText: response.statusText,
+
+        statusText:
+          response.statusText,
+
         contentType:
-          response.headers.get("content-type") || "",
+          response.headers.get(
+            "content-type"
+          ) || "",
       },
 
       page: {
         title: pageTitle,
-        htmlLength: html.length,
+
+        htmlLength:
+          html.length,
       },
 
       summary: {
@@ -247,10 +367,16 @@ export async function GET() {
       },
 
       detectedElements:
-        detectedElements.slice(0, 30),
+        detectedElements.slice(
+          0,
+          30
+        ),
 
       marketContainers:
-        marketContainers.slice(0, 20),
+        marketContainers.slice(
+          0,
+          20
+        ),
     });
   } catch (error) {
     return NextResponse.json(
@@ -265,6 +391,7 @@ export async function GET() {
             ? error.message
             : "Bilinmeyen hata",
       },
+
       {
         status: 500,
       }
