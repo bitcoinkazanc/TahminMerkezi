@@ -1,449 +1,237 @@
 import { NextResponse } from "next/server";
+import * as cheerio from "cheerio";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-const MACKOLIK_URL =
-  "https://www.mackolik.com/perform/p0/ajax/components/competition/livescores/json";
+const MACKOLIK_MATCH_URL =
+  "https://www.mackolik.com/mac/erzurumspor-fk-vs-galatasaray/iddaa/c8xvpz70pwcqq45ptmigb5las";
 
-type UnknownRecord = Record<string, unknown>;
-
-function isRecord(value: unknown): value is UnknownRecord {
-  return typeof value === "object" && value !== null;
-}
-
-function getString(
-  object: UnknownRecord,
-  ...keys: string[]
-): string | null {
-  for (const key of keys) {
-    const value = object[key];
-
-    if (typeof value === "string" && value.length > 0) {
-      return value;
-    }
-
-    if (typeof value === "number") {
-      return String(value);
-    }
-  }
-
-  return null;
-}
-
-function findMatchesContainer(
-  data: UnknownRecord
-): UnknownRecord | unknown[] | null {
-  const directMatches = data["matches"];
-
-  if (isRecord(directMatches) || Array.isArray(directMatches)) {
-    return directMatches;
-  }
-
-  const nestedData = data["data"];
-
-  if (isRecord(nestedData)) {
-    const nestedMatches = nestedData["matches"];
-
-    if (isRecord(nestedMatches) || Array.isArray(nestedMatches)) {
-      return nestedMatches;
-    }
-  }
-
-  return null;
-}
-
-function normalizeMatches(
-  matchesContainer: UnknownRecord | unknown[]
-): UnknownRecord[] {
-  if (Array.isArray(matchesContainer)) {
-    return matchesContainer.filter(isRecord);
-  }
-
-  return Object.entries(matchesContainer).map(([key, value]) => {
-    if (isRecord(value)) {
-      return {
-        _objectKey: key,
-        ...value,
-      };
-    }
-
-    return {
-      _objectKey: key,
-      value,
-    };
-  });
-}
-
-function extractTeamName(
-  team: unknown
-): string | null {
-  if (typeof team === "string") {
-    return team;
-  }
-
-  if (!isRecord(team)) {
-    return null;
-  }
-
-  return getString(
-    team,
-    "name",
-    "teamName",
-    "title",
-    "shortName"
-  );
-}
-
-function extractCompetitionName(
-  match: UnknownRecord
-): string | null {
-  const competition = match["competition"];
-
-  if (typeof competition === "string") {
-    return competition;
-  }
-
-  if (isRecord(competition)) {
-    return getString(
-      competition,
-      "name",
-      "competitionName",
-      "title"
-    );
-  }
-
-  return getString(
-    match,
-    "competitionName",
-    "leagueName"
-  );
-}
-
-function extractMatch(
-  match: UnknownRecord
-) {
-  const score = isRecord(match["score"])
-    ? match["score"]
-    : null;
-
-  const halfTimeScore =
-    score && isRecord(score["ht"])
-      ? score["ht"]
-      : null;
-
-  const homeTeam =
-    extractTeamName(match["home"]) ||
-    extractTeamName(match["homeTeam"]) ||
-    extractTeamName(match["teamHome"]);
-
-  const awayTeam =
-    extractTeamName(match["away"]) ||
-    extractTeamName(match["awayTeam"]) ||
-    extractTeamName(match["teamAway"]);
-
-  const homeScore =
-    score
-      ? getString(score, "home")
-      : null;
-
-  const awayScore =
-    score
-      ? getString(score, "away")
-      : null;
-
-  const halfTimeHome =
-    halfTimeScore
-      ? getString(halfTimeScore, "home")
-      : null;
-
-  const halfTimeAway =
-    halfTimeScore
-      ? getString(halfTimeScore, "away")
-      : null;
-
-  return {
-    id:
-      getString(
-        match,
-        "id",
-        "key",
-        "matchId"
-      ) ||
-      getString(match, "_objectKey"),
-
-    matchName:
-      getString(
-        match,
-        "matchName",
-        "name",
-        "title"
-      ) ||
-      (
-        homeTeam && awayTeam
-          ? `${homeTeam} - ${awayTeam}`
-          : null
-      ),
-
-    homeTeam,
-
-    awayTeam,
-
-    competition:
-      extractCompetitionName(match),
-
-    dateTime:
-      getString(
-        match,
-        "mstUtc",
-        "startTime",
-        "matchDate",
-        "date",
-        "dateTime"
-      ),
-
-    status:
-      getString(
-        match,
-        "status",
-        "matchStatus",
-        "state"
-      ),
-
-    minute:
-      getString(
-        match,
-        "minute",
-        "matchMinute",
-        "elapsed"
-      ),
-
-    score: {
-      home: homeScore,
-      away: awayScore,
-    },
-
-    halfTimeScore: {
-      home: halfTimeHome,
-      away: halfTimeAway,
-    },
-
-    iddaaCode:
-      getString(
-        match,
-        "iddaaCode",
-        "iddaa",
-        "betCode"
-      ),
-  };
-}
-
-export async function GET(request: Request) {
+export async function GET() {
   try {
-    const { searchParams } = new URL(request.url);
+    const response = await fetch(MACKOLIK_MATCH_URL, {
+      method: "GET",
+      headers: {
+        Accept:
+          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36",
+        Referer: "https://www.mackolik.com/",
+      },
+      cache: "no-store",
+    });
 
-    const requestedDate =
-      searchParams.get("date") ||
-      new Date().toISOString().slice(0, 10);
+    const html = await response.text();
 
-    const targetUrl = new URL(MACKOLIK_URL);
-
-    targetUrl.searchParams.append(
-      "sports[]",
-      "Soccer"
-    );
-
-    targetUrl.searchParams.set(
-      "matchDate",
-      requestedDate
-    );
-
-    const response = await fetch(
-      targetUrl.toString(),
-      {
-        method: "GET",
-
-        headers: {
-          Accept:
-            "application/json, text/plain, */*",
-
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36",
-
-          Referer:
-            "https://www.mackolik.com/canli-sonuclar",
-
-          Origin:
-            "https://www.mackolik.com",
+    if (!response.ok) {
+      return NextResponse.json(
+        {
+          success: false,
+          test: "mackolik-iddaa-detail",
+          mackolik: {
+            status: response.status,
+            statusText: response.statusText,
+          },
+          error: "Mackolik maç detay sayfası alınamadı.",
+          rawLength: html.length,
+          rawPreview: html.slice(0, 3000),
         },
+        {
+          status: response.status,
+        }
+      );
+    }
 
-        cache: "no-store",
+    const $ = cheerio.load(html);
+
+    const pageTitle = $("title").first().text().trim();
+
+    const marketSections: Array<{
+      market: string;
+      code: string | null;
+      mbs: string | null;
+      selections: Array<{
+        name: string;
+        odd: string;
+      }>;
+    }> = [];
+
+    $(".widget-iddaa-markets__markets-list > *").each(
+      (_, element) => {
+        const section = $(element);
+
+        const text = section
+          .text()
+          .replace(/\s+/g, " ")
+          .trim();
+
+        if (!text) {
+          return;
+        }
+
+        const marketName =
+          section
+            .find(
+              ".widget-iddaa-markets__market-name, .market-name"
+            )
+            .first()
+            .text()
+            .replace(/\s+/g, " ")
+            .trim() || null;
+
+        const selections: Array<{
+          name: string;
+          odd: string;
+        }> = [];
+
+        section
+          .find(
+            ".widget-iddaa-markets__market-item, .market-item"
+          )
+          .each((__, item) => {
+            const itemElement = $(item);
+
+            const itemText = itemElement
+              .text()
+              .replace(/\s+/g, " ")
+              .trim();
+
+            if (!itemText) {
+              return;
+            }
+
+            const odd =
+              itemElement
+                .find(
+                  ".widget-iddaa-markets__odd, .odd"
+                )
+                .first()
+                .text()
+                .replace(/\s+/g, " ")
+                .trim() || "";
+
+            const name =
+              itemElement
+                .find(
+                  ".widget-iddaa-markets__selection, .selection, .name"
+                )
+                .first()
+                .text()
+                .replace(/\s+/g, " ")
+                .trim() ||
+              itemText;
+
+            selections.push({
+              name,
+              odd,
+            });
+          });
+
+        if (
+          marketName ||
+          selections.length > 0
+        ) {
+          marketSections.push({
+            market:
+              marketName ||
+              text.slice(0, 150),
+            code: null,
+            mbs: null,
+            selections,
+          });
+        }
       }
     );
 
-    const contentType =
-      response.headers.get("content-type") ||
-      "";
+    const bodyText = $("body")
+      .text()
+      .replace(/\s+/g, " ")
+      .trim();
 
-    const rawText =
-      await response.text();
+    const knownMarkets = [
+      "Maç Sonucu",
+      "Devre Sonucu",
+      "Altı/Üstü",
+      "Çifte Şans",
+      "İlk Yarı/Maç Sonucu",
+      "Toplam Gol",
+      "Maç Skoru",
+      "Tek/Çift",
+      "Karşılıklı Gol",
+    ];
 
-    let parsedData: unknown = null;
-
-    try {
-      parsedData =
-        JSON.parse(rawText);
-    } catch {
-      parsedData = null;
-    }
-
-    if (
-      !parsedData ||
-      !isRecord(parsedData)
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-
-          test: "mackolik-match-extraction",
-
-          request: {
-            date: requestedDate,
-            url: targetUrl.toString(),
-          },
-
-          mackolik: {
-            status: response.status,
-            statusText: response.statusText,
-            contentType,
-          },
-
-          response: {
-            isJson: false,
-            rawLength: rawText.length,
-            rawPreview:
-              rawText.slice(0, 5000),
-          },
-        },
-
-        {
-          status:
-            response.ok
-              ? 200
-              : response.status,
-        }
-      );
-    }
-
-    const rootData =
-      isRecord(parsedData["data"])
-        ? parsedData["data"]
-        : parsedData;
-
-    const matchesContainer =
-      findMatchesContainer(parsedData);
-
-    if (!matchesContainer) {
-      return NextResponse.json(
-        {
-          success: false,
-
-          test:
-            "mackolik-match-extraction",
-
-          request: {
-            date: requestedDate,
-            url: targetUrl.toString(),
-          },
-
-          mackolik: {
-            status: response.status,
-            statusText: response.statusText,
-            contentType,
-          },
-
-          error:
-            "Mackolik cevabında matches alanı bulunamadı.",
-
-          availableRootKeys:
-            Object.keys(rootData),
-
-          availableTopLevelKeys:
-            Object.keys(parsedData),
-        },
-
-        {
-          status: 500,
-        }
-      );
-    }
-
-    const allMatches =
-      normalizeMatches(matchesContainer);
-
-    const extractedMatches =
-      allMatches.map(extractMatch);
-
-    const firstTenMatches =
-      extractedMatches.slice(0, 10);
-
-    const firstThreeRawMatches =
-      allMatches.slice(0, 3);
+    const detectedMarkets = knownMarkets.filter(
+      (market) =>
+        bodyText
+          .toLocaleLowerCase("tr-TR")
+          .includes(
+            market.toLocaleLowerCase("tr-TR")
+          )
+    );
 
     return NextResponse.json({
-      success: response.ok,
-
-      test:
-        "mackolik-match-extraction",
+      success: true,
+      test: "mackolik-iddaa-detail",
 
       request: {
-        date: requestedDate,
-        url: targetUrl.toString(),
+        url: MACKOLIK_MATCH_URL,
       },
 
       mackolik: {
         status: response.status,
         statusText: response.statusText,
-        contentType,
+        contentType:
+          response.headers.get("content-type") || "",
+      },
+
+      match: {
+        title: pageTitle,
+        expectedMatch:
+          "Erzurumspor FK vs Galatasaray",
+        id: "c8xvpz70pwcqq45ptmigb5las",
+        iddaaCode: "3074731",
       },
 
       summary: {
-        rawResponseLength:
-          rawText.length,
-
-        totalMatches:
-          allMatches.length,
-
-        extractedMatches:
-          extractedMatches.length,
-
-        showingFirst:
-          firstTenMatches.length,
-
-        showingRawExamples:
-          firstThreeRawMatches.length,
+        htmlLength: html.length,
+        detectedMarketsCount:
+          detectedMarkets.length,
+        detectedMarkets,
+        parsedMarketSections:
+          marketSections.length,
       },
 
-      matches:
-        firstTenMatches,
+      marketSections,
 
-      rawExamples:
-        firstThreeRawMatches,
+      rawCheck: {
+        hasIddaaText:
+          bodyText
+            .toLocaleLowerCase("tr-TR")
+            .includes("iddaa"),
+        hasMatchResult:
+          bodyText
+            .toLocaleLowerCase("tr-TR")
+            .includes("maç sonucu"),
+        hasDoubleChance:
+          bodyText
+            .toLocaleLowerCase("tr-TR")
+            .includes("çifte şans"),
+        hasOverUnder:
+          bodyText
+            .toLocaleLowerCase("tr-TR")
+            .includes("altı/üstü"),
+      },
     });
   } catch (error) {
     return NextResponse.json(
       {
         success: false,
-
-        test:
-          "mackolik-match-extraction",
-
+        test: "mackolik-iddaa-detail",
         error:
           error instanceof Error
             ? error.message
             : "Bilinmeyen hata",
       },
-
       {
         status: 500,
       }
