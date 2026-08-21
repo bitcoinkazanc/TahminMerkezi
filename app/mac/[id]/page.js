@@ -236,13 +236,6 @@ export default function MatchDetailPage() {
       ? match.away_score
       : 0;
 
-  const liveMinute =
-    match.live_minute !== null &&
-    match.live_minute !== undefined &&
-    match.live_minute !== ""
-      ? match.live_minute
-      : null;
-
   return (
     <main className="page">
       <div className="page-container">
@@ -289,9 +282,7 @@ export default function MatchDetailPage() {
             }}
           >
             {isLive
-              ? liveMinute !== null
-                ? `🔴 CANLI • ${liveMinute}'`
-                : "🔴 CANLI"
+              ? "🔴 CANLI"
               : isFinished
                 ? "🏁 MAÇ BİTTİ"
                 : match.status ===
