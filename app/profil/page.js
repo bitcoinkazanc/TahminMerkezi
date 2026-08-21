@@ -9,29 +9,67 @@ export default function ProfilePage() {
   const [user, setUser] = useState(null);
   const [predictions, setPredictions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     async function loadProfile() {
       try {
-        const savedUser = localStorage.getItem("tm_user");
+        setLoading(true);
+        setError("");
 
-        if (!savedUser) {
-          setLoading(false);
-          return;
+        const params = new URLSearchParams(
+          window.location.search
+        );
+
+        const profileUserId = params.get("user_id");
+
+        let profileUser = null;
+
+        if (profileUserId) {
+          const response = await fetch(
+            `/api/users/${encodeURIComponent(
+              profileUserId
+            )}`,
+            {
+              cache: "no-store",
+            }
+          );
+
+          const result = await response.json();
+
+          if (!response.ok || !result.success) {
+            throw new Error(
+              result.error ||
+                "Kullanıcı profili alınamadı."
+            );
+          }
+
+          profileUser = result.user;
+        } else {
+          const savedUser =
+            localStorage.getItem("tm_user");
+
+          if (!savedUser) {
+            setLoading(false);
+            return;
+          }
+
+          const parsedUser =
+            JSON.parse(savedUser);
+
+          if (!parsedUser?.id) {
+            setLoading(false);
+            return;
+          }
+
+          profileUser = parsedUser;
         }
 
-        const parsedUser = JSON.parse(savedUser);
-
-        if (!parsedUser?.id) {
-          setLoading(false);
-          return;
-        }
-
-        setUser(parsedUser);
+        setUser(profileUser);
 
         const response = await fetch(
           `/api/predictions?user_id=${encodeURIComponent(
-            parsedUser.id
+            profileUser.id
           )}`,
           {
             cache: "no-store",
@@ -41,10 +79,20 @@ export default function ProfilePage() {
         const result = await response.json();
 
         if (response.ok && result.success) {
-          setPredictions(result.predictions || []);
+          setPredictions(
+            result.predictions || []
+          );
         }
       } catch (error) {
-        console.error("Profile loading error:", error);
+        console.error(
+          "Profile loading error:",
+          error
+        );
+
+        setError(
+          error.message ||
+            "Profil yüklenirken bir hata oluştu."
+        );
       } finally {
         setLoading(false);
       }
@@ -57,21 +105,48 @@ export default function ProfilePage() {
     return <Loading />;
   }
 
+  if (error) {
+    return (
+      <main className="page">
+        <div className="page-container">
+          <div className="error-box">
+            <h2>Bir sorun oluştu</h2>
+
+            <p>{error}</p>
+
+            <Link
+              href="/"
+              className="primary-button"
+            >
+              Ana Sayfaya Dön
+            </Link>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   if (!user) {
     return (
       <main className="page">
         <div className="page-container">
           <div className="empty-state profile-empty">
-            <div className="empty-icon">👤</div>
+            <div className="empty-icon">
+              👤
+            </div>
 
             <h1>Profil</h1>
 
             <p>
-              Profil bilgilerini görmek için Telegram
-              üzerinden uygulamayı açmalısın.
+              Profil bilgilerini görmek için
+              Telegram üzerinden uygulamayı
+              açmalısın.
             </p>
 
-            <Link href="/" className="primary-button">
+            <Link
+              href="/"
+              className="primary-button"
+            >
               Ana Sayfaya Dön
             </Link>
           </div>
@@ -83,29 +158,26 @@ export default function ProfilePage() {
   return (
     <main className="page">
       <div className="page-container">
-        <div className="page-header">
-          <div>
-            <span className="page-eyebrow">HESABIM</span>
-            <h1>Profil</h1>
-            <p>TahminMerkezi profilin.</p>
-          </div>
-        </div>
-
         <ProfileCard user={user} />
 
         <section className="profile-stats">
           <div className="stat-card">
-            <strong>{predictions.length}</strong>
+            <strong>
+              {predictions.length}
+            </strong>
+
             <span>Toplam Tahmin</span>
           </div>
 
           <div className="stat-card">
             <strong>—</strong>
+
             <span>Başarı Oranı</span>
           </div>
 
           <div className="stat-card">
             <strong>—</strong>
+
             <span>Puan</span>
           </div>
         </section>
@@ -113,25 +185,26 @@ export default function ProfilePage() {
         <section className="section-card">
           <div className="section-title">
             <h2>Tahminlerim</h2>
+
             <p>
-              Daha önce yaptığın tahminler.
+              Daha önce yaptığı tahminler.
             </p>
           </div>
 
           {predictions.length === 0 ? (
             <div className="empty-state small">
-              <div className="empty-icon">🎯</div>
+              <div className="empty-icon">
+                🎯
+              </div>
 
-              <h3>Henüz tahminin yok</h3>
+              <h3>
+                Henüz tahmin yok
+              </h3>
 
               <p>
-                Maçlara giderek ilk tahminini
-                oluşturabilirsin.
+                Bu kullanıcının henüz
+                yaptığı bir tahmin bulunmuyor.
               </p>
-
-              <Link href="/maclar" className="primary-button">
-                Maçları Gör
-              </Link>
             </div>
           ) : (
             <div className="my-predictions">
@@ -152,29 +225,50 @@ export default function ProfilePage() {
                         : item.prediction;
 
                 const date = item.created_at
-                  ? new Date(item.created_at).toLocaleDateString(
+                  ? new Date(
+                      item.created_at
+                    ).toLocaleDateString(
                       "tr-TR"
                     )
                   : "";
 
-                return (
-                  <div
-                    className="my-prediction-item"
-                    key={item.id}
-                  >
+                const content = (
+                  <div className="my-prediction-item">
                     <div className="my-prediction-info">
-                      <strong>{matchName}</strong>
+                      <strong>
+                        {matchName}
+                      </strong>
 
                       <span>
-                        {match?.league || "Futbol"}
+                        {match?.league ||
+                          "Futbol"}
                       </span>
 
-                      <small>{date}</small>
+                      <small>
+                        {date}
+                      </small>
                     </div>
 
                     <div className="my-prediction-value">
                       {predictionLabel}
                     </div>
+                  </div>
+                );
+
+                if (match?.id) {
+                  return (
+                    <Link
+                      key={item.id}
+                      href={`/mac/${match.id}`}
+                    >
+                      {content}
+                    </Link>
+                  );
+                }
+
+                return (
+                  <div key={item.id}>
+                    {content}
                   </div>
                 );
               })}
