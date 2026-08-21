@@ -2,26 +2,28 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import ProfileCard from "../../components/ProfileCard";
 import Loading from "../../components/Loading";
 
 export default function ProfilePage() {
+  const searchParams = useSearchParams();
+
   const [user, setUser] = useState(null);
   const [predictions, setPredictions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const profileUserId =
+    searchParams.get("user_id");
 
   useEffect(() => {
     async function loadProfile() {
       try {
         setLoading(true);
         setError("");
-
-        const params = new URLSearchParams(
-          window.location.search
-        );
-
-        const profileUserId = params.get("user_id");
+        setUser(null);
+        setPredictions([]);
 
         let profileUser = null;
 
@@ -35,19 +37,26 @@ export default function ProfilePage() {
             }
           );
 
-          const result = await response.json();
+          const result =
+            await response.json();
 
-          if (!response.ok || !result.success) {
+          if (
+            !response.ok ||
+            !result.success
+          ) {
             throw new Error(
               result.error ||
                 "Kullanıcı profili alınamadı."
             );
           }
 
-          profileUser = result.user;
+          profileUser =
+            result.user;
         } else {
           const savedUser =
-            localStorage.getItem("tm_user");
+            localStorage.getItem(
+              "tm_user"
+            );
 
           if (!savedUser) {
             setLoading(false);
@@ -62,23 +71,29 @@ export default function ProfilePage() {
             return;
           }
 
-          profileUser = parsedUser;
+          profileUser =
+            parsedUser;
         }
 
         setUser(profileUser);
 
-        const response = await fetch(
-          `/api/predictions?user_id=${encodeURIComponent(
-            profileUser.id
-          )}`,
-          {
-            cache: "no-store",
-          }
-        );
+        const response =
+          await fetch(
+            `/api/predictions?user_id=${encodeURIComponent(
+              profileUser.id
+            )}`,
+            {
+              cache: "no-store",
+            }
+          );
 
-        const result = await response.json();
+        const result =
+          await response.json();
 
-        if (response.ok && result.success) {
+        if (
+          response.ok &&
+          result.success
+        ) {
           setPredictions(
             result.predictions || []
           );
@@ -99,7 +114,7 @@ export default function ProfilePage() {
     }
 
     loadProfile();
-  }, []);
+  }, [profileUserId]);
 
   if (loading) {
     return <Loading />;
@@ -110,7 +125,9 @@ export default function ProfilePage() {
       <main className="page">
         <div className="page-container">
           <div className="error-box">
-            <h2>Bir sorun oluştu</h2>
+            <h2>
+              Bir sorun oluştu
+            </h2>
 
             <p>{error}</p>
 
@@ -155,6 +172,52 @@ export default function ProfilePage() {
     );
   }
 
+  const totalPredictions =
+    predictions.length;
+
+  const correctPredictions =
+    predictions.filter(
+      (item) =>
+        item.result ===
+        "correct"
+    ).length;
+
+  const wrongPredictions =
+    predictions.filter(
+      (item) =>
+        item.result ===
+        "wrong"
+    ).length;
+
+  const pendingPredictions =
+    predictions.filter(
+      (item) =>
+        !item.result ||
+        item.result ===
+          "pending"
+    ).length;
+
+  const completedPredictions =
+    correctPredictions +
+    wrongPredictions;
+
+  const successRate =
+    completedPredictions > 0
+      ? Math.round(
+          (correctPredictions /
+            completedPredictions) *
+            100
+        )
+      : 0;
+
+  const totalPoints =
+    predictions.reduce(
+      (total, item) =>
+        total +
+        (Number(item.points) || 0),
+      0
+    );
+
   return (
     <main className="page">
       <div className="page-container">
@@ -163,28 +226,40 @@ export default function ProfilePage() {
         <section className="profile-stats">
           <div className="stat-card">
             <strong>
-              {predictions.length}
+              {totalPredictions}
             </strong>
 
-            <span>Toplam Tahmin</span>
+            <span>
+              Toplam Tahmin
+            </span>
           </div>
 
           <div className="stat-card">
-            <strong>—</strong>
+            <strong>
+              {successRate}%
+            </strong>
 
-            <span>Başarı Oranı</span>
+            <span>
+              Başarı Oranı
+            </span>
           </div>
 
           <div className="stat-card">
-            <strong>—</strong>
+            <strong>
+              {totalPoints}
+            </strong>
 
-            <span>Puan</span>
+            <span>
+              Puan
+            </span>
           </div>
         </section>
 
         <section className="section-card">
           <div className="section-title">
-            <h2>Tahminlerim</h2>
+            <h2>
+              Tahminlerim
+            </h2>
 
             <p>
               Daha önce yaptığı tahminler.
@@ -208,70 +283,104 @@ export default function ProfilePage() {
             </div>
           ) : (
             <div className="my-predictions">
-              {predictions.map((item) => {
-                const match = item.matches;
+              {predictions.map(
+                (item) => {
+                  const match =
+                    item.matches;
 
-                const matchName = match
-                  ? `${match.home_team} - ${match.away_team}`
-                  : "Maç bilgisi yok";
+                  const matchName =
+                    match
+                      ? `${match.home_team} - ${match.away_team}`
+                      : "Maç bilgisi yok";
 
-                const predictionLabel =
-                  item.prediction === "MS1"
-                    ? "MS 1"
-                    : item.prediction === "MSX"
-                      ? "MS X"
-                      : item.prediction === "MS2"
-                        ? "MS 2"
-                        : item.prediction;
+                  const predictionLabel =
+                    item.prediction ===
+                    "MS1"
+                      ? "MS 1"
+                      : item.prediction ===
+                        "MSX"
+                        ? "MS X"
+                        : item.prediction ===
+                          "MS2"
+                          ? "MS 2"
+                          : item.prediction;
 
-                const date = item.created_at
-                  ? new Date(
-                      item.created_at
-                    ).toLocaleDateString(
-                      "tr-TR"
-                    )
-                  : "";
+                  const date =
+                    item.created_at
+                      ? new Date(
+                          item.created_at
+                        ).toLocaleDateString(
+                          "tr-TR"
+                        )
+                      : "";
 
-                const content = (
-                  <div className="my-prediction-item">
-                    <div className="my-prediction-info">
-                      <strong>
-                        {matchName}
-                      </strong>
+                  const resultLabel =
+                    item.result ===
+                    "correct"
+                      ? "✓ Doğru"
+                      : item.result ===
+                        "wrong"
+                        ? "✕ Yanlış"
+                        : "⏳ Bekliyor";
 
-                      <span>
-                        {match?.league ||
-                          "Futbol"}
-                      </span>
+                  const points =
+                    Number(
+                      item.points
+                    ) || 0;
 
-                      <small>
-                        {date}
-                      </small>
+                  const content = (
+                    <div className="my-prediction-item">
+                      <div className="my-prediction-info">
+                        <strong>
+                          {matchName}
+                        </strong>
+
+                        <span>
+                          {match?.league ||
+                            "Futbol"}
+                        </span>
+
+                        <small>
+                          {date}
+                        </small>
+                      </div>
+
+                      <div className="my-prediction-value">
+                        <strong>
+                          {predictionLabel}
+                        </strong>
+
+                        <small>
+                          {resultLabel}
+                        </small>
+
+                        <small>
+                          +{points} puan
+                        </small>
+                      </div>
                     </div>
+                  );
 
-                    <div className="my-prediction-value">
-                      {predictionLabel}
-                    </div>
-                  </div>
-                );
+                  if (match?.id) {
+                    return (
+                      <Link
+                        key={item.id}
+                        href={`/mac/${match.id}`}
+                      >
+                        {content}
+                      </Link>
+                    );
+                  }
 
-                if (match?.id) {
                   return (
-                    <Link
+                    <div
                       key={item.id}
-                      href={`/mac/${match.id}`}
                     >
                       {content}
-                    </Link>
+                    </div>
                   );
                 }
-
-                return (
-                  <div key={item.id}>
-                    {content}
-                  </div>
-                );
-              })}
+              )}
             </div>
           )}
         </section>
