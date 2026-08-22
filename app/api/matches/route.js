@@ -112,9 +112,7 @@ function normalizeMatch(match) {
   };
 }
 
-function getSourceSport(
-  match
-) {
+function getSourceSport(match) {
   if (
     match?.sport ===
     "basketball"
@@ -123,6 +121,22 @@ function getSourceSport(
   }
 
   return "football";
+}
+
+function applyLimit(
+  matches,
+  limit
+) {
+  if (
+    limit === null
+  ) {
+    return matches;
+  }
+
+  return matches.slice(
+    0,
+    limit
+  );
 }
 
 export async function GET(request) {
@@ -161,10 +175,22 @@ export async function GET(request) {
           )
         : null;
 
+    /*
+     * =====================================================
+     * 1. MAÇKOLİK'TEN GÜNCEL VERİYİ AL
+     * =====================================================
+     */
+
     const sourceMatches =
       await getMatches();
 
-    const filteredSourceMatches =
+    /*
+     * =====================================================
+     * 2. KAYNAK VERİYİ FİLTRELE
+     * =====================================================
+     */
+
+    let filteredSourceMatches =
       sourceMatches.filter(
         (match) => {
           if (
@@ -183,25 +209,127 @@ export async function GET(request) {
             return false;
           }
 
-          if (
-            matchId &&
-            String(
-              match?.id
-            ) !==
-              String(matchId)
-          ) {
-            return false;
-          }
-
           return true;
         }
       );
 
+    /*
+     * =====================================================
+     * 3. ID İLE TEK MAÇ İSTENİYORSA
+     *
+     * id hem Supabase UUID'si
+     * hem de Maçkolik external_id'si olabilir.
+     * =====================================================
+     */
+
+    if (matchId) {
+      let requestedExternalId =
+        null;
+
+      /*
+       * Önce Maçkolik ID olarak kontrol et.
+       */
+      const sourceMatch =
+        filteredSourceMatches.find(
+          (match) =>
+            String(
+              match?.id
+            ) ===
+            String(
+              matchId
+            )
+        );
+
+      if (sourceMatch) {
+        requestedExternalId =
+          String(
+            sourceMatch.id
+          );
+      } else {
+        /*
+         * Bulunamadıysa Supabase UUID
+         * olarak kontrol et.
+         */
+        const {
+          data: existingMatch,
+          error:
+            existingMatchError,
+        } = await supabase
+          .from("matches")
+          .select(
+            "id, external_id"
+          )
+          .eq(
+            "id",
+            matchId
+          )
+          .maybeSingle();
+
+        if (
+          existingMatchError
+        ) {
+          console.error(
+            "Existing match lookup error:",
+            existingMatchError
+          );
+
+          return NextResponse.json(
+            {
+              success: false,
+              error:
+                existingMatchError.message,
+            },
+            {
+              status: 500,
+            }
+          );
+        }
+
+        requestedExternalId =
+          existingMatch?.external_id ||
+          null;
+      }
+
+      /*
+       * Eğer Maçkolik'te artık bu maç yoksa
+       * eski Supabase kaydını göstermiyoruz.
+       */
+      if (
+        requestedExternalId
+      ) {
+        filteredSourceMatches =
+          filteredSourceMatches.filter(
+            (match) =>
+              String(
+                match?.id
+              ) ===
+              String(
+                requestedExternalId
+              )
+          );
+      } else {
+        filteredSourceMatches =
+          [];
+      }
+    }
+
+    /*
+     * =====================================================
+     * 4. MAÇLARI SUPABASE FORMATINA ÇEVİR
+     * =====================================================
+     */
+
     const normalizedMatches =
       filteredSourceMatches
-        .map(normalizeMatch)
+        .map(
+          normalizeMatch
+        )
         .filter(Boolean);
 
+    /*
+     * Aynı external_id iki kere gelirse
+     * sadece birini tut.
+     */
     const uniqueMatches =
       Array.from(
         new Map(
@@ -213,6 +341,12 @@ export async function GET(request) {
           )
         ).values()
       );
+
+    /*
+     * =====================================================
+     * 5. GÜNCEL MAÇLARI SUPABASE'E UPSERT ET
+     * =====================================================
+     */
 
     if (
       uniqueMatches.length > 0
@@ -248,85 +382,114 @@ export async function GET(request) {
       }
     }
 
-    let query =
-      supabase
-        .from("matches")
-        .select(`
-          id,
-          external_id,
-          league,
-          league_logo,
-          home_team,
-          away_team,
-          home_logo,
-          away_logo,
-          match_date,
-          status,
-          home_score,
-          away_score,
-          created_at,
-          updated_at
-        `)
-        .order(
-          "match_date",
+    /*
+     * =====================================================
+     * 6. SADECE ŞU AN MAÇKOLİK'TEN GELEN
+     *    MAÇLARIN SUPABASE KAYITLARINI AL
+     *
+     *    ÖNEMLİ:
+     *    Burada artık bütün matches tablosunu
+     *    çekmiyoruz.
+     *
+     *    Böylece eski SportScore / eski veri
+     *    sonuçlara karışmıyor.
+     * =====================================================
+     */
+
+    const externalIds =
+      uniqueMatches.map(
+        (match) =>
+          match.external_id
+      );
+
+    let databaseMatches =
+      [];
+
+    if (
+      externalIds.length > 0
+    ) {
+      let query =
+        supabase
+          .from("matches")
+          .select(`
+            id,
+            external_id,
+            league,
+            league_logo,
+            home_team,
+            away_team,
+            home_logo,
+            away_logo,
+            match_date,
+            status,
+            home_score,
+            away_score,
+            created_at,
+            updated_at
+          `)
+          .in(
+            "external_id",
+            externalIds
+          );
+
+      const {
+        data,
+        error,
+      } = await query;
+
+      if (error) {
+        console.error(
+          "Matches select error:",
+          error
+        );
+
+        return NextResponse.json(
           {
-            ascending: true,
+            success: false,
+            error:
+              error.message,
+          },
+          {
+            status: 500,
           }
         );
+      }
 
-    if (matchId) {
-      query =
-        query.eq(
-          "id",
-          matchId
+      databaseMatches =
+        data || [];
+    }
+
+    /*
+     * =====================================================
+     * 7. MAÇKOLİK VERİSİ + SUPABASE ID EŞLEŞTİR
+     *
+     * Supabase'in kendi UUID'sini koruyoruz.
+     * Böylece predictions.match_id bozulmaz.
+     * =====================================================
+     */
+
+    const databaseMap =
+      new Map();
+
+    databaseMatches.forEach(
+      (match) => {
+        databaseMap.set(
+          String(
+            match.external_id
+          ),
+          match
         );
-    }
-
-    if (status) {
-      query =
-        query.eq(
-          "status",
-          status
-        );
-    }
-
-    if (limit !== null) {
-      query =
-        query.limit(limit);
-    }
-
-    const {
-      data,
-      error,
-    } = await query;
-
-    if (error) {
-      console.error(
-        "Matches select error:",
-        error
-      );
-
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            error.message,
-        },
-        {
-          status: 500,
-        }
-      );
-    }
-
-    let matches =
-      data || [];
+      }
+    );
 
     const sourceSportMap =
       new Map();
 
     filteredSourceMatches.forEach(
       (sourceMatch) => {
-        if (!sourceMatch?.id) {
+        if (
+          !sourceMatch?.id
+        ) {
           return;
         }
 
@@ -341,20 +504,82 @@ export async function GET(request) {
       }
     );
 
-    matches =
-      matches.map(
-        (match) => ({
-          ...match,
+    let matches =
+      uniqueMatches
+        .map(
+          (sourceMatch) => {
+            const databaseMatch =
+              databaseMap.get(
+                String(
+                  sourceMatch.external_id
+                )
+              );
 
-          sport:
-            sourceSportMap.get(
-              String(
-                match.external_id
-              )
-            ) ||
-            "football",
-        })
+            if (
+              !databaseMatch
+            ) {
+              return null;
+            }
+
+            return {
+              ...databaseMatch,
+
+              sport:
+                sourceSportMap.get(
+                  String(
+                    sourceMatch.external_id
+                  )
+                ) ||
+                getSourceSport(
+                  sourceMatch
+                ),
+            };
+          }
+        )
+        .filter(Boolean);
+
+    /*
+     * =====================================================
+     * 8. MAÇ TARİHİNE GÖRE SIRALA
+     * =====================================================
+     */
+
+    matches.sort(
+      (a, b) => {
+        const dateA =
+          new Date(
+            a.match_date
+          ).getTime();
+
+        const dateB =
+          new Date(
+            b.match_date
+          ).getTime();
+
+        return dateA - dateB;
+      }
+    );
+
+    /*
+     * =====================================================
+     * 9. LIMIT ARTIK GÜNCEL MAÇLARA UYGULANIYOR
+     *
+     * Eski Supabase kayıtları arasından
+     * ilk 5 seçilmiyor.
+     * =====================================================
+     */
+
+    matches =
+      applyLimit(
+        matches,
+        limit
       );
+
+    /*
+     * =====================================================
+     * 10. TEK MAÇ İÇİN CANLI DETAY
+     * =====================================================
+     */
 
     if (
       matchId &&
@@ -382,6 +607,7 @@ export async function GET(request) {
               matches.map(
                 (item) => ({
                   ...item,
+
                   live_minute:
                     liveMinute,
                 })
@@ -395,6 +621,12 @@ export async function GET(request) {
         }
       }
     }
+
+    /*
+     * =====================================================
+     * 11. CEVAP
+     * =====================================================
+     */
 
     return NextResponse.json(
       {
@@ -410,13 +642,18 @@ export async function GET(request) {
 
         total_source_matches:
           sourceMatches.length,
+
+        returned_count:
+          matches.length,
       },
       {
         headers: {
           "Cache-Control":
             "no-store, no-cache, must-revalidate, proxy-revalidate",
+
           Pragma:
             "no-cache",
+
           Expires:
             "0",
         },
@@ -431,6 +668,7 @@ export async function GET(request) {
     return NextResponse.json(
       {
         success: false,
+
         error:
           error?.message ||
           "Maçlar alınırken hata oluştu.",
@@ -471,6 +709,7 @@ export async function POST(
       return NextResponse.json(
         {
           success: false,
+
           error:
             "Ev sahibi, deplasman ve maç tarihi zorunludur.",
         },
@@ -491,6 +730,7 @@ export async function POST(
       return NextResponse.json(
         {
           success: false,
+
           error:
             "Geçersiz maç tarihi.",
         },
@@ -517,6 +757,7 @@ export async function POST(
       return NextResponse.json(
         {
           success: false,
+
           error:
             "Geçersiz maç durumu.",
         },
@@ -631,6 +872,7 @@ export async function POST(
       return NextResponse.json(
         {
           success: false,
+
           error:
             result.error.message,
         },
@@ -643,6 +885,7 @@ export async function POST(
     return NextResponse.json(
       {
         success: true,
+
         match:
           result.data,
       },
@@ -659,6 +902,7 @@ export async function POST(
     return NextResponse.json(
       {
         success: false,
+
         error:
           error?.message ||
           "Maç kaydedilirken hata oluştu.",
