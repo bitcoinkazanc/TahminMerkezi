@@ -123,11 +123,11 @@ function getSourceSport(match) {
   return "football";
 }
 
-function addSportToMatches(
-  matches,
+function addSourceDataToMatches(
+  databaseMatches,
   sourceMatches
 ) {
-  const sportMap =
+  const sourceMap =
     new Map();
 
   sourceMatches.forEach(
@@ -138,33 +138,91 @@ function addSportToMatches(
         return;
       }
 
-      sportMap.set(
+      sourceMap.set(
         String(
           sourceMatch.id
         ),
-        getSourceSport(
-          sourceMatch
-        )
+        sourceMatch
       );
     }
   );
 
-  return matches.map(
-    (match) => ({
-      ...match,
-
-      sport:
-        sportMap.get(
+  return databaseMatches.map(
+    (databaseMatch) => {
+      const sourceMatch =
+        sourceMap.get(
           String(
-            match.external_id
+            databaseMatch.external_id
           )
-        ) ||
-        "football",
-    })
+        );
+
+      if (!sourceMatch) {
+        return {
+          ...databaseMatch,
+          sport:
+            "football",
+        };
+      }
+
+      return {
+        ...databaseMatch,
+
+        sport:
+          getSourceSport(
+            sourceMatch
+          ),
+
+        home_logo:
+          sourceMatch.home_logo ||
+          databaseMatch.home_logo ||
+          null,
+
+        away_logo:
+          sourceMatch.away_logo ||
+          databaseMatch.away_logo ||
+          null,
+
+        live_minute:
+          sourceMatch.live_minute ||
+          null,
+
+        source:
+          "Mackolik",
+
+        source_id:
+          sourceMatch.id,
+
+        source_status:
+          sourceMatch.source_status ||
+          null,
+
+        source_state:
+          sourceMatch.source_state ||
+          null,
+
+        source_substate:
+          sourceMatch.source_substate ||
+          null,
+
+        status_box_content:
+          sourceMatch.status_box_content ||
+          null,
+
+        home_team_id:
+          sourceMatch.home_team_id ||
+          null,
+
+        away_team_id:
+          sourceMatch.away_team_id ||
+          null,
+      };
+    }
   );
 }
 
-export async function GET(request) {
+export async function GET(
+  request
+) {
   try {
     const supabase =
       getSupabase();
@@ -176,31 +234,17 @@ export async function GET(request) {
       searchParams.get("id");
 
     const requestedStatus =
-      searchParams.get("status");
+      searchParams.get(
+        "status"
+      );
 
     const requestedSport =
-      searchParams.get("sport");
-
-    /*
-     * =====================================================
-     * 1. MAÇKOLİK'TEN TÜM MAÇLARI AL
-     *
-     * Burada artık hiçbir limit yok.
-     *
-     * Maçkolik 20 maç verirse 20,
-     * 500 maç verirse 500,
-     * 1098 maç verirse 1098 alınır.
-     * =====================================================
-     */
+      searchParams.get(
+        "sport"
+      );
 
     const sourceMatches =
       await getMatches();
-
-    /*
-     * =====================================================
-     * 2. KAYNAK MAÇLARI FİLTRELE
-     * =====================================================
-     */
 
     let filteredSourceMatches =
       sourceMatches.filter(
@@ -225,15 +269,6 @@ export async function GET(request) {
         }
       );
 
-    /*
-     * =====================================================
-     * 3. TEK MAÇ İSTENİYORSA
-     *
-     * Önce Maçkolik ID'sine bakıyoruz.
-     * Bulamazsak Supabase UUID'si olarak arıyoruz.
-     * =====================================================
-     */
-
     if (matchId) {
       let sourceMatch =
         filteredSourceMatches.find(
@@ -248,7 +283,8 @@ export async function GET(request) {
 
       if (!sourceMatch) {
         const {
-          data: databaseMatch,
+          data:
+            databaseMatch,
           error:
             databaseMatchError,
         } = await supabase
@@ -308,23 +344,12 @@ export async function GET(request) {
       }
     }
 
-    /*
-     * =====================================================
-     * 4. SUPABASE FORMATINA ÇEVİR
-     * =====================================================
-     */
-
     const normalizedMatches =
       filteredSourceMatches
         .map(
           normalizeMatch
         )
         .filter(Boolean);
-
-    /*
-     * Aynı external_id varsa
-     * tek kayıt tut.
-     */
 
     const uniqueMatches =
       Array.from(
@@ -337,17 +362,6 @@ export async function GET(request) {
           )
         ).values()
       );
-
-    /*
-     * =====================================================
-     * 5. SUPABASE'E UPSERT
-     *
-     * Artık 1098 ID'yi ayrıca .in() ile aramıyoruz.
-     *
-     * Upsert'in döndürdüğü kayıtları doğrudan
-     * kullanıyoruz.
-     * =====================================================
-     */
 
     let databaseMatches =
       [];
@@ -406,27 +420,11 @@ export async function GET(request) {
         data || [];
     }
 
-    /*
-     * =====================================================
-     * 6. SPORT BİLGİSİNİ EKLE
-     * =====================================================
-     */
-
     let matches =
-      addSportToMatches(
+      addSourceDataToMatches(
         databaseMatches,
         filteredSourceMatches
       );
-
-    /*
-     * =====================================================
-     * 7. TARİHE GÖRE SIRALA
-     *
-     * API tarafında LIMIT YOK.
-     *
-     * Maçkolik'ten gelen bütün maçlar döndürülür.
-     * =====================================================
-     */
 
     matches.sort(
       (a, b) => {
@@ -443,12 +441,6 @@ export async function GET(request) {
         return dateA - dateB;
       }
     );
-
-    /*
-     * =====================================================
-     * 8. TEK MAÇ İÇİN CANLI DETAY
-     * =====================================================
-     */
 
     if (
       matchId &&
@@ -468,17 +460,41 @@ export async function GET(request) {
             );
 
           if (detail) {
-            const liveMinute =
-              detail?.live_minute ||
-              null;
-
             matches =
               matches.map(
                 (item) => ({
                   ...item,
 
                   live_minute:
-                    liveMinute,
+                    detail.live_minute ||
+                    item.live_minute ||
+                    null,
+
+                  home_logo:
+                    detail.home_logo ||
+                    item.home_logo ||
+                    null,
+
+                  away_logo:
+                    detail.away_logo ||
+                    item.away_logo ||
+                    null,
+
+                  home_score:
+                    detail.home_score !==
+                      null &&
+                    detail.home_score !==
+                      undefined
+                      ? detail.home_score
+                      : item.home_score,
+
+                  away_score:
+                    detail.away_score !==
+                      null &&
+                    detail.away_score !==
+                      undefined
+                      ? detail.away_score
+                      : item.away_score,
                 })
               );
           }
@@ -490,14 +506,6 @@ export async function GET(request) {
         }
       }
     }
-
-    /*
-     * =====================================================
-     * 9. CEVAP
-     *
-     * BURADA LIMIT YOK.
-     * =====================================================
-     */
 
     return NextResponse.json(
       {
@@ -580,7 +588,6 @@ export async function POST(
       return NextResponse.json(
         {
           success: false,
-
           error:
             "Ev sahibi, deplasman ve maç tarihi zorunludur.",
         },
@@ -601,7 +608,6 @@ export async function POST(
       return NextResponse.json(
         {
           success: false,
-
           error:
             "Geçersiz maç tarihi.",
         },
@@ -628,7 +634,6 @@ export async function POST(
       return NextResponse.json(
         {
           success: false,
-
           error:
             "Geçersiz maç durumu.",
         },
@@ -743,7 +748,6 @@ export async function POST(
       return NextResponse.json(
         {
           success: false,
-
           error:
             result.error.message,
         },
@@ -756,7 +760,6 @@ export async function POST(
     return NextResponse.json(
       {
         success: true,
-
         match:
           result.data,
       },
@@ -773,7 +776,6 @@ export async function POST(
     return NextResponse.json(
       {
         success: false,
-
         error:
           error?.message ||
           "Maç kaydedilirken sunucu hatası oluştu.",
