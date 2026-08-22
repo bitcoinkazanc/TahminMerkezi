@@ -66,62 +66,22 @@ export default function ProfileCard({ user }) {
         </div>
       )}
 
-      <div
-        className="profile-info"
-        style={{
-          flex: 1,
-          minWidth: 0,
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: "10px",
-            width: "100%",
-          }}
-        >
-          {user.username ? (
-            <p
-              style={{
-                margin: 0,
-                minWidth: 0,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
-            >
-              @{user.username}
-            </p>
-          ) : (
-            <p style={{ margin: 0 }}>
-              Telegram kullanıcısı
-            </p>
-          )}
+      <div className="profile-info">
+        {user.username ? (
+          <>
+            <p>@{user.username}</p>
 
-          {user.username ? (
             <button
               type="button"
+              className="primary-button"
               onClick={openTelegram}
-              style={{
-                flexShrink: 0,
-                padding: "6px 10px",
-                minHeight: "30px",
-                border: "none",
-                borderRadius: "8px",
-                background: "var(--primary)",
-                color: "#fff",
-                fontSize: "10px",
-                fontWeight: 800,
-                cursor: "pointer",
-                whiteSpace: "nowrap",
-              }}
             >
-              💬 Mesaj
+              💬 Mesaj Yaz
             </button>
-          ) : null}
-        </div>
+          </>
+        ) : (
+          <p>Telegram kullanıcısı</p>
+        )}
       </div>
     </section>
   );
