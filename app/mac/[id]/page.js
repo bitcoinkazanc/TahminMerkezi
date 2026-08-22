@@ -17,7 +17,9 @@ export default function MatchDetailPage() {
   const [error, setError] = useState("");
 
   async function loadMatch(showLoading = true) {
-    if (!matchId) return;
+    if (!matchId) {
+      return;
+    }
 
     try {
       if (showLoading) {
@@ -48,8 +50,23 @@ export default function MatchDetailPage() {
         );
       }
 
+      /*
+       * /api/matches?id=... artık tek maçta:
+       *
+       * {
+       *   success: true,
+       *   match: {...}
+       * }
+       *
+       * döndürüyor.
+       *
+       * Eski yapı matches[0] ise
+       * geriye dönük olarak destekleniyor.
+       */
       const foundMatch =
-        result.matches?.[0];
+        result.match ||
+        result.matches?.[0] ||
+        null;
 
       if (!foundMatch) {
         throw new Error(
@@ -59,11 +76,14 @@ export default function MatchDetailPage() {
 
       setMatch(foundMatch);
     } catch (err) {
-      console.error(err);
+      console.error(
+        "Match loading error:",
+        err
+      );
 
       if (showLoading) {
         setError(
-          err.message ||
+          err?.message ||
             "Maç yüklenirken hata oluştu."
         );
       }
@@ -75,7 +95,9 @@ export default function MatchDetailPage() {
   }
 
   async function loadPredictions() {
-    if (!matchId) return;
+    if (!matchId) {
+      return;
+    }
 
     try {
       const response =
@@ -110,12 +132,18 @@ export default function MatchDetailPage() {
   }
 
   useEffect(() => {
+    if (!matchId) {
+      return;
+    }
+
     loadMatch();
     loadPredictions();
   }, [matchId]);
 
   useEffect(() => {
-    if (!matchId) return;
+    if (!matchId) {
+      return;
+    }
 
     const interval =
       setInterval(() => {
@@ -123,36 +151,34 @@ export default function MatchDetailPage() {
       }, 30000);
 
     return () => {
-      clearInterval(
-        interval
-      );
+      clearInterval(interval);
     };
   }, [matchId]);
 
   function handlePredictionCreated(
     newPrediction
   ) {
-    if (!newPrediction) return;
+    if (!newPrediction) {
+      return;
+    }
 
-    setPredictions(
-      (current) => {
-        const exists =
-          current.some(
-            (item) =>
-              item.id ===
-              newPrediction.id
-          );
+    setPredictions((current) => {
+      const exists =
+        current.some(
+          (item) =>
+            item.id ===
+            newPrediction.id
+        );
 
-        if (exists) {
-          return current;
-        }
-
-        return [
-          newPrediction,
-          ...current,
-        ];
+      if (exists) {
+        return current;
       }
-    );
+
+      return [
+        newPrediction,
+        ...current,
+      ];
+    });
   }
 
   if (loading) {
@@ -208,57 +234,68 @@ export default function MatchDetailPage() {
   }
 
   const matchDate =
-    new Date(
-      match.match_date
+    match.match_date
+      ? new Date(match.match_date)
+      : null;
+
+  const validDate =
+    matchDate &&
+    !Number.isNaN(
+      matchDate.getTime()
     );
 
   const formattedDate =
-    matchDate.toLocaleDateString(
-      "tr-TR",
-      {
-        day: "2-digit",
-        month: "long",
-        year: "numeric",
-      }
-    );
+    validDate
+      ? matchDate.toLocaleDateString(
+          "tr-TR",
+          {
+            day: "2-digit",
+            month: "long",
+            year: "numeric",
+          }
+        )
+      : "";
 
   const formattedTime =
-    matchDate.toLocaleTimeString(
-      "tr-TR",
-      {
-        hour: "2-digit",
-        minute: "2-digit",
-      }
-    );
+    validDate
+      ? matchDate.toLocaleTimeString(
+          "tr-TR",
+          {
+            hour: "2-digit",
+            minute: "2-digit",
+          }
+        )
+      : "";
 
   const isLive =
-    match.status === "live";
+    match.status === "live" ||
+    match.state === "live";
 
   const isFinished =
-    match.status === "finished";
+    match.status === "finished" ||
+    match.state === "post" ||
+    match.substate === "fullTime";
 
   const hasScore =
-    isLive ||
-    isFinished;
+    isLive || isFinished;
 
   const homeScore =
-    match.home_score !==
-      null &&
-    match.home_score !==
-      undefined
+    match.home_score !== null &&
+    match.home_score !== undefined
       ? match.home_score
       : 0;
 
   const awayScore =
-    match.away_score !==
-      null &&
-    match.away_score !==
-      undefined
+    match.away_score !== null &&
+    match.away_score !== undefined
       ? match.away_score
       : 0;
 
   const liveMinute =
-    match.live_minute;
+    match.live_minute !== null &&
+    match.live_minute !== undefined
+      ? match.live_minute
+      : null;
 
   return (
     <main className="page">
@@ -267,21 +304,21 @@ export default function MatchDetailPage() {
         <section
           className="match-detail-card"
           style={{
-            textAlign:
-              "center",
-            padding:
-              "20px 14px",
+            textAlign: "center",
+            padding: "20px 14px",
           }}
         >
 
           <div className="match-detail-league">
             {match.league_logo ? (
               <img
-                src={
-                  match.league_logo
-                }
+                src={match.league_logo}
                 alt=""
                 className="league-logo"
+                onError={(event) => {
+                  event.currentTarget.style.display =
+                    "none";
+                }}
               />
             ) : null}
 
@@ -294,65 +331,49 @@ export default function MatchDetailPage() {
           <div
             className="match-detail-date"
             style={{
-              marginTop:
-                "8px",
+              marginTop: "8px",
             }}
           >
-            {formattedDate} •{" "}
-            {formattedTime}
+            {formattedDate}{" "}
+            {formattedTime
+              ? `• ${formattedTime}`
+              : ""}
           </div>
 
           <div
             className="match-status"
             style={{
-              display:
-                "flex",
-              alignItems:
-                "center",
-              justifyContent:
-                "center",
-              textAlign:
-                "center",
-              margin:
-                "14px auto 20px",
-              minHeight:
-                "42px",
-              padding:
-                "8px 16px",
-              width:
-                "fit-content",
-              boxSizing:
-                "border-box",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              textAlign: "center",
+              margin: "14px auto 20px",
+              minHeight: "42px",
+              padding: "8px 16px",
+              width: "fit-content",
+              boxSizing: "border-box",
             }}
           >
             {isLive ? (
               <div
                 style={{
-                  display:
-                    "flex",
-                  flexDirection:
-                    "column",
-                  alignItems:
-                    "center",
-                  justifyContent:
-                    "center",
-                  lineHeight:
-                    "1.2",
-                  gap:
-                    "3px",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  lineHeight: "1.2",
+                  gap: "3px",
                 }}
               >
                 <span>
                   🔴 CANLI
                 </span>
 
-                {liveMinute ? (
+                {liveMinute !== null ? (
                   <span
                     style={{
-                      fontSize:
-                        "14px",
-                      fontWeight:
-                        "800",
+                      fontSize: "14px",
+                      fontWeight: "800",
                     }}
                   >
                     {liveMinute}'
@@ -375,38 +396,40 @@ export default function MatchDetailPage() {
           <div
             className="teams-detail"
             style={{
-              display:
-                "grid",
+              display: "grid",
               gridTemplateColumns:
                 "1fr 100px 1fr",
-              alignItems:
-                "center",
-              gap:
-                "10px",
+              alignItems: "center",
+              gap: "10px",
             }}
           >
 
             <div
               className="team-detail"
               style={{
-                textAlign:
-                  "center",
+                textAlign: "center",
               }}
             >
               {match.home_logo ? (
                 <img
-                  src={
-                    match.home_logo
-                  }
+                  src={match.home_logo}
                   alt={
-                    match.home_team
+                    match.home_team ||
+                    ""
                   }
                   className="team-logo-large"
-                  onError={(
-                    event
-                  ) => {
+                  width="80"
+                  height="80"
+                  onError={(event) => {
                     event.currentTarget.style.display =
                       "none";
+                  }}
+                  style={{
+                    width: "80px",
+                    height: "80px",
+                    objectFit: "contain",
+                    display: "block",
+                    margin: "0 auto 8px",
                   }}
                 />
               ) : (
@@ -423,27 +446,19 @@ export default function MatchDetailPage() {
             <div
               className="match-vs"
               style={{
-                display:
-                  "flex",
-                alignItems:
-                  "center",
-                justifyContent:
-                  "center",
-                minHeight:
-                  "70px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                minHeight: "70px",
               }}
             >
               {hasScore ? (
                 <span
                   style={{
-                    fontSize:
-                      "36px",
-                    fontWeight:
-                      "900",
-                    letterSpacing:
-                      "2px",
-                    whiteSpace:
-                      "nowrap",
+                    fontSize: "36px",
+                    fontWeight: "900",
+                    letterSpacing: "2px",
+                    whiteSpace: "nowrap",
                   }}
                 >
                   {homeScore} -{" "}
@@ -452,12 +467,9 @@ export default function MatchDetailPage() {
               ) : (
                 <span
                   style={{
-                    fontSize:
-                      "18px",
-                    fontWeight:
-                      "800",
-                    color:
-                      "#9ca3af",
+                    fontSize: "18px",
+                    fontWeight: "800",
+                    color: "#9ca3af",
                   }}
                 >
                   VS
@@ -468,24 +480,29 @@ export default function MatchDetailPage() {
             <div
               className="team-detail"
               style={{
-                textAlign:
-                  "center",
+                textAlign: "center",
               }}
             >
               {match.away_logo ? (
                 <img
-                  src={
-                    match.away_logo
-                  }
+                  src={match.away_logo}
                   alt={
-                    match.away_team
+                    match.away_team ||
+                    ""
                   }
                   className="team-logo-large"
-                  onError={(
-                    event
-                  ) => {
+                  width="80"
+                  height="80"
+                  onError={(event) => {
                     event.currentTarget.style.display =
                       "none";
+                  }}
+                  style={{
+                    width: "80px",
+                    height: "80px",
+                    objectFit: "contain",
+                    display: "block",
+                    margin: "0 auto 8px",
                   }}
                 />
               ) : (
@@ -504,14 +521,10 @@ export default function MatchDetailPage() {
           {isLive ? (
             <div
               style={{
-                marginTop:
-                  "16px",
-                fontSize:
-                  "12px",
-                color:
-                  "#dc2626",
-                fontWeight:
-                  "700",
+                marginTop: "16px",
+                fontSize: "12px",
+                color: "#dc2626",
+                fontWeight: "700",
               }}
             >
               🔄 Canlı skor otomatik
@@ -569,9 +582,7 @@ export default function MatchDetailPage() {
           ) : (
             <div className="prediction-list">
               {predictions.map(
-                (
-                  prediction
-                ) => (
+                (prediction) => (
                   <PredictionMessage
                     key={
                       prediction.id
@@ -599,9 +610,7 @@ export default function MatchDetailPage() {
           </div>
 
           <ChatBox
-            matchId={
-              match.id
-            }
+            matchId={match.id}
           />
         </section>
 
