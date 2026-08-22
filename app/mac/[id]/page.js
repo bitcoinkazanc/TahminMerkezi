@@ -617,4 +617,4 @@ export default function MatchDetailPage() {
       </div>
     </main>
   );
-} 
+}
