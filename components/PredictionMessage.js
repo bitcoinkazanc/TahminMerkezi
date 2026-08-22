@@ -59,9 +59,32 @@ export default function PredictionMessage({
     : "Maç bilgisi yok";
 
   return (
-    <article className="prediction-message">
-      <div className="prediction-message-main">
-        <div className="prediction-message-avatar">
+    <article
+      className="prediction-message"
+      style={{
+        width: "100%",
+        maxWidth: "100%",
+        minWidth: 0,
+        boxSizing: "border-box",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        className="prediction-message-main"
+        style={{
+          display: "flex",
+          width: "100%",
+          maxWidth: "100%",
+          minWidth: 0,
+          boxSizing: "border-box",
+        }}
+      >
+        <div
+          className="prediction-message-avatar"
+          style={{
+            flex: "0 0 auto",
+          }}
+        >
           {user?.avatar_url ? (
             <img
               src={user.avatar_url}
@@ -75,9 +98,35 @@ export default function PredictionMessage({
           )}
         </div>
 
-        <div className="prediction-message-content">
-          <div className="prediction-message-top">
-            <strong>{username}</strong>
+        <div
+          className="prediction-message-content"
+          style={{
+            flex: "1 1 auto",
+            width: 0,
+            maxWidth: "100%",
+            minWidth: 0,
+            overflow: "hidden",
+            boxSizing: "border-box",
+          }}
+        >
+          <div
+            className="prediction-message-top"
+            style={{
+              minWidth: 0,
+              overflow: "hidden",
+            }}
+          >
+            <strong
+              style={{
+                display: "block",
+                maxWidth: "100%",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {username}
+            </strong>
           </div>
 
           {match ? (
@@ -85,14 +134,21 @@ export default function PredictionMessage({
               style={{
                 marginTop: "8px",
                 marginBottom: "10px",
+                minWidth: 0,
+                maxWidth: "100%",
+                overflow: "hidden",
               }}
             >
               <div
                 style={{
+                  maxWidth: "100%",
+                  minWidth: 0,
                   fontSize: "14px",
                   fontWeight: 800,
                   color: "var(--text)",
                   lineHeight: 1.35,
+                  overflowWrap: "anywhere",
+                  wordBreak: "break-word",
                 }}
               >
                 ⚽ {matchName}
@@ -102,8 +158,12 @@ export default function PredictionMessage({
                 <div
                   style={{
                     marginTop: "3px",
+                    maxWidth: "100%",
+                    minWidth: 0,
                     fontSize: "11px",
                     color: "var(--muted)",
+                    overflowWrap: "anywhere",
+                    wordBreak: "break-word",
                   }}
                 >
                   🏆 {match.league}
@@ -118,6 +178,8 @@ export default function PredictionMessage({
               alignItems: "center",
               gap: "8px",
               flexWrap: "wrap",
+              maxWidth: "100%",
+              minWidth: 0,
               marginBottom: "8px",
             }}
           >
@@ -125,12 +187,16 @@ export default function PredictionMessage({
               style={{
                 display: "inline-flex",
                 alignItems: "center",
+                maxWidth: "100%",
+                boxSizing: "border-box",
                 padding: "6px 10px",
                 borderRadius: "8px",
                 background: "var(--primary)",
                 color: "#fff",
                 fontSize: "12px",
                 fontWeight: 800,
+                overflowWrap: "anywhere",
+                wordBreak: "break-word",
               }}
             >
               🎯 Tahmin: {predictionLabel}
@@ -139,9 +205,12 @@ export default function PredictionMessage({
             {prediction.confidence != null ? (
               <span
                 style={{
+                  maxWidth: "100%",
                   fontSize: "12px",
                   fontWeight: 700,
                   color: "var(--text)",
+                  overflowWrap: "anywhere",
+                  wordBreak: "break-word",
                 }}
               >
                 📊 Güven: %{prediction.confidence}
@@ -152,11 +221,16 @@ export default function PredictionMessage({
           {prediction.message ? (
             <div
               style={{
+                width: "100%",
+                maxWidth: "100%",
+                minWidth: 0,
                 marginTop: "8px",
                 padding: "10px 12px",
                 borderRadius: "10px",
                 background: "var(--surface-soft)",
                 border: "1px solid var(--border)",
+                boxSizing: "border-box",
+                overflow: "hidden",
               }}
             >
               <div
@@ -173,9 +247,13 @@ export default function PredictionMessage({
               <p
                 style={{
                   margin: 0,
+                  maxWidth: "100%",
                   fontSize: "12px",
                   lineHeight: 1.5,
                   color: "var(--text)",
+                  whiteSpace: "pre-wrap",
+                  overflowWrap: "anywhere",
+                  wordBreak: "break-word",
                 }}
               >
                 {prediction.message}
@@ -187,8 +265,10 @@ export default function PredictionMessage({
             <div
               style={{
                 marginTop: "8px",
+                maxWidth: "100%",
                 fontSize: "10px",
                 color: "var(--muted)",
+                overflowWrap: "anywhere",
               }}
             >
               🕐 {formattedDate} · {formattedTime}
@@ -202,9 +282,13 @@ export default function PredictionMessage({
           style={{
             display: "flex",
             gap: "8px",
+            width: "100%",
+            maxWidth: "100%",
+            minWidth: 0,
             marginTop: "12px",
             paddingTop: "10px",
             borderTop: "1px solid var(--border)",
+            boxSizing: "border-box",
           }}
         >
           {user?.id ? (
@@ -213,12 +297,13 @@ export default function PredictionMessage({
                 user.id
               )}`}
               style={{
-                flex: 1,
+                flex: "1 1 0",
+                minWidth: 0,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 minHeight: "34px",
-                padding: "7px 10px",
+                padding: "7px 8px",
                 border: "1px solid var(--border)",
                 borderRadius: "9px",
                 background: "var(--surface-soft)",
@@ -226,6 +311,10 @@ export default function PredictionMessage({
                 fontSize: "11px",
                 fontWeight: 800,
                 textDecoration: "none",
+                boxSizing: "border-box",
+                overflow: "hidden",
+                whiteSpace: "nowrap",
+                textOverflow: "ellipsis",
               }}
             >
               👤 Profile Git
@@ -235,12 +324,13 @@ export default function PredictionMessage({
           <Link
             href={`/mac/${match.id}`}
             style={{
-              flex: 1,
+              flex: "1 1 0",
+              minWidth: 0,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               minHeight: "34px",
-              padding: "7px 10px",
+              padding: "7px 8px",
               border: "1px solid var(--primary)",
               borderRadius: "9px",
               background: "var(--primary)",
@@ -248,6 +338,10 @@ export default function PredictionMessage({
               fontSize: "11px",
               fontWeight: 800,
               textDecoration: "none",
+              boxSizing: "border-box",
+              overflow: "hidden",
+              whiteSpace: "nowrap",
+              textOverflow: "ellipsis",
             }}
           >
             ⚽ Maça Git
