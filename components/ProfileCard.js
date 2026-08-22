@@ -36,7 +36,16 @@ export default function ProfileCard({ user }) {
   }
 
   return (
-    <section className="profile-card">
+    <section
+      className="profile-card"
+      style={{
+        width: "100%",
+        maxWidth: "100%",
+        minWidth: 0,
+        boxSizing: "border-box",
+        overflow: "hidden",
+      }}
+    >
       {user.avatar_url ? (
         <img
           src={user.avatar_url}
@@ -58,30 +67,98 @@ export default function ProfileCard({ user }) {
             objectFit: "cover",
             borderRadius: "50%",
             display: "block",
+            flexShrink: 0,
           }}
         />
       ) : (
-        <div className="profile-avatar-placeholder">
+        <div
+          className="profile-avatar-placeholder"
+          style={{
+            flexShrink: 0,
+          }}
+        >
           {avatarLetter}
         </div>
       )}
 
-      <div className="profile-info">
-        {user.username ? (
-          <>
-            <p>@{user.username}</p>
+      <div
+        className="profile-info"
+        style={{
+          flex: "1 1 auto",
+          width: 0,
+          minWidth: 0,
+          maxWidth: "100%",
+          boxSizing: "border-box",
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "10px",
+            width: "100%",
+            maxWidth: "100%",
+            minWidth: 0,
+            boxSizing: "border-box",
+          }}
+        >
+          {user.username ? (
+            <p
+              style={{
+                flex: "1 1 auto",
+                width: 0,
+                minWidth: 0,
+                maxWidth: "100%",
+                margin: 0,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              @{user.username}
+            </p>
+          ) : (
+            <p
+              style={{
+                flex: "1 1 auto",
+                width: 0,
+                minWidth: 0,
+                maxWidth: "100%",
+                margin: 0,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              Telegram kullanıcısı
+            </p>
+          )}
 
+          {user.username ? (
             <button
               type="button"
-              className="primary-button"
               onClick={openTelegram}
+              style={{
+                flex: "0 0 auto",
+                flexShrink: 0,
+                padding: "6px 10px",
+                minHeight: "30px",
+                border: "none",
+                borderRadius: "8px",
+                background: "var(--primary)",
+                color: "#fff",
+                fontSize: "10px",
+                fontWeight: 800,
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+              }}
             >
-              💬 Mesaj Yaz
+              💬 Mesaj
             </button>
-          </>
-        ) : (
-          <p>Telegram kullanıcısı</p>
-        )}
+          ) : null}
+        </div>
       </div>
     </section>
   );
