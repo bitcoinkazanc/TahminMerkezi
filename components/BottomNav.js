@@ -13,6 +13,11 @@ export default function BottomNav() {
       icon: "🏠",
     },
     {
+      href: "/maclar",
+      label: "Maçlar",
+      icon: "⚽",
+    },
+    {
       href: "/tahminler",
       label: "Tahminler",
       icon: "🎯",
