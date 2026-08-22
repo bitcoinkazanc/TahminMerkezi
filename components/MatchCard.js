@@ -228,4 +228,4 @@ export default function MatchCard({ match }) {
       </div>
     </Link>
   );
-}
+} 
