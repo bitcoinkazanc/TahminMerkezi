@@ -122,8 +122,26 @@ export default function ProfilePage() {
 
   if (error) {
     return (
-      <main className="page">
-        <div className="page-container">
+      <main
+        className="page"
+        style={{
+          width: "100%",
+          maxWidth: "100%",
+          minWidth: 0,
+          overflowX: "hidden",
+          boxSizing: "border-box",
+          paddingBottom: "100px",
+        }}
+      >
+        <div
+          className="page-container"
+          style={{
+            width: "100%",
+            maxWidth: "100%",
+            minWidth: 0,
+            boxSizing: "border-box",
+          }}
+        >
           <div className="error-box">
             <h2>
               Bir sorun oluştu
@@ -145,8 +163,26 @@ export default function ProfilePage() {
 
   if (!user) {
     return (
-      <main className="page">
-        <div className="page-container">
+      <main
+        className="page"
+        style={{
+          width: "100%",
+          maxWidth: "100%",
+          minWidth: 0,
+          overflowX: "hidden",
+          boxSizing: "border-box",
+          paddingBottom: "100px",
+        }}
+      >
+        <div
+          className="page-container"
+          style={{
+            width: "100%",
+            maxWidth: "100%",
+            minWidth: 0,
+            boxSizing: "border-box",
+          }}
+        >
           <div className="empty-state profile-empty">
             <div className="empty-icon">
               👤
@@ -219,8 +255,27 @@ export default function ProfilePage() {
     );
 
   return (
-    <main className="page">
-      <div className="page-container">
+    <main
+      className="page"
+      style={{
+        width: "100%",
+        maxWidth: "100%",
+        minWidth: 0,
+        overflowX: "hidden",
+        boxSizing: "border-box",
+        paddingBottom: "100px",
+      }}
+    >
+      <div
+        className="page-container"
+        style={{
+          width: "100%",
+          maxWidth: "100%",
+          minWidth: 0,
+          boxSizing: "border-box",
+          overflowX: "hidden",
+        }}
+      >
         <ProfileCard user={user} />
 
         <section className="profile-stats">
@@ -255,7 +310,16 @@ export default function ProfilePage() {
           </div>
         </section>
 
-        <section className="section-card">
+        <section
+          className="section-card"
+          style={{
+            width: "100%",
+            maxWidth: "100%",
+            minWidth: 0,
+            boxSizing: "border-box",
+            overflow: "hidden",
+          }}
+        >
           <div className="section-title">
             <h2>
               Tahminlerim
@@ -282,7 +346,16 @@ export default function ProfilePage() {
               </p>
             </div>
           ) : (
-            <div className="my-predictions">
+            <div
+              className="my-predictions"
+              style={{
+                width: "100%",
+                maxWidth: "100%",
+                minWidth: 0,
+                boxSizing: "border-box",
+                overflow: "hidden",
+              }}
+            >
               {predictions.map(
                 (item) => {
                   const match =
@@ -329,13 +402,60 @@ export default function ProfilePage() {
                     ) || 0;
 
                   const content = (
-                    <div className="my-prediction-item">
-                      <div className="my-prediction-info">
-                        <strong>
+                    <div
+                      className="my-prediction-item"
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        width: "100%",
+                        maxWidth: "100%",
+                        minWidth: 0,
+                        boxSizing: "border-box",
+                        overflow: "hidden",
+                      }}
+                    >
+                      <div
+                        className="my-prediction-info"
+                        style={{
+                          flex: "1 1 auto",
+                          width: 0,
+                          minWidth: 0,
+                          maxWidth: "100%",
+                          boxSizing: "border-box",
+                          overflow: "hidden",
+                        }}
+                      >
+                        <strong
+                          style={{
+                            display: "block",
+                            width: "100%",
+                            maxWidth: "100%",
+                            minWidth: 0,
+                            overflow: "hidden",
+                            textOverflow:
+                              "ellipsis",
+                            whiteSpace:
+                              "nowrap",
+                            boxSizing:
+                              "border-box",
+                          }}
+                        >
                           {matchName}
                         </strong>
 
-                        <span>
+                        <span
+                          style={{
+                            display: "block",
+                            width: "100%",
+                            maxWidth: "100%",
+                            minWidth: 0,
+                            overflow: "hidden",
+                            textOverflow:
+                              "ellipsis",
+                            whiteSpace:
+                              "nowrap",
+                          }}
+                        >
                           {match?.league ||
                             "Futbol"}
                         </span>
@@ -345,16 +465,79 @@ export default function ProfilePage() {
                         </small>
                       </div>
 
-                      <div className="my-prediction-value">
-                        <strong>
-                          {predictionLabel}
+                      <div
+                        className="my-prediction-value"
+                        style={{
+                          flex:
+                            "0 0 auto",
+                          width: "78px",
+                          minWidth: "78px",
+                          maxWidth: "78px",
+                          boxSizing:
+                            "border-box",
+                          overflow:
+                            "hidden",
+                          textAlign:
+                            "center",
+                          display: "flex",
+                          flexDirection:
+                            "column",
+                          alignItems:
+                            "center",
+                          justifyContent:
+                            "center",
+                        }}
+                      >
+                        <strong
+                          style={{
+                            display:
+                              "block",
+                            maxWidth:
+                              "100%",
+                            overflow:
+                              "hidden",
+                            textOverflow:
+                              "ellipsis",
+                            whiteSpace:
+                              "nowrap",
+                          }}
+                        >
+                          {
+                            predictionLabel
+                          }
                         </strong>
 
-                        <small>
+                        <small
+                          style={{
+                            display:
+                              "block",
+                            maxWidth:
+                              "100%",
+                            overflow:
+                              "hidden",
+                            textOverflow:
+                              "ellipsis",
+                            whiteSpace:
+                              "nowrap",
+                          }}
+                        >
                           {resultLabel}
                         </small>
 
-                        <small>
+                        <small
+                          style={{
+                            display:
+                              "block",
+                            maxWidth:
+                              "100%",
+                            overflow:
+                              "hidden",
+                            textOverflow:
+                              "ellipsis",
+                            whiteSpace:
+                              "nowrap",
+                          }}
+                        >
                           +{points} puan
                         </small>
                       </div>
@@ -366,6 +549,18 @@ export default function ProfilePage() {
                       <Link
                         key={item.id}
                         href={`/mac/${match.id}`}
+                        style={{
+                          display: "block",
+                          width: "100%",
+                          maxWidth: "100%",
+                          minWidth: 0,
+                          boxSizing:
+                            "border-box",
+                          overflow:
+                            "hidden",
+                          textDecoration:
+                            "none",
+                        }}
                       >
                         {content}
                       </Link>
@@ -375,6 +570,15 @@ export default function ProfilePage() {
                   return (
                     <div
                       key={item.id}
+                      style={{
+                        width: "100%",
+                        maxWidth: "100%",
+                        minWidth: 0,
+                        boxSizing:
+                          "border-box",
+                        overflow:
+                          "hidden",
+                      }}
                     >
                       {content}
                     </div>
