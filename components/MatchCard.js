@@ -16,24 +16,18 @@ export default function MatchCard({ match }) {
     !Number.isNaN(matchDate.getTime());
 
   const formattedDate = validDate
-    ? matchDate.toLocaleDateString(
-        "tr-TR",
-        {
-          day: "2-digit",
-          month: "2-digit",
-          year: "numeric",
-        }
-      )
+    ? matchDate.toLocaleDateString("tr-TR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      })
     : "";
 
   const formattedTime = validDate
-    ? matchDate.toLocaleTimeString(
-        "tr-TR",
-        {
-          hour: "2-digit",
-          minute: "2-digit",
-        }
-      )
+    ? matchDate.toLocaleTimeString("tr-TR", {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
     : "";
 
   const statusLabels = {
@@ -51,10 +45,13 @@ export default function MatchCard({ match }) {
     "Yaklaşan";
 
   const isLive =
-    match.status === "live";
+    match.status === "live" ||
+    match.state === "live";
 
   const isFinished =
-    match.status === "finished";
+    match.status === "finished" ||
+    match.state === "post" ||
+    match.substate === "fullTime";
 
   const hasScore =
     isLive || isFinished;
@@ -71,9 +68,17 @@ export default function MatchCard({ match }) {
       ? match.away_score
       : 0;
 
+  const liveMinute =
+    match.live_minute !== null &&
+    match.live_minute !== undefined
+      ? match.live_minute
+      : null;
+
   return (
     <Link
-      href={`/mac/${match.id}`}
+      href={`/mac/${encodeURIComponent(
+        match.id
+      )}`}
       className="match-card"
     >
       <div className="match-card-top">
@@ -83,6 +88,10 @@ export default function MatchCard({ match }) {
               src={match.league_logo}
               alt=""
               className="league-logo"
+              onError={(event) => {
+                event.currentTarget.style.display =
+                  "none";
+              }}
             />
           ) : null}
 
@@ -96,7 +105,9 @@ export default function MatchCard({ match }) {
             isLive ? "live" : ""
           }`}
         >
-          {statusLabel}
+          {isLive
+            ? "CANLI"
+            : statusLabel}
         </span>
       </div>
 
@@ -105,8 +116,21 @@ export default function MatchCard({ match }) {
           {match.home_logo ? (
             <img
               src={match.home_logo}
-              alt={match.home_team}
+              alt={match.home_team || ""}
               className="team-logo"
+              width="48"
+              height="48"
+              loading="lazy"
+              onError={(event) => {
+                event.currentTarget.style.display =
+                  "none";
+              }}
+              style={{
+                width: "48px",
+                height: "48px",
+                objectFit: "contain",
+                display: "block",
+              }}
             />
           ) : (
             <div className="team-logo-placeholder">
@@ -121,9 +145,32 @@ export default function MatchCard({ match }) {
 
         <div className="match-vs-small">
           {hasScore ? (
-            <strong>
-              {homeScore} - {awayScore}
-            </strong>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "3px",
+              }}
+            >
+              <strong>
+                {homeScore} - {awayScore}
+              </strong>
+
+              {isLive && liveMinute !== null ? (
+                <span
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: "800",
+                    color: "#dc2626",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  🔴 {liveMinute}'
+                </span>
+              ) : null}
+            </div>
           ) : (
             "VS"
           )}
@@ -137,8 +184,21 @@ export default function MatchCard({ match }) {
           {match.away_logo ? (
             <img
               src={match.away_logo}
-              alt={match.away_team}
+              alt={match.away_team || ""}
               className="team-logo"
+              width="48"
+              height="48"
+              loading="lazy"
+              onError={(event) => {
+                event.currentTarget.style.display =
+                  "none";
+              }}
+              style={{
+                width: "48px",
+                height: "48px",
+                objectFit: "contain",
+                display: "block",
+              }}
             />
           ) : (
             <div className="team-logo-placeholder">
