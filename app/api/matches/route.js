@@ -123,19 +123,44 @@ function getSourceSport(match) {
   return "football";
 }
 
-function applyLimit(
+function addSportToMatches(
   matches,
-  limit
+  sourceMatches
 ) {
-  if (
-    limit === null
-  ) {
-    return matches;
-  }
+  const sportMap =
+    new Map();
 
-  return matches.slice(
-    0,
-    limit
+  sourceMatches.forEach(
+    (sourceMatch) => {
+      if (
+        !sourceMatch?.id
+      ) {
+        return;
+      }
+
+      sportMap.set(
+        String(
+          sourceMatch.id
+        ),
+        getSourceSport(
+          sourceMatch
+        )
+      );
+    }
+  );
+
+  return matches.map(
+    (match) => ({
+      ...match,
+
+      sport:
+        sportMap.get(
+          String(
+            match.external_id
+          )
+        ) ||
+        "football",
+    })
   );
 }
 
@@ -150,34 +175,21 @@ export async function GET(request) {
     const matchId =
       searchParams.get("id");
 
-    const status =
+    const requestedStatus =
       searchParams.get("status");
 
-    const sport =
+    const requestedSport =
       searchParams.get("sport");
-
-    const limitParam =
-      searchParams.get("limit");
-
-    const requestedLimit =
-      limitParam
-        ? Number(limitParam)
-        : null;
-
-    const limit =
-      requestedLimit !== null &&
-      Number.isFinite(
-        requestedLimit
-      ) &&
-      requestedLimit > 0
-        ? Math.floor(
-            requestedLimit
-          )
-        : null;
 
     /*
      * =====================================================
-     * 1. MAÇKOLİK'TEN GÜNCEL VERİYİ AL
+     * 1. MAÇKOLİK'TEN TÜM MAÇLARI AL
+     *
+     * Burada artık hiçbir limit yok.
+     *
+     * Maçkolik 20 maç verirse 20,
+     * 500 maç verirse 500,
+     * 1098 maç verirse 1098 alınır.
      * =====================================================
      */
 
@@ -186,7 +198,7 @@ export async function GET(request) {
 
     /*
      * =====================================================
-     * 2. KAYNAK VERİYİ FİLTRELE
+     * 2. KAYNAK MAÇLARI FİLTRELE
      * =====================================================
      */
 
@@ -194,17 +206,17 @@ export async function GET(request) {
       sourceMatches.filter(
         (match) => {
           if (
-            sport &&
+            requestedSport &&
             match?.sport !==
-              sport
+              requestedSport
           ) {
             return false;
           }
 
           if (
-            status &&
+            requestedStatus &&
             match?.status !==
-              status
+              requestedStatus
           ) {
             return false;
           }
@@ -215,21 +227,15 @@ export async function GET(request) {
 
     /*
      * =====================================================
-     * 3. ID İLE TEK MAÇ İSTENİYORSA
+     * 3. TEK MAÇ İSTENİYORSA
      *
-     * id hem Supabase UUID'si
-     * hem de Maçkolik external_id'si olabilir.
+     * Önce Maçkolik ID'sine bakıyoruz.
+     * Bulamazsak Supabase UUID'si olarak arıyoruz.
      * =====================================================
      */
 
     if (matchId) {
-      let requestedExternalId =
-        null;
-
-      /*
-       * Önce Maçkolik ID olarak kontrol et.
-       */
-      const sourceMatch =
+      let sourceMatch =
         filteredSourceMatches.find(
           (match) =>
             String(
@@ -240,20 +246,11 @@ export async function GET(request) {
             )
         );
 
-      if (sourceMatch) {
-        requestedExternalId =
-          String(
-            sourceMatch.id
-          );
-      } else {
-        /*
-         * Bulunamadıysa Supabase UUID
-         * olarak kontrol et.
-         */
+      if (!sourceMatch) {
         const {
-          data: existingMatch,
+          data: databaseMatch,
           error:
-            existingMatchError,
+            databaseMatchError,
         } = await supabase
           .from("matches")
           .select(
@@ -266,18 +263,18 @@ export async function GET(request) {
           .maybeSingle();
 
         if (
-          existingMatchError
+          databaseMatchError
         ) {
           console.error(
-            "Existing match lookup error:",
-            existingMatchError
+            "Match lookup error:",
+            databaseMatchError
           );
 
           return NextResponse.json(
             {
               success: false,
               error:
-                existingMatchError.message,
+                databaseMatchError.message,
             },
             {
               status: 500,
@@ -285,28 +282,26 @@ export async function GET(request) {
           );
         }
 
-        requestedExternalId =
-          existingMatch?.external_id ||
-          null;
+        if (
+          databaseMatch
+            ?.external_id
+        ) {
+          sourceMatch =
+            filteredSourceMatches.find(
+              (match) =>
+                String(
+                  match?.id
+                ) ===
+                String(
+                  databaseMatch.external_id
+                )
+            );
+        }
       }
 
-      /*
-       * Eğer Maçkolik'te artık bu maç yoksa
-       * eski Supabase kaydını göstermiyoruz.
-       */
-      if (
-        requestedExternalId
-      ) {
+      if (sourceMatch) {
         filteredSourceMatches =
-          filteredSourceMatches.filter(
-            (match) =>
-              String(
-                match?.id
-              ) ===
-              String(
-                requestedExternalId
-              )
-          );
+          [sourceMatch];
       } else {
         filteredSourceMatches =
           [];
@@ -315,7 +310,7 @@ export async function GET(request) {
 
     /*
      * =====================================================
-     * 4. MAÇLARI SUPABASE FORMATINA ÇEVİR
+     * 4. SUPABASE FORMATINA ÇEVİR
      * =====================================================
      */
 
@@ -327,9 +322,10 @@ export async function GET(request) {
         .filter(Boolean);
 
     /*
-     * Aynı external_id iki kere gelirse
-     * sadece birini tut.
+     * Aynı external_id varsa
+     * tek kayıt tut.
      */
+
     const uniqueMatches =
       Array.from(
         new Map(
@@ -344,15 +340,24 @@ export async function GET(request) {
 
     /*
      * =====================================================
-     * 5. GÜNCEL MAÇLARI SUPABASE'E UPSERT ET
+     * 5. SUPABASE'E UPSERT
+     *
+     * Artık 1098 ID'yi ayrıca .in() ile aramıyoruz.
+     *
+     * Upsert'in döndürdüğü kayıtları doğrudan
+     * kullanıyoruz.
      * =====================================================
      */
+
+    let databaseMatches =
+      [];
 
     if (
       uniqueMatches.length > 0
     ) {
       const {
-        error: upsertError,
+        data,
+        error,
       } = await supabase
         .from("matches")
         .upsert(
@@ -361,85 +366,27 @@ export async function GET(request) {
             onConflict:
               "external_id",
           }
-        );
-
-      if (upsertError) {
-        console.error(
-          "Matches upsert error:",
-          upsertError
-        );
-
-        return NextResponse.json(
-          {
-            success: false,
-            error:
-              upsertError.message,
-          },
-          {
-            status: 500,
-          }
-        );
-      }
-    }
-
-    /*
-     * =====================================================
-     * 6. SADECE ŞU AN MAÇKOLİK'TEN GELEN
-     *    MAÇLARIN SUPABASE KAYITLARINI AL
-     *
-     *    ÖNEMLİ:
-     *    Burada artık bütün matches tablosunu
-     *    çekmiyoruz.
-     *
-     *    Böylece eski SportScore / eski veri
-     *    sonuçlara karışmıyor.
-     * =====================================================
-     */
-
-    const externalIds =
-      uniqueMatches.map(
-        (match) =>
-          match.external_id
-      );
-
-    let databaseMatches =
-      [];
-
-    if (
-      externalIds.length > 0
-    ) {
-      let query =
-        supabase
-          .from("matches")
-          .select(`
-            id,
-            external_id,
-            league,
-            league_logo,
-            home_team,
-            away_team,
-            home_logo,
-            away_logo,
-            match_date,
-            status,
-            home_score,
-            away_score,
-            created_at,
-            updated_at
-          `)
-          .in(
-            "external_id",
-            externalIds
-          );
-
-      const {
-        data,
-        error,
-      } = await query;
+        )
+        .select(`
+          id,
+          external_id,
+          league,
+          league_logo,
+          home_team,
+          away_team,
+          home_logo,
+          away_logo,
+          match_date,
+          status,
+          home_score,
+          away_score,
+          created_at,
+          updated_at
+        `);
 
       if (error) {
         console.error(
-          "Matches select error:",
+          "Matches upsert error:",
           error
         );
 
@@ -461,86 +408,23 @@ export async function GET(request) {
 
     /*
      * =====================================================
-     * 7. MAÇKOLİK VERİSİ + SUPABASE ID EŞLEŞTİR
-     *
-     * Supabase'in kendi UUID'sini koruyoruz.
-     * Böylece predictions.match_id bozulmaz.
+     * 6. SPORT BİLGİSİNİ EKLE
      * =====================================================
      */
 
-    const databaseMap =
-      new Map();
-
-    databaseMatches.forEach(
-      (match) => {
-        databaseMap.set(
-          String(
-            match.external_id
-          ),
-          match
-        );
-      }
-    );
-
-    const sourceSportMap =
-      new Map();
-
-    filteredSourceMatches.forEach(
-      (sourceMatch) => {
-        if (
-          !sourceMatch?.id
-        ) {
-          return;
-        }
-
-        sourceSportMap.set(
-          String(
-            sourceMatch.id
-          ),
-          getSourceSport(
-            sourceMatch
-          )
-        );
-      }
-    );
-
     let matches =
-      uniqueMatches
-        .map(
-          (sourceMatch) => {
-            const databaseMatch =
-              databaseMap.get(
-                String(
-                  sourceMatch.external_id
-                )
-              );
-
-            if (
-              !databaseMatch
-            ) {
-              return null;
-            }
-
-            return {
-              ...databaseMatch,
-
-              sport:
-                sourceSportMap.get(
-                  String(
-                    sourceMatch.external_id
-                  )
-                ) ||
-                getSourceSport(
-                  sourceMatch
-                ),
-            };
-          }
-        )
-        .filter(Boolean);
+      addSportToMatches(
+        databaseMatches,
+        filteredSourceMatches
+      );
 
     /*
      * =====================================================
-     * 8. MAÇ TARİHİNE GÖRE SIRALA
+     * 7. TARİHE GÖRE SIRALA
+     *
+     * API tarafında LIMIT YOK.
+     *
+     * Maçkolik'ten gelen bütün maçlar döndürülür.
      * =====================================================
      */
 
@@ -562,22 +446,7 @@ export async function GET(request) {
 
     /*
      * =====================================================
-     * 9. LIMIT ARTIK GÜNCEL MAÇLARA UYGULANIYOR
-     *
-     * Eski Supabase kayıtları arasından
-     * ilk 5 seçilmiyor.
-     * =====================================================
-     */
-
-    matches =
-      applyLimit(
-        matches,
-        limit
-      );
-
-    /*
-     * =====================================================
-     * 10. TEK MAÇ İÇİN CANLI DETAY
+     * 8. TEK MAÇ İÇİN CANLI DETAY
      * =====================================================
      */
 
@@ -624,7 +493,9 @@ export async function GET(request) {
 
     /*
      * =====================================================
-     * 11. CEVAP
+     * 9. CEVAP
+     *
+     * BURADA LIMIT YOK.
      * =====================================================
      */
 
@@ -671,7 +542,7 @@ export async function GET(request) {
 
         error:
           error?.message ||
-          "Maçlar alınırken hata oluştu.",
+          "Maçlar alınırken sunucu hatası oluştu.",
       },
       {
         status: 500,
@@ -905,7 +776,7 @@ export async function POST(
 
         error:
           error?.message ||
-          "Maç kaydedilirken hata oluştu.",
+          "Maç kaydedilirken sunucu hatası oluştu.",
       },
       {
         status: 500,
