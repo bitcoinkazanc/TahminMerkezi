@@ -1,11 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 
 export default function BottomNav() {
   const pathname = usePathname();
-  const router = useRouter();
 
   const items = [
     {
@@ -25,13 +24,6 @@ export default function BottomNav() {
     },
   ];
 
-  function handleProfileClick(event) {
-    event.preventDefault();
-
-    router.push("/profil");
-    router.refresh();
-  }
-
   return (
     <nav className="bottom-nav">
       <div className="bottom-nav-inner">
@@ -45,11 +37,6 @@ export default function BottomNav() {
             <Link
               key={item.href}
               href={item.href}
-              onClick={
-                item.href === "/profil"
-                  ? handleProfileClick
-                  : undefined
-              }
               className={`bottom-nav-item ${
                 active ? "active" : ""
               }`}
