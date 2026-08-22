@@ -14,8 +14,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const profileUserId =
-    searchParams.get("user_id");
+  const profileUserId = searchParams.get("user_id");
 
   useEffect(() => {
     async function loadProfile() {
@@ -29,9 +28,7 @@ export default function ProfilePage() {
 
         if (profileUserId) {
           const response = await fetch(
-            `/api/users/${encodeURIComponent(
-              profileUserId
-            )}`,
+            `/api/users/${encodeURIComponent(profileUserId)}`,
             {
               cache: "no-store",
             }
@@ -56,8 +53,7 @@ export default function ProfilePage() {
             return;
           }
 
-          const parsedUser =
-            JSON.parse(savedUser);
+          const parsedUser = JSON.parse(savedUser);
 
           if (!parsedUser?.id) {
             setLoading(false);
@@ -81,9 +77,7 @@ export default function ProfilePage() {
         const result = await response.json();
 
         if (response.ok && result.success) {
-          setPredictions(
-            result.predictions || []
-          );
+          setPredictions(result.predictions || []);
         }
       } catch (error) {
         console.error(
@@ -109,8 +103,26 @@ export default function ProfilePage() {
 
   if (error) {
     return (
-      <main className="page">
-        <div className="page-container">
+      <main
+        className="page"
+        style={{
+          width: "100%",
+          maxWidth: "100%",
+          minWidth: 0,
+          overflowX: "hidden",
+          boxSizing: "border-box",
+          paddingBottom: "100px",
+        }}
+      >
+        <div
+          className="page-container"
+          style={{
+            width: "100%",
+            maxWidth: "100%",
+            minWidth: 0,
+            boxSizing: "border-box",
+          }}
+        >
           <div className="error-box">
             <h2>Bir sorun oluştu</h2>
 
@@ -130,8 +142,26 @@ export default function ProfilePage() {
 
   if (!user) {
     return (
-      <main className="page">
-        <div className="page-container">
+      <main
+        className="page"
+        style={{
+          width: "100%",
+          maxWidth: "100%",
+          minWidth: 0,
+          overflowX: "hidden",
+          boxSizing: "border-box",
+          paddingBottom: "100px",
+        }}
+      >
+        <div
+          className="page-container"
+          style={{
+            width: "100%",
+            maxWidth: "100%",
+            minWidth: 0,
+            boxSizing: "border-box",
+          }}
+        >
           <div className="empty-state profile-empty">
             <div className="empty-icon">
               👤
@@ -158,15 +188,32 @@ export default function ProfilePage() {
   }
 
   return (
-    <main className="page">
-      <div className="page-container">
+    <main
+      className="page"
+      style={{
+        width: "100%",
+        maxWidth: "100%",
+        minWidth: 0,
+        overflowX: "hidden",
+        boxSizing: "border-box",
+        paddingBottom: "100px",
+      }}
+    >
+      <div
+        className="page-container"
+        style={{
+          width: "100%",
+          maxWidth: "100%",
+          minWidth: 0,
+          boxSizing: "border-box",
+          overflowX: "hidden",
+        }}
+      >
         <ProfileCard user={user} />
 
         <section className="profile-stats">
           <div className="stat-card">
-            <strong>
-              {predictions.length}
-            </strong>
+            <strong>{predictions.length}</strong>
 
             <span>Toplam Tahmin</span>
           </div>
@@ -184,7 +231,16 @@ export default function ProfilePage() {
           </div>
         </section>
 
-        <section className="section-card">
+        <section
+          className="section-card"
+          style={{
+            width: "100%",
+            maxWidth: "100%",
+            minWidth: 0,
+            boxSizing: "border-box",
+            overflow: "hidden",
+          }}
+        >
           <div className="section-title">
             <h2>Tahminlerim</h2>
 
@@ -209,7 +265,16 @@ export default function ProfilePage() {
               </p>
             </div>
           ) : (
-            <div className="my-predictions">
+            <div
+              className="my-predictions"
+              style={{
+                width: "100%",
+                maxWidth: "100%",
+                minWidth: 0,
+                boxSizing: "border-box",
+                overflow: "hidden",
+              }}
+            >
               {predictions.map((item) => {
                 const match = item.matches;
 
@@ -229,29 +294,72 @@ export default function ProfilePage() {
                 const date = item.created_at
                   ? new Date(
                       item.created_at
-                    ).toLocaleDateString(
-                      "tr-TR"
-                    )
+                    ).toLocaleDateString("tr-TR")
                   : "";
 
                 const content = (
-                  <div className="my-prediction-item">
-                    <div className="my-prediction-info">
-                      <strong>
+                  <div
+                    className="my-prediction-item"
+                    style={{
+                      width: "100%",
+                      maxWidth: "100%",
+                      minWidth: 0,
+                      boxSizing: "border-box",
+                      overflow: "hidden",
+                    }}
+                  >
+                    <div
+                      className="my-prediction-info"
+                      style={{
+                        flex: "1 1 auto",
+                        width: 0,
+                        minWidth: 0,
+                        maxWidth: "100%",
+                        overflow: "hidden",
+                      }}
+                    >
+                      <strong
+                        style={{
+                          display: "block",
+                          maxWidth: "100%",
+                          minWidth: 0,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
                         {matchName}
                       </strong>
 
-                      <span>
-                        {match?.league ||
-                          "Futbol"}
+                      <span
+                        style={{
+                          display: "block",
+                          maxWidth: "100%",
+                          minWidth: 0,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {match?.league || "Futbol"}
                       </span>
 
-                      <small>
-                        {date}
-                      </small>
+                      <small>{date}</small>
                     </div>
 
-                    <div className="my-prediction-value">
+                    <div
+                      className="my-prediction-value"
+                      style={{
+                        flex: "0 0 auto",
+                        minWidth: "48px",
+                        maxWidth: "80px",
+                        boxSizing: "border-box",
+                        textAlign: "center",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
                       {predictionLabel}
                     </div>
                   </div>
@@ -262,6 +370,15 @@ export default function ProfilePage() {
                     <Link
                       key={item.id}
                       href={`/mac/${match.id}`}
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        maxWidth: "100%",
+                        minWidth: 0,
+                        boxSizing: "border-box",
+                        overflow: "hidden",
+                        textDecoration: "none",
+                      }}
                     >
                       {content}
                     </Link>
@@ -269,7 +386,16 @@ export default function ProfilePage() {
                 }
 
                 return (
-                  <div key={item.id}>
+                  <div
+                    key={item.id}
+                    style={{
+                      width: "100%",
+                      maxWidth: "100%",
+                      minWidth: 0,
+                      boxSizing: "border-box",
+                      overflow: "hidden",
+                    }}
+                  >
                     {content}
                   </div>
                 );
