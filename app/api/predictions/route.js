@@ -22,298 +22,154 @@ function getSupabase() {
   });
 }
 
-/*
- * Supabase UUID kontrolü.
+/**
+ * Maç ID'sini Supabase matches tablosundaki
+ * gerçek UUID'ye çevirir.
  *
- * matches.id = UUID
- * matches.external_id = Mackolik ID
- */
-function isUuid(value) {
-  if (!value) {
-    return false;
-  }
-
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    String(value)
-  );
-}
-
-/*
- * Gelen match_id'nin:
+ * Frontend Maçkolik ID gönderebilir:
+ * c6f9csiwtzkjr2ei2wekrs8pg
  *
- * - Supabase UUID olması durumunda matches.id
- * - Mackolik ID olması durumunda matches.external_id
- *
- * üzerinden gerçek Supabase maç kaydını bulur.
+ * Supabase tarafında ise:
+ * id = UUID
+ * external_id = Maçkolik ID
  */
 async function findMatch(supabase, matchId) {
+  if (!matchId) {
+    return null;
+  }
+
   const requestedId = String(matchId).trim();
 
   if (!requestedId) {
-    return {
-      match: null,
-      error: "Maç bilgisi gerekli.",
-    };
-  }
-
-  let query;
-
-  if (isUuid(requestedId)) {
-    query = supabase
-      .from("matches")
-      .select(`
-        id,
-        external_id,
-        league,
-        home_team,
-        away_team,
-        home_logo,
-        away_logo,
-        match_date,
-        status,
-        home_score,
-        away_score
-      `)
-      .eq("id", requestedId)
-      .maybeSingle();
-  } else {
-    query = supabase
-      .from("matches")
-      .select(`
-        id,
-        external_id,
-        league,
-        home_team,
-        away_team,
-        home_logo,
-        away_logo,
-        match_date,
-        status,
-        home_score,
-        away_score
-      `)
-      .eq("external_id", requestedId)
-      .maybeSingle();
-  }
-
-  const { data, error } = await query;
-
-  if (error) {
-    console.error(
-      "Prediction match lookup error:",
-      error
-    );
-
-    return {
-      match: null,
-      error: error.message,
-    };
-  }
-
-  return {
-    match: data || null,
-    error: null,
-  };
-}
-
-async function getUser(supabase, userId) {
-  const requestedUserId = String(userId).trim();
-
-  if (!requestedUserId) {
-    return {
-      user: null,
-      error: "Kullanıcı bilgisi gerekli.",
-    };
+    return null;
   }
 
   /*
-   * users.id de UUID olduğu için burada
-   * UUID olmayan değeri direkt id'ye göndermiyoruz.
-   *
-   * Telegram ID gönderiliyorsa telegram_id üzerinden
-   * kullanıcıyı buluyoruz.
+   * 1. Önce Maçkolik external_id üzerinden ara.
    */
-  if (isUuid(requestedUserId)) {
-    const { data, error } = await supabase
-      .from("users")
-      .select(`
-        id,
-        telegram_id,
-        username,
-        first_name,
-        last_name,
-        avatar_url
-      `)
-      .eq("id", requestedUserId)
-      .maybeSingle();
-
-    return {
-      user: data || null,
-      error: error?.message || null,
-    };
-  }
-
-  const { data, error } = await supabase
-    .from("users")
-    .select(`
-      id,
-      telegram_id,
-      username,
-      first_name,
-      last_name,
-      avatar_url
-    `)
-    .eq("telegram_id", requestedUserId)
+  const {
+    data: externalMatch,
+    error: externalError,
+  } = await supabase
+    .from("matches")
+    .select("id, external_id, status")
+    .eq("external_id", requestedId)
     .maybeSingle();
 
-  return {
-    user: data || null,
-    error: error?.message || null,
-  };
-}
+  if (externalError) {
+    console.error(
+      "Match external_id lookup error:",
+      externalError
+    );
 
-const ALLOWED_PREDICTIONS = [
-  "MS1",
-  "MSX",
-  "MS2",
+    throw externalError;
+  }
 
-  "DC1X",
-  "DC12",
-  "DCX2",
+  if (externalMatch) {
+    return externalMatch;
+  }
 
-  "U05",
-  "O05",
-  "U15",
-  "O15",
-  "U25",
-  "O25",
-  "U35",
-  "O35",
-  "U45",
-  "O45",
+  /*
+   * 2. Eğer frontend zaten Supabase UUID gönderiyorsa
+   * id üzerinden de destekle.
+   *
+   * Böylece eski çalışan bölümler de bozulmaz.
+   */
+  const {
+    data: uuidMatch,
+    error: uuidError,
+  } = await supabase
+    .from("matches")
+    .select("id, external_id, status")
+    .eq("id", requestedId)
+    .maybeSingle();
 
-  "HT1",
-  "HTX",
-  "HT2",
+  if (uuidError) {
+    /*
+     * PostgreSQL UUID formatına uygun olmayan
+     * Maçkolik ID'lerinde burada hata oluşabilir.
+     *
+     * Bu durumda hata vermek yerine maç bulunamadı
+     * kabul ediyoruz.
+     */
+    if (
+      uuidError.code === "22P02" ||
+      uuidError.message?.includes(
+        "invalid input syntax for type uuid"
+      )
+    ) {
+      return null;
+    }
 
-  "HTU05",
-  "HTO05",
-  "HTU15",
-  "HTO15",
-  "HTU25",
-  "HTO25",
+    console.error(
+      "Match UUID lookup error:",
+      uuidError
+    );
 
-  "HTDC1X",
-  "HTDC12",
-  "HTDCX2",
+    throw uuidError;
+  }
 
-  "2H1",
-  "2HX",
-  "2H2",
-
-  "ODD",
-  "EVEN",
-
-  "GOAL_RANGE_0_1",
-  "GOAL_RANGE_2_3",
-  "GOAL_RANGE_4_5",
-  "GOAL_RANGE_6_PLUS",
-
-  "BTTS_YES",
-  "BTTS_NO",
-
-  "FIRST_GOAL_HOME",
-  "FIRST_GOAL_NONE",
-  "FIRST_GOAL_AWAY",
-
-  "MOST_GOALS_1H",
-  "MOST_GOALS_EQUAL",
-  "MOST_GOALS_2H",
-];
-
-function predictionSelect() {
-  return `
-    id,
-    prediction,
-    confidence,
-    message,
-    created_at,
-    user_id,
-    match_id,
-    result,
-    points,
-
-    users (
-      id,
-      telegram_id,
-      username,
-      first_name,
-      last_name,
-      avatar_url
-    ),
-
-    matches (
-      id,
-      external_id,
-      league,
-      home_team,
-      away_team,
-      home_logo,
-      away_logo,
-      match_date,
-      status,
-      home_score,
-      away_score
-    )
-  `;
+  return uuidMatch || null;
 }
 
 export async function GET(request) {
   try {
     const supabase = getSupabase();
+    const { searchParams } = new URL(request.url);
 
-    const { searchParams } =
-      new URL(request.url);
-
-    const matchId =
-      searchParams.get("match_id");
-
-    const userId =
-      searchParams.get("user_id");
+    const matchId = searchParams.get("match_id");
+    const userId = searchParams.get("user_id");
 
     let query = supabase
       .from("predictions")
-      .select(predictionSelect())
+      .select(`
+        id,
+        prediction,
+        confidence,
+        message,
+        created_at,
+        user_id,
+        match_id,
+        result,
+        points,
+        users (
+          id,
+          telegram_id,
+          username,
+          first_name,
+          last_name,
+          avatar_url
+        ),
+        matches (
+          id,
+          external_id,
+          league,
+          home_team,
+          away_team,
+          home_logo,
+          away_logo,
+          match_date,
+          status
+        )
+      `)
       .order("created_at", {
         ascending: false,
       });
 
     /*
-     * match_id gönderilmişse:
+     * GET tarafında da Maçkolik ID desteği.
      *
-     * Önce maçın gerçek Supabase UUID'sini buluyoruz.
+     * Örneğin:
+     * /api/predictions?match_id=c6f9csiwtzkjr2ei2wekrs8pg
      *
-     * Böylece frontend yanlışlıkla Mackolik ID
-     * gönderse bile sorgu bozulmuyor.
+     * Önce matches.external_id bulunur,
+     * sonra predictions.match_id UUID ile sorgulanır.
      */
     if (matchId) {
-      const {
-        match,
-        error: matchLookupError,
-      } = await findMatch(
+      const match = await findMatch(
         supabase,
         matchId
       );
-
-      if (matchLookupError) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: matchLookupError,
-          },
-          { status: 500 }
-        );
-      }
 
       if (!match) {
         return NextResponse.json({
@@ -328,44 +184,10 @@ export async function GET(request) {
       );
     }
 
-    /*
-     * user_id için de UUID / Telegram ID
-     * ayrımını yapıyoruz.
-     */
     if (userId) {
-      const {
-        user,
-        error: userLookupError,
-      } = await getUser(
-        supabase,
-        userId
-      );
-
-      if (userLookupError) {
-        console.error(
-          "Prediction GET user lookup error:",
-          userLookupError
-        );
-
-        return NextResponse.json(
-          {
-            success: false,
-            error: userLookupError,
-          },
-          { status: 500 }
-        );
-      }
-
-      if (!user) {
-        return NextResponse.json({
-          success: true,
-          predictions: [],
-        });
-      }
-
       query = query.eq(
         "user_id",
-        user.id
+        userId
       );
     }
 
@@ -385,7 +207,9 @@ export async function GET(request) {
           success: false,
           error: error.message,
         },
-        { status: 500 }
+        {
+          status: 500,
+        }
       );
     }
 
@@ -405,28 +229,22 @@ export async function GET(request) {
         error:
           "Tahminler alınırken bir sunucu hatası oluştu.",
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 }
 
 export async function POST(request) {
   try {
-    const body =
-      await request.json();
+    const body = await request.json();
 
-    const userId =
-      body?.user_id;
-
-    const matchId =
-      body?.match_id;
-
-    const prediction =
-      body?.prediction;
-
+    const userId = body?.user_id;
+    const matchId = body?.match_id;
+    const prediction = body?.prediction;
     const confidence =
       body?.confidence ?? null;
-
     const message =
       body?.message ?? null;
 
@@ -437,7 +255,9 @@ export async function POST(request) {
           error:
             "Kullanıcı bilgisi gerekli.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
@@ -448,12 +268,73 @@ export async function POST(request) {
           error:
             "Maç bilgisi gerekli.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
+    const allowedPredictions = [
+      "MS1",
+      "MSX",
+      "MS2",
+
+      "DC1X",
+      "DC12",
+      "DCX2",
+
+      "U05",
+      "O05",
+      "U15",
+      "O15",
+      "U25",
+      "O25",
+      "U35",
+      "O35",
+      "U45",
+      "O45",
+
+      "HT1",
+      "HTX",
+      "HT2",
+
+      "HTU05",
+      "HTO05",
+      "HTU15",
+      "HTO15",
+      "HTU25",
+      "HTO25",
+
+      "HTDC1X",
+      "HTDC12",
+      "HTDCX2",
+
+      "2H1",
+      "2HX",
+      "2H2",
+
+      "ODD",
+      "EVEN",
+
+      "GOAL_RANGE_0_1",
+      "GOAL_RANGE_2_3",
+      "GOAL_RANGE_4_5",
+      "GOAL_RANGE_6_PLUS",
+
+      "BTTS_YES",
+      "BTTS_NO",
+
+      "FIRST_GOAL_HOME",
+      "FIRST_GOAL_NONE",
+      "FIRST_GOAL_AWAY",
+
+      "MOST_GOALS_1H",
+      "MOST_GOALS_EQUAL",
+      "MOST_GOALS_2H",
+    ];
+
     if (
-      !ALLOWED_PREDICTIONS.includes(
+      !allowedPredictions.includes(
         prediction
       )
     ) {
@@ -463,7 +344,9 @@ export async function POST(request) {
           error:
             "Geçersiz tahmin seçimi.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
@@ -483,7 +366,9 @@ export async function POST(request) {
           error:
             "Güven oranı 1 ile 100 arasında olmalıdır.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
@@ -502,7 +387,9 @@ export async function POST(request) {
             error:
               "Analiz metni geçersiz.",
           },
-          { status: 400 }
+          {
+            status: 400,
+          }
         );
       }
 
@@ -510,8 +397,7 @@ export async function POST(request) {
         message.trim();
 
       if (
-        cleanMessage.length >
-        2000
+        cleanMessage.length > 2000
       ) {
         return NextResponse.json(
           {
@@ -519,7 +405,9 @@ export async function POST(request) {
             error:
               "Analiz en fazla 2000 karakter olabilir.",
           },
-          { status: 400 }
+          {
+            status: 400,
+          }
         );
       }
 
@@ -532,17 +420,16 @@ export async function POST(request) {
       getSupabase();
 
     /*
-     * --------------------------------------------------
-     * 1. KULLANICIYI BUL
-     * --------------------------------------------------
+     * KULLANICI KONTROLÜ
      */
     const {
-      user,
+      data: user,
       error: userError,
-    } = await getUser(
-      supabase,
-      userId
-    );
+    } = await supabase
+      .from("users")
+      .select("id")
+      .eq("id", userId)
+      .maybeSingle();
 
     if (userError) {
       console.error(
@@ -553,9 +440,12 @@ export async function POST(request) {
       return NextResponse.json(
         {
           success: false,
-          error: userError,
+          error:
+            userError.message,
         },
-        { status: 500 }
+        {
+          status: 500,
+        }
       );
     }
 
@@ -566,50 +456,44 @@ export async function POST(request) {
           error:
             "Kullanıcı bulunamadı.",
         },
-        { status: 404 }
+        {
+          status: 404,
+        }
       );
     }
 
     /*
-     * --------------------------------------------------
-     * 2. MAÇI BUL
-     * --------------------------------------------------
+     * MAÇ KONTROLÜ
      *
-     * Buradaki en önemli düzeltme:
+     * Burada artık:
      *
-     * Mackolik:
-     * c6f9csiwtzkjr2ei2wekrs8pg
+     * matchId -> matches.external_id
      *
-     * matches.external_id
-     *
-     * Supabase:
-     * 550e8400-e29b-41d4-a716-446655440000
-     *
-     * matches.id
-     *
-     * predictions.match_id'ye SADECE
-     * Supabase UUID yazılacak.
+     * üzerinden gerçek Supabase UUID'sini buluyoruz.
      */
-    const {
-      match,
-      error: matchError,
-    } = await findMatch(
-      supabase,
-      matchId
-    );
+    let match;
 
-    if (matchError) {
+    try {
+      match = await findMatch(
+        supabase,
+        matchId
+      );
+    } catch (matchLookupError) {
       console.error(
         "Prediction match lookup error:",
-        matchError
+        matchLookupError
       );
 
       return NextResponse.json(
         {
           success: false,
-          error: matchError,
+          error:
+            matchLookupError.message ||
+            "Maç kontrol edilemedi.",
         },
-        { status: 500 }
+        {
+          status: 500,
+        }
       );
     }
 
@@ -618,16 +502,22 @@ export async function POST(request) {
         {
           success: false,
           error:
-            "Maç bulunamadı. Mackolik ID ile Supabase matches.external_id eşleşmesi yok.",
+            "Maç bulunamadı. Maçkolik ID ile Supabase matches.external_id eşleşmesi yok.",
+          received_match_id:
+            String(matchId),
         },
-        { status: 404 }
+        {
+          status: 404,
+        }
       );
     }
 
     /*
-     * --------------------------------------------------
-     * 3. DAHA ÖNCE TAHMİN YAPILMIŞ MI?
-     * --------------------------------------------------
+     * AYNI KULLANICININ AYNI MAÇA
+     * İKİNCİ KEZ TAHMİN YAPMASINI ENGELLE.
+     *
+     * Burada match.id kullanıyoruz.
+     * Çünkü predictions.match_id UUID.
      */
     const {
       data: existingPrediction,
@@ -637,7 +527,7 @@ export async function POST(request) {
       .select("id")
       .eq(
         "user_id",
-        user.id
+        userId
       )
       .eq(
         "match_id",
@@ -657,7 +547,9 @@ export async function POST(request) {
           error:
             existingError.message,
         },
-        { status: 500 }
+        {
+          status: 500,
+        }
       );
     }
 
@@ -668,21 +560,14 @@ export async function POST(request) {
           error:
             "Bu maç için zaten bir tahmin yaptınız.",
         },
-        { status: 409 }
+        {
+          status: 409,
+        }
       );
     }
 
     /*
-     * --------------------------------------------------
-     * 4. TAHMİNİ KAYDET
-     * --------------------------------------------------
-     *
-     * DİKKAT:
-     *
-     * match_id: match.id
-     *
-     * Burada artık Mackolik ID kesinlikle
-     * predictions.match_id alanına gitmiyor.
+     * TAHMİNİ KAYDET
      */
     const {
       data,
@@ -690,8 +575,13 @@ export async function POST(request) {
     } = await supabase
       .from("predictions")
       .insert({
-        user_id: user.id,
+        user_id: userId,
 
+        /*
+         * ÖNEMLİ:
+         * Buraya Maçkolik ID değil,
+         * Supabase matches.id UUID'si yazılıyor.
+         */
         match_id: match.id,
 
         prediction,
@@ -701,12 +591,38 @@ export async function POST(request) {
             ? null
             : Number(confidence),
 
-        message:
-          cleanMessage,
+        message: cleanMessage,
       })
-      .select(
-        predictionSelect()
-      )
+      .select(`
+        id,
+        prediction,
+        confidence,
+        message,
+        created_at,
+        user_id,
+        match_id,
+        result,
+        points,
+        users (
+          id,
+          telegram_id,
+          username,
+          first_name,
+          last_name,
+          avatar_url
+        ),
+        matches (
+          id,
+          external_id,
+          league,
+          home_team,
+          away_team,
+          home_logo,
+          away_logo,
+          match_date,
+          status
+        )
+      `)
       .single();
 
     if (error) {
@@ -718,9 +634,12 @@ export async function POST(request) {
       return NextResponse.json(
         {
           success: false,
-          error: error.message,
+          error:
+            error.message,
         },
-        { status: 500 }
+        {
+          status: 500,
+        }
       );
     }
 
@@ -729,7 +648,9 @@ export async function POST(request) {
         success: true,
         prediction: data,
       },
-      { status: 201 }
+      {
+        status: 201,
+      }
     );
   } catch (error) {
     console.error(
@@ -743,7 +664,9 @@ export async function POST(request) {
         error:
           "Tahmin gönderilirken bir sunucu hatası oluştu.",
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 }
