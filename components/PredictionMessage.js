@@ -322,7 +322,9 @@ export default function PredictionMessage({
           ) : null}
 
           <Link
-            href={`/mac/${match.id}`}
+            href={`/mac/${encodeURIComponent(
+              match.external_id
+            )}`}
             style={{
               flex: "1 1 0",
               minWidth: 0,
