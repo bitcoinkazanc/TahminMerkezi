@@ -1,11 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import { getMatchStatus } from "../lib/match-utils";
 
 export default function MatchCard({ match }) {
   if (!match) {
     return null;
   }
+
+  const normalizedStatus =
+    getMatchStatus(match);
 
   const matchDate = match.match_date
     ? new Date(match.match_date)
@@ -16,18 +20,24 @@ export default function MatchCard({ match }) {
     !Number.isNaN(matchDate.getTime());
 
   const formattedDate = validDate
-    ? matchDate.toLocaleDateString("tr-TR", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-      })
+    ? matchDate.toLocaleDateString(
+        "tr-TR",
+        {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+        }
+      )
     : "";
 
   const formattedTime = validDate
-    ? matchDate.toLocaleTimeString("tr-TR", {
-        hour: "2-digit",
-        minute: "2-digit",
-      })
+    ? matchDate.toLocaleTimeString(
+        "tr-TR",
+        {
+          hour: "2-digit",
+          minute: "2-digit",
+        }
+      )
     : "";
 
   const statusLabels = {
@@ -40,33 +50,49 @@ export default function MatchCard({ match }) {
   };
 
   const statusLabel =
-    statusLabels[match.status] ||
+    statusLabels[
+      normalizedStatus
+    ] ||
     match.status ||
     "Yaklaşan";
 
   const isLive =
-    match.status === "live" ||
-    match.state === "live";
+    normalizedStatus === "live";
 
   const isFinished =
-    match.status === "finished" ||
-    match.state === "post" ||
-    match.substate === "fullTime";
+    normalizedStatus === "finished";
+
+  /*
+   * Skoru sadece gerçekten skor
+   * bilgisi varsa göster.
+   *
+   * Böylece null değerler
+   * yanlışlıkla 0-0 görünmez.
+   */
+  const hasHomeScore =
+    match.home_score !== null &&
+    match.home_score !== undefined &&
+    match.home_score !== "";
+
+  const hasAwayScore =
+    match.away_score !== null &&
+    match.away_score !== undefined &&
+    match.away_score !== "";
 
   const hasScore =
-    isLive || isFinished;
+    (isLive || isFinished) &&
+    hasHomeScore &&
+    hasAwayScore;
 
   const homeScore =
-    match.home_score !== null &&
-    match.home_score !== undefined
+    hasHomeScore
       ? match.home_score
-      : 0;
+      : null;
 
   const awayScore =
-    match.away_score !== null &&
-    match.away_score !== undefined
+    hasAwayScore
       ? match.away_score
-      : 0;
+      : null;
 
   const liveMinute =
     match.live_minute !== null &&
@@ -77,7 +103,8 @@ export default function MatchCard({ match }) {
   return (
     <Link
       href={`/mac/${encodeURIComponent(
-        match.id
+        match.id ||
+          match.external_id
       )}`}
       className="match-card"
     >
@@ -96,13 +123,19 @@ export default function MatchCard({ match }) {
           ) : null}
 
           <span>
-            {match.league || "Futbol"}
+            {match.league ||
+              "Futbol"}
           </span>
         </div>
 
         <span
           className={`match-status ${
-            isLive ? "live" : ""
+            isLive
+              ? "live"
+              : normalizedStatus ===
+                "finished"
+              ? "finished"
+              : ""
           }`}
         >
           {isLive
@@ -116,7 +149,10 @@ export default function MatchCard({ match }) {
           {match.home_logo ? (
             <img
               src={match.home_logo}
-              alt={match.home_team || ""}
+              alt={
+                match.home_team ||
+                ""
+              }
               className="team-logo"
               width="48"
               height="48"
@@ -148,26 +184,36 @@ export default function MatchCard({ match }) {
             <div
               style={{
                 display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
+                flexDirection:
+                  "column",
+                alignItems:
+                  "center",
+                justifyContent:
+                  "center",
                 gap: "3px",
               }}
             >
               <strong>
-                {homeScore} - {awayScore}
+                {homeScore} -{" "}
+                {awayScore}
               </strong>
 
-              {isLive && liveMinute !== null ? (
+              {isLive &&
+              liveMinute !== null ? (
                 <span
                   style={{
-                    fontSize: "12px",
-                    fontWeight: "800",
-                    color: "#dc2626",
-                    whiteSpace: "nowrap",
+                    fontSize:
+                      "12px",
+                    fontWeight:
+                      "800",
+                    color:
+                      "#dc2626",
+                    whiteSpace:
+                      "nowrap",
                   }}
                 >
-                  🔴 {liveMinute}'
+                  🔴{" "}
+                  {liveMinute}'
                 </span>
               ) : null}
             </div>
@@ -184,7 +230,10 @@ export default function MatchCard({ match }) {
           {match.away_logo ? (
             <img
               src={match.away_logo}
-              alt={match.away_team || ""}
+              alt={
+                match.away_team ||
+                ""
+              }
               className="team-logo"
               width="48"
               height="48"
