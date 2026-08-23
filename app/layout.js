@@ -16,6 +16,11 @@ export default function RootLayout({ children }) {
           src="https://telegram.org/js/telegram-web-app.js"
           strategy="beforeInteractive"
         />
+
+        <Script
+          src="https://sad.adsgram.ai/js/sad.min.js"
+          strategy="afterInteractive"
+        />
       </head>
 
       <body>
