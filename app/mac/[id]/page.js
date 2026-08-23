@@ -18,7 +18,7 @@ export default function MatchDetailPage() {
 
   async function loadMatch(showLoading = true) {
     if (!matchId) {
-      return;
+      return null;
     }
 
     try {
@@ -29,57 +29,34 @@ export default function MatchDetailPage() {
       setError("");
 
       const response = await fetch(
-        `/api/matches?id=${encodeURIComponent(
-          matchId
-        )}`,
+        `/api/matches?id=${encodeURIComponent(matchId)}`,
         {
           cache: "no-store",
         }
       );
 
-      const result =
-        await response.json();
+      const result = await response.json();
 
-      if (
-        !response.ok ||
-        !result.success
-      ) {
+      if (!response.ok || !result.success) {
         throw new Error(
-          result.error ||
-            "Maç bilgileri alınamadı."
+          result.error || "Maç bilgileri alınamadı."
         );
       }
 
-      /*
-       * /api/matches?id=... artık tek maçta:
-       *
-       * {
-       *   success: true,
-       *   match: {...}
-       * }
-       *
-       * döndürüyor.
-       *
-       * Eski yapı matches[0] ise
-       * geriye dönük olarak destekleniyor.
-       */
       const foundMatch =
         result.match ||
         result.matches?.[0] ||
         null;
 
       if (!foundMatch) {
-        throw new Error(
-          "Maç bulunamadı."
-        );
+        throw new Error("Maç bulunamadı.");
       }
 
       setMatch(foundMatch);
+
+      return foundMatch;
     } catch (err) {
-      console.error(
-        "Match loading error:",
-        err
-      );
+      console.error("Match loading error:", err);
 
       if (showLoading) {
         setError(
@@ -87,6 +64,8 @@ export default function MatchDetailPage() {
             "Maç yüklenirken hata oluştu."
         );
       }
+
+      return null;
     } finally {
       if (showLoading) {
         setLoading(false);
@@ -94,29 +73,28 @@ export default function MatchDetailPage() {
     }
   }
 
-  async function loadPredictions() {
-    if (!matchId) {
+  async function loadPredictions(supabaseMatchId) {
+    if (!supabaseMatchId) {
       return;
     }
 
     try {
-      const response =
-        await fetch(
-          `/api/predictions?match_id=${encodeURIComponent(
-            matchId
-          )}`,
-          {
-            cache: "no-store",
-          }
+      const response = await fetch(
+        `/api/predictions?match_id=${encodeURIComponent(
+          supabaseMatchId
+        )}`,
+        {
+          cache: "no-store",
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        console.error(
+          "Predictions API error:",
+          result.error
         );
-
-      const result =
-        await response.json();
-
-      if (
-        !response.ok ||
-        !result.success
-      ) {
         return;
       }
 
@@ -131,13 +109,36 @@ export default function MatchDetailPage() {
     }
   }
 
+  async function loadPage() {
+    if (!matchId) {
+      return;
+    }
+
+    const foundMatch = await loadMatch(true);
+
+    if (!foundMatch?.id) {
+      return;
+    }
+
+    /*
+     * ÖNEMLİ:
+     *
+     * URL'deki matchId = Maçkolik external_id
+     *
+     * foundMatch.id = Supabase UUID
+     *
+     * predictions.match_id UUID olduğu için
+     * tahminleri Supabase UUID ile sorguluyoruz.
+     */
+    await loadPredictions(foundMatch.id);
+  }
+
   useEffect(() => {
     if (!matchId) {
       return;
     }
 
-    loadMatch();
-    loadPredictions();
+    loadPage();
   }, [matchId]);
 
   useEffect(() => {
@@ -145,10 +146,13 @@ export default function MatchDetailPage() {
       return;
     }
 
-    const interval =
-      setInterval(() => {
-        loadMatch(false);
-      }, 30000);
+    const interval = setInterval(async () => {
+      const foundMatch = await loadMatch(false);
+
+      if (foundMatch?.id) {
+        await loadPredictions(foundMatch.id);
+      }
+    }, 30000);
 
     return () => {
       clearInterval(interval);
@@ -163,12 +167,10 @@ export default function MatchDetailPage() {
     }
 
     setPredictions((current) => {
-      const exists =
-        current.some(
-          (item) =>
-            item.id ===
-            newPrediction.id
-        );
+      const exists = current.some(
+        (item) =>
+          item.id === newPrediction.id
+      );
 
       if (exists) {
         return current;
@@ -194,16 +196,13 @@ export default function MatchDetailPage() {
               Bir sorun oluştu
             </h2>
 
-            <p>
-              {error}
-            </p>
+            <p>{error}</p>
 
             <button
               type="button"
               className="primary-button"
               onClick={() => {
-                loadMatch();
-                loadPredictions();
+                loadPage();
               }}
             >
               Tekrar Dene
@@ -323,8 +322,7 @@ export default function MatchDetailPage() {
             ) : null}
 
             <span>
-              {match.league ||
-                "Futbol"}
+              {match.league || "Futbol"}
             </span>
           </div>
 
@@ -382,11 +380,9 @@ export default function MatchDetailPage() {
               </div>
             ) : isFinished ? (
               "🏁 MAÇ BİTTİ"
-            ) : match.status ===
-              "postponed" ? (
+            ) : match.status === "postponed" ? (
               "⏸ ERTELENDİ"
-            ) : match.status ===
-              "cancelled" ? (
+            ) : match.status === "cancelled" ? (
               "❌ İPTAL"
             ) : (
               "🕐 YAKLAŞIYOR"
@@ -413,10 +409,7 @@ export default function MatchDetailPage() {
               {match.home_logo ? (
                 <img
                   src={match.home_logo}
-                  alt={
-                    match.home_team ||
-                    ""
-                  }
+                  alt={match.home_team || ""}
                   className="team-logo-large"
                   width="80"
                   height="80"
@@ -461,8 +454,7 @@ export default function MatchDetailPage() {
                     whiteSpace: "nowrap",
                   }}
                 >
-                  {homeScore} -{" "}
-                  {awayScore}
+                  {homeScore} - {awayScore}
                 </span>
               ) : (
                 <span
@@ -486,10 +478,7 @@ export default function MatchDetailPage() {
               {match.away_logo ? (
                 <img
                   src={match.away_logo}
-                  alt={
-                    match.away_team ||
-                    ""
-                  }
+                  alt={match.away_team || ""}
                   className="team-logo-large"
                   width="80"
                   height="80"
@@ -566,8 +555,7 @@ export default function MatchDetailPage() {
             </p>
           </div>
 
-          {predictions.length ===
-          0 ? (
+          {predictions.length === 0 ? (
             <div className="empty-state small">
               <p>
                 Henüz bu maç için
@@ -584,12 +572,8 @@ export default function MatchDetailPage() {
               {predictions.map(
                 (prediction) => (
                   <PredictionMessage
-                    key={
-                      prediction.id
-                    }
-                    prediction={
-                      prediction
-                    }
+                    key={prediction.id}
+                    prediction={prediction}
                   />
                 )
               )}
