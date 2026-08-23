@@ -31,14 +31,9 @@ function isAuthorized(request) {
     process.env.CRON_SECRET;
 
   const authHeader =
-    request.headers.get(
-      "authorization"
-    );
+    request.headers.get("authorization");
 
-  if (
-    !cronSecret ||
-    !authHeader
-  ) {
+  if (!cronSecret || !authHeader) {
     return false;
   }
 
@@ -48,20 +43,150 @@ function isAuthorized(request) {
   );
 }
 
+/*
+ * Mackolik external_id bazen doğrudan ID,
+ * bazen URL/slug olabilir.
+ */
 function getSlugFromMatchUrl(matchUrl) {
   if (!matchUrl) {
     return null;
   }
 
+  const value = String(matchUrl).trim();
+
+  if (!value) {
+    return null;
+  }
+
+  /*
+   * UUID / numeric / doğrudan Mackolik ID
+   * ise olduğu gibi kullan.
+   */
+  if (!value.includes("/")) {
+    return value;
+  }
+
   const parts =
-    String(matchUrl)
+    value
       .split("/")
       .filter(Boolean);
 
   return parts.length > 0
     ? parts[parts.length - 1]
-    : null;
+    : value;
 }
+
+/*
+ * --------------------------------------------------
+ * MAÇ DURUMU
+ * --------------------------------------------------
+ */
+
+function normalizeFreshMatchStatus(match) {
+  if (!match) {
+    return null;
+  }
+
+  const state =
+    String(
+      match.state || ""
+    ).toLowerCase();
+
+  const status =
+    String(
+      match.status || ""
+    ).toLowerCase();
+
+  const substate =
+    String(
+      match.substate || ""
+    ).toLowerCase();
+
+  /*
+   * Kesin bitmiş durumlar.
+   */
+  if (
+    state === "finished" ||
+    state === "completed" ||
+    state === "complete" ||
+    state === "ended" ||
+    state === "final" ||
+    status === "finished" ||
+    status === "completed" ||
+    status === "fulltime" ||
+    status === "full_time" ||
+    status === "final" ||
+    substate === "finished" ||
+    substate === "completed" ||
+    substate === "fulltime"
+  ) {
+    return "finished";
+  }
+
+  /*
+   * İptal / ertelenmiş maçlar bitmiş kabul edilmez.
+   */
+  if (
+    state === "cancelled" ||
+    state === "canceled" ||
+    state === "postponed" ||
+    status === "cancelled" ||
+    status === "canceled" ||
+    status === "postponed"
+  ) {
+    return state === "postponed" ||
+      status === "postponed"
+      ? "postponed"
+      : "cancelled";
+  }
+
+  /*
+   * Canlı.
+   */
+  if (
+    state === "live" ||
+    status === "live"
+  ) {
+    return "live";
+  }
+
+  /*
+   * Devre arası canlı maçtır.
+   */
+  if (
+    state === "halftime" ||
+    substate === "halftime" ||
+    substate === "halfTime".toLowerCase()
+  ) {
+    return "live";
+  }
+
+  return "scheduled";
+}
+
+function getNumericScore(value) {
+  if (
+    value === null ||
+    value === undefined ||
+    value === ""
+  ) {
+    return null;
+  }
+
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return null;
+  }
+
+  return number;
+}
+
+/*
+ * --------------------------------------------------
+ * İLK YARI SKORU
+ * --------------------------------------------------
+ */
 
 function getFirstHalfScoreFromIncidents(
   incidents,
@@ -77,7 +202,9 @@ function getFirstHalfScoreFromIncidents(
 
   for (const incident of incidents) {
     const minute =
-      Number(incident?.time);
+      Number(
+        incident?.time
+      );
 
     if (
       !Number.isFinite(minute) ||
@@ -92,27 +219,29 @@ function getFirstHalfScoreFromIncidents(
       continue;
     }
 
+    const incidentHomeScore =
+      Number(
+        incident?.home_score
+      );
+
+    const incidentAwayScore =
+      Number(
+        incident?.away_score
+      );
+
     if (
       Number.isFinite(
-        Number(
-          incident?.home_score
-        )
+        incidentHomeScore
       ) &&
       Number.isFinite(
-        Number(
-          incident?.away_score
-        )
+        incidentAwayScore
       )
     ) {
       firstHalfHome =
-        Number(
-          incident.home_score
-        );
+        incidentHomeScore;
 
       firstHalfAway =
-        Number(
-          incident.away_score
-        );
+        incidentAwayScore;
     } else if (
       incident?.side === "home"
     ) {
@@ -132,6 +261,10 @@ function getFirstHalfScoreFromIncidents(
     finalHomeScore +
     finalAwayScore;
 
+  /*
+   * İlk yarı skoru final skordan büyük
+   * olamaz. Veri hatalıysa sonuç üretme.
+   */
   if (
     totalFirstHalf >
     totalFinal
@@ -145,6 +278,12 @@ function getFirstHalfScoreFromIncidents(
   };
 }
 
+/*
+ * --------------------------------------------------
+ * DETAY GEREKTİREN TAHMİNLER
+ * --------------------------------------------------
+ */
+
 function predictionNeedsDetail(
   prediction
 ) {
@@ -152,26 +291,41 @@ function predictionNeedsDetail(
     "HT1",
     "HTX",
     "HT2",
+
     "HTU05",
     "HTO05",
     "HTU15",
     "HTO15",
     "HTU25",
     "HTO25",
+
     "HTDC1X",
     "HTDC12",
     "HTDCX2",
+
     "2H1",
     "2HX",
     "2H2",
+
     "FIRST_GOAL_HOME",
     "FIRST_GOAL_NONE",
     "FIRST_GOAL_AWAY",
+
     "MOST_GOALS_1H",
     "MOST_GOALS_EQUAL",
     "MOST_GOALS_2H",
-  ].includes(prediction);
+  ].includes(
+    String(
+      prediction || ""
+    ).trim()
+  );
 }
+
+/*
+ * --------------------------------------------------
+ * TAHMİN SONUCU
+ * --------------------------------------------------
+ */
 
 function getPredictionCorrectness(
   prediction,
@@ -179,27 +333,39 @@ function getPredictionCorrectness(
   detail
 ) {
   const homeScore =
-    Number(match.home_score);
+    getNumericScore(
+      match.home_score
+    );
 
   const awayScore =
-    Number(match.away_score);
+    getNumericScore(
+      match.away_score
+    );
 
+  /*
+   * Final skor olmadan sonuç üretme.
+   */
   if (
-    !Number.isFinite(homeScore) ||
-    !Number.isFinite(awayScore)
+    homeScore === null ||
+    awayScore === null
   ) {
     return null;
   }
 
   const totalGoals =
-    homeScore + awayScore;
+    homeScore +
+    awayScore;
 
   let matchResult;
 
-  if (homeScore > awayScore) {
+  if (
+    homeScore >
+    awayScore
+  ) {
     matchResult = "MS1";
   } else if (
-    homeScore === awayScore
+    homeScore ===
+    awayScore
   ) {
     matchResult = "MSX";
   } else {
@@ -209,8 +375,11 @@ function getPredictionCorrectness(
   const code =
     String(
       prediction || ""
-    );
+    ).trim();
 
+  /*
+   * MS1 / MSX / MS2
+   */
   if (
     [
       "MS1",
@@ -218,9 +387,15 @@ function getPredictionCorrectness(
       "MS2",
     ].includes(code)
   ) {
-    return code === matchResult;
+    return (
+      code ===
+      matchResult
+    );
   }
 
+  /*
+   * Çifte şans.
+   */
   if (
     [
       "DC1X",
@@ -228,26 +403,46 @@ function getPredictionCorrectness(
       "DCX2",
     ].includes(code)
   ) {
-    if (code === "DC1X") {
-      return homeScore >= awayScore;
+    if (
+      code === "DC1X"
+    ) {
+      return (
+        homeScore >=
+        awayScore
+      );
     }
 
-    if (code === "DC12") {
-      return homeScore !== awayScore;
+    if (
+      code === "DC12"
+    ) {
+      return (
+        homeScore !==
+        awayScore
+      );
     }
 
-    return awayScore >= homeScore;
+    return (
+      awayScore >=
+      homeScore
+    );
   }
 
+  /*
+   * Alt / Üst.
+   */
   const overUnderMap = {
     U05: 0.5,
     O05: 0.5,
+
     U15: 1.5,
     O15: 1.5,
+
     U25: 2.5,
     O25: 2.5,
+
     U35: 3.5,
     O35: 3.5,
+
     U45: 4.5,
     O45: 4.5,
   };
@@ -261,24 +456,44 @@ function getPredictionCorrectness(
     const line =
       overUnderMap[code];
 
-    if (code.startsWith("U")) {
-      return totalGoals < line;
+    if (
+      code.startsWith("U")
+    ) {
+      return (
+        totalGoals <
+        line
+      );
     }
 
-    return totalGoals > line;
+    return (
+      totalGoals >
+      line
+    );
   }
 
+  /*
+   * Tek / Çift.
+   */
   if (
     code === "ODD" ||
     code === "EVEN"
   ) {
-    if (code === "ODD") {
-      return totalGoals % 2 === 1;
+    if (
+      code === "ODD"
+    ) {
+      return (
+        totalGoals % 2 === 1
+      );
     }
 
-    return totalGoals % 2 === 0;
+    return (
+      totalGoals % 2 === 0
+    );
   }
 
+  /*
+   * Gol aralıkları.
+   */
   if (
     code ===
     "GOAL_RANGE_0_1"
@@ -313,9 +528,14 @@ function getPredictionCorrectness(
     code ===
     "GOAL_RANGE_6_PLUS"
   ) {
-    return totalGoals >= 6;
+    return (
+      totalGoals >= 6
+    );
   }
 
+  /*
+   * KG Var / Yok.
+   */
   if (
     [
       "BTTS_YES",
@@ -326,13 +546,20 @@ function getPredictionCorrectness(
       homeScore > 0 &&
       awayScore > 0;
 
-    if (code === "BTTS_YES") {
+    if (
+      code ===
+      "BTTS_YES"
+    ) {
       return bothScored;
     }
 
     return !bothScored;
   }
 
+  /*
+   * Detay isteyen tahminlerde
+   * Mackolik maç detayına ihtiyaç var.
+   */
   const firstHalfScore =
     getFirstHalfScoreFromIncidents(
       detail?.match?.incidents,
@@ -340,26 +567,34 @@ function getPredictionCorrectness(
       awayScore
     );
 
+  /*
+   * İlk yarı tahminleri.
+   */
   if (
     [
       "HT1",
       "HTX",
       "HT2",
+
       "HTU05",
       "HTO05",
       "HTU15",
       "HTO15",
       "HTU25",
       "HTO25",
+
       "HTDC1X",
       "HTDC12",
       "HTDCX2",
+
       "MOST_GOALS_1H",
       "MOST_GOALS_EQUAL",
       "MOST_GOALS_2H",
     ].includes(code)
   ) {
-    if (!firstHalfScore) {
+    if (
+      !firstHalfScore
+    ) {
       return null;
     }
 
@@ -370,61 +605,118 @@ function getPredictionCorrectness(
       firstHalfScore.away;
 
     const htTotal =
-      htHome + htAway;
+      htHome +
+      htAway;
 
-    if (code === "HT1") {
-      return htHome > htAway;
+    if (
+      code === "HT1"
+    ) {
+      return (
+        htHome >
+        htAway
+      );
     }
 
-    if (code === "HTX") {
-      return htHome === htAway;
+    if (
+      code === "HTX"
+    ) {
+      return (
+        htHome ===
+        htAway
+      );
     }
 
-    if (code === "HT2") {
-      return htAway > htHome;
+    if (
+      code === "HT2"
+    ) {
+      return (
+        htAway >
+        htHome
+      );
     }
 
-    if (code === "HTU05") {
-      return htTotal < 0.5;
+    if (
+      code === "HTU05"
+    ) {
+      return (
+        htTotal < 0.5
+      );
     }
 
-    if (code === "HTO05") {
-      return htTotal > 0.5;
+    if (
+      code === "HTO05"
+    ) {
+      return (
+        htTotal > 0.5
+      );
     }
 
-    if (code === "HTU15") {
-      return htTotal < 1.5;
+    if (
+      code === "HTU15"
+    ) {
+      return (
+        htTotal < 1.5
+      );
     }
 
-    if (code === "HTO15") {
-      return htTotal > 1.5;
+    if (
+      code === "HTO15"
+    ) {
+      return (
+        htTotal > 1.5
+      );
     }
 
-    if (code === "HTU25") {
-      return htTotal < 2.5;
+    if (
+      code === "HTU25"
+    ) {
+      return (
+        htTotal < 2.5
+      );
     }
 
-    if (code === "HTO25") {
-      return htTotal > 2.5;
+    if (
+      code === "HTO25"
+    ) {
+      return (
+        htTotal > 2.5
+      );
     }
 
-    if (code === "HTDC1X") {
-      return htHome >= htAway;
+    if (
+      code === "HTDC1X"
+    ) {
+      return (
+        htHome >=
+        htAway
+      );
     }
 
-    if (code === "HTDC12") {
-      return htHome !== htAway;
+    if (
+      code === "HTDC12"
+    ) {
+      return (
+        htHome !==
+        htAway
+      );
     }
 
-    if (code === "HTDCX2") {
-      return htAway >= htHome;
+    if (
+      code === "HTDCX2"
+    ) {
+      return (
+        htAway >=
+        htHome
+      );
     }
 
     const secondHalfHome =
-      homeScore - htHome;
+      homeScore -
+      htHome;
 
     const secondHalfAway =
-      awayScore - htAway;
+      awayScore -
+      htAway;
 
     const firstHalfGoals =
       htTotal;
@@ -464,6 +756,9 @@ function getPredictionCorrectness(
     }
   }
 
+  /*
+   * İkinci yarı sonucu.
+   */
   if (
     [
       "2H1",
@@ -471,7 +766,9 @@ function getPredictionCorrectness(
       "2H2",
     ].includes(code)
   ) {
-    if (!firstHalfScore) {
+    if (
+      !firstHalfScore
+    ) {
       return null;
     }
 
@@ -483,14 +780,18 @@ function getPredictionCorrectness(
       awayScore -
       firstHalfScore.away;
 
-    if (code === "2H1") {
+    if (
+      code === "2H1"
+    ) {
       return (
         secondHalfHome >
         secondHalfAway
       );
     }
 
-    if (code === "2HX") {
+    if (
+      code === "2HX"
+    ) {
       return (
         secondHalfHome ===
         secondHalfAway
@@ -503,6 +804,9 @@ function getPredictionCorrectness(
     );
   }
 
+  /*
+   * İlk gol.
+   */
   if (
     [
       "FIRST_GOAL_HOME",
@@ -513,7 +817,11 @@ function getPredictionCorrectness(
     const incidents =
       detail?.match?.incidents;
 
-    if (!Array.isArray(incidents)) {
+    if (
+      !Array.isArray(
+        incidents
+      )
+    ) {
       return null;
     }
 
@@ -531,10 +839,18 @@ function getPredictionCorrectness(
         )
         .sort(
           (a, b) =>
-            Number(a?.time || 0) -
-            Number(b?.time || 0)
+            Number(
+              a?.time || 0
+            ) -
+            Number(
+              b?.time || 0
+            )
         );
 
+    /*
+     * Maçta hiç gol yoksa
+     * FIRST_GOAL_NONE doğrudur.
+     */
     if (
       goalIncidents.length === 0
     ) {
@@ -552,7 +868,8 @@ function getPredictionCorrectness(
       "FIRST_GOAL_HOME"
     ) {
       return (
-        firstGoal.side === "home"
+        firstGoal.side ===
+        "home"
       );
     }
 
@@ -561,18 +878,208 @@ function getPredictionCorrectness(
       "FIRST_GOAL_AWAY"
     ) {
       return (
-        firstGoal.side === "away"
+        firstGoal.side ===
+        "away"
       );
     }
 
     return false;
   }
 
+  /*
+   * Tanınmayan tahmin kodu.
+   * Yanlış kabul etmiyoruz.
+   */
   return null;
 }
 
-export async function GET(request) {
-  if (!isAuthorized(request)) {
+/*
+ * --------------------------------------------------
+ * MACKOLIK'TEN MAÇI YENİLE
+ * --------------------------------------------------
+ *
+ * Kritik düzeltme:
+ *
+ * Supabase'deki status'a körü körüne
+ * güvenmiyoruz.
+ *
+ * Pending tahmin varsa maçın güncel
+ * durumunu Mackolik'ten tekrar çekiyoruz.
+ */
+async function refreshMatchFromMackolik(
+  supabase,
+  databaseMatch
+) {
+  if (!databaseMatch) {
+    return {
+      match: databaseMatch,
+      fresh: null,
+      refreshed: false,
+      finished: false,
+    };
+  }
+
+  const externalId =
+    databaseMatch.external_id;
+
+  if (!externalId) {
+    return {
+      match: databaseMatch,
+      fresh: null,
+      refreshed: false,
+      finished:
+        String(
+          databaseMatch.status ||
+            ""
+        ).toLowerCase() ===
+        "finished",
+    };
+  }
+
+  let fresh = null;
+
+  try {
+    const lookupId =
+      getSlugFromMatchUrl(
+        externalId
+      );
+
+    fresh =
+      await getMatch(
+        lookupId
+      );
+  } catch (error) {
+    console.error(
+      "Mackolik maç yenileme hatası:",
+      {
+        matchId:
+          databaseMatch.id,
+        externalId,
+        error:
+          error?.message ||
+          error,
+      }
+    );
+  }
+
+  if (!fresh) {
+    /*
+     * Mackolik erişilemezse mevcut
+     * Supabase durumunu kullan.
+     *
+     * Ancak sadece zaten finished ise.
+     */
+    return {
+      match: databaseMatch,
+      fresh: null,
+      refreshed: false,
+      finished:
+        String(
+          databaseMatch.status ||
+            ""
+        ).toLowerCase() ===
+        "finished",
+    };
+  }
+
+  const freshStatus =
+    normalizeFreshMatchStatus(
+      fresh
+    );
+
+  const freshHomeScore =
+    getNumericScore(
+      fresh.home_score
+    );
+
+  const freshAwayScore =
+    getNumericScore(
+      fresh.away_score
+    );
+
+  /*
+   * Mackolik'ten alınan güncel skorları
+   * Supabase'e yaz.
+   */
+  const updateData = {
+    status:
+      freshStatus ||
+      databaseMatch.status,
+
+    updated_at:
+      new Date().toISOString(),
+  };
+
+  if (
+    freshHomeScore !== null
+  ) {
+    updateData.home_score =
+      freshHomeScore;
+  }
+
+  if (
+    freshAwayScore !== null
+  ) {
+    updateData.away_score =
+      freshAwayScore;
+  }
+
+  /*
+   * Sadece gerçekten değişen/güncellenen
+   * maç bilgisini DB'ye yazıyoruz.
+   */
+  const {
+    error: updateError,
+  } = await supabase
+    .from("matches")
+    .update(updateData)
+    .eq(
+      "id",
+      databaseMatch.id
+    );
+
+  if (updateError) {
+    console.error(
+      "Maç Supabase güncelleme hatası:",
+      {
+        matchId:
+          databaseMatch.id,
+        error:
+          updateError,
+      }
+    );
+  }
+
+  const refreshedMatch = {
+    ...databaseMatch,
+    ...updateData,
+  };
+
+  return {
+    match:
+      refreshedMatch,
+    fresh,
+    refreshed: true,
+    finished:
+      freshStatus ===
+      "finished",
+  };
+}
+
+/*
+ * --------------------------------------------------
+ * GET
+ * --------------------------------------------------
+ */
+
+export async function GET(
+  request
+) {
+  if (
+    !isAuthorized(
+      request
+    )
+  ) {
     return NextResponse.json(
       {
         success: false,
@@ -590,12 +1097,13 @@ export async function GET(request) {
       getSupabase();
 
     /*
-     * Önce bütün pending tahminleri
-     * tek sorguda alıyoruz.
+     * Bütün pending tahminleri al.
      */
     const {
-      data: pendingPredictions,
-      error: predictionsError,
+      data:
+        pendingPredictions,
+      error:
+        predictionsError,
     } = await supabase
       .from("predictions")
       .select(`
@@ -610,7 +1118,9 @@ export async function GET(request) {
         "pending"
       );
 
-    if (predictionsError) {
+    if (
+      predictionsError
+    ) {
       console.error(
         "Pending predictions lookup error:",
         predictionsError
@@ -630,55 +1140,88 @@ export async function GET(request) {
 
     if (
       !pendingPredictions ||
-      pendingPredictions.length === 0
+      pendingPredictions.length ===
+        0
     ) {
       return NextResponse.json({
         success: true,
+
         message:
           "Puanlanacak bekleyen tahmin bulunamadı.",
+
         finishedMatches: 0,
+
         pendingPredictions: 0,
+
         processedMatches: 0,
+
         processedPredictions: 0,
+
         correctPredictions: 0,
+
         wrongPredictions: 0,
+
+        pendingWithoutResult: 0,
+
+        refreshedMatches: 0,
       });
     }
 
     /*
-     * Pending tahminlerin bulunduğu
-     * benzersiz maç ID'lerini çıkarıyoruz.
+     * Benzersiz maç ID'leri.
      */
-    const matchIds =
-      [
-        ...new Set(
-          pendingPredictions
-            .map(
-              (prediction) =>
-                prediction.match_id
-            )
-            .filter(Boolean)
-        ),
-      ];
+    const matchIds = [
+      ...new Set(
+        pendingPredictions
+          .map(
+            (prediction) =>
+              prediction.match_id
+          )
+          .filter(Boolean)
+      ),
+    ];
 
-    if (matchIds.length === 0) {
+    if (
+      matchIds.length ===
+      0
+    ) {
       return NextResponse.json({
         success: true,
+
         message:
           "Tahminlerde geçerli maç bulunamadı.",
+
         finishedMatches: 0,
+
         pendingPredictions:
           pendingPredictions.length,
+
         processedMatches: 0,
+
         processedPredictions: 0,
+
         correctPredictions: 0,
+
         wrongPredictions: 0,
+
+        pendingWithoutResult: 0,
+
+        refreshedMatches: 0,
       });
     }
 
     /*
-     * Sadece bu tahminlere ait maçları
-     * tek sorguda alıyoruz.
+     * KRİTİK DEĞİŞİKLİK:
+     *
+     * Artık sadece status=finished
+     * olan maçları çekmiyoruz.
+     *
+     * Pending tahmini olan bütün maçları
+     * çekiyoruz.
+     *
+     * Böylece Supabase'de yanlışlıkla
+     * live/scheduled kalmış ama Mackolik'te
+     * bitmiş maçları da yenileyebiliyoruz.
      */
     const {
       data: matches,
@@ -695,15 +1238,13 @@ export async function GET(request) {
       .in(
         "id",
         matchIds
-      )
-      .eq(
-        "status",
-        "finished"
       );
 
-    if (matchesError) {
+    if (
+      matchesError
+    ) {
       console.error(
-        "Finished matches lookup error:",
+        "Matches lookup error:",
         matchesError
       );
 
@@ -721,34 +1262,37 @@ export async function GET(request) {
 
     if (
       !matches ||
-      matches.length === 0
+      matches.length ===
+        0
     ) {
       return NextResponse.json({
         success: true,
+
         message:
-          "Bekleyen tahminlere ait bitmiş maç bulunamadı.",
+          "Bekleyen tahminlere ait maç bulunamadı.",
+
         finishedMatches: 0,
+
         pendingPredictions:
           pendingPredictions.length,
+
         processedMatches: 0,
+
         processedPredictions: 0,
+
         correctPredictions: 0,
+
         wrongPredictions: 0,
+
+        pendingWithoutResult:
+          pendingPredictions.length,
+
+        refreshedMatches: 0,
       });
     }
 
-    const matchMap =
-      new Map(
-        matches.map(
-          (match) => [
-            String(match.id),
-            match,
-          ]
-        )
-      );
-
     /*
-     * Tahminleri maçlara göre gruplayalım.
+     * Tahminleri maçlara göre grupla.
      */
     const predictionsByMatch =
       new Map();
@@ -775,44 +1319,126 @@ export async function GET(request) {
 
       predictionsByMatch
         .get(key)
-        .push(prediction);
+        .push(
+          prediction
+        );
     }
 
     const correctIds = [];
     const wrongIds = [];
 
     let processedMatches = 0;
-    let pendingWithoutResult = 0;
+
+    let pendingWithoutResult =
+      0;
+
+    let refreshedMatches = 0;
+
+    let finishedMatches = 0;
 
     /*
-     * Sadece pending tahmini bulunan
-     * finished maçları işliyoruz.
+     * Her maçın güncel durumunu Mackolik'ten
+     * kontrol et.
      */
     for (
-      const match of matches
+      const databaseMatch of
+        matches
     ) {
       const predictions =
         predictionsByMatch.get(
-          String(match.id)
+          String(
+            databaseMatch.id
+          )
         ) || [];
 
       if (
-        predictions.length === 0
+        predictions.length ===
+        0
       ) {
         continue;
       }
 
+      /*
+       * Maçı Mackolik'ten yenile.
+       */
+      const refreshResult =
+        await refreshMatchFromMackolik(
+          supabase,
+          databaseMatch
+        );
+
       if (
-        match.home_score === null ||
-        match.home_score === undefined ||
-        match.away_score === null ||
-        match.away_score === undefined
+        refreshResult.refreshed
       ) {
+        refreshedMatches +=
+          1;
+      }
+
+      const match =
+        refreshResult.match;
+
+      /*
+       * Mackolik kesin olarak bitmiş
+       * diyorsa puanlama yapılabilir.
+       *
+       * Supabase'de daha önce finished ise
+       * de kabul edilir.
+       */
+      const databaseFinished =
+        String(
+          databaseMatch.status ||
+            ""
+        ).toLowerCase() ===
+        "finished";
+
+      const matchFinished =
+        refreshResult.finished ||
+        databaseFinished;
+
+      if (
+        !matchFinished
+      ) {
+        /*
+         * Canlı / başlamamış / ertelenmiş
+         * maçlara kesinlikle puan verme.
+         */
+        pendingWithoutResult +=
+          predictions.length;
+
+        continue;
+      }
+
+      const homeScore =
+        getNumericScore(
+          match.home_score
+        );
+
+      const awayScore =
+        getNumericScore(
+          match.away_score
+        );
+
+      /*
+       * Maç bitmiş görünse bile final skor
+       * yoksa puanlama yapma.
+       */
+      if (
+        homeScore === null ||
+        awayScore === null
+      ) {
+        pendingWithoutResult +=
+          predictions.length;
+
         continue;
       }
 
       processedMatches += 1;
 
+      finishedMatches += 1;
+
+      /*
+       * Detay gerektiren tahmin var mı?
+       */
       const needsDetail =
         predictions.some(
           (item) =>
@@ -823,7 +1449,30 @@ export async function GET(request) {
 
       let detail = null;
 
-      if (needsDetail) {
+      /*
+       * İlk yarı / ilk gol gibi tahminler
+       * için detay al.
+       *
+       * getMatch() sonucunu zaten
+       * refreshMatchFromMackolik()
+       * içerisinde aldık.
+       */
+      if (
+        needsDetail &&
+        refreshResult.fresh
+      ) {
+        detail =
+          refreshResult.fresh;
+      }
+
+      /*
+       * Eğer refresh sırasında detay
+       * gelmediyse tekrar dene.
+       */
+      if (
+        needsDetail &&
+        !detail
+      ) {
         const slug =
           getSlugFromMatchUrl(
             match.external_id
@@ -832,21 +1481,31 @@ export async function GET(request) {
         if (slug) {
           try {
             detail =
-              await getMatch(slug);
+              await getMatch(
+                slug
+              );
           } catch (error) {
             console.error(
               "Match detail loading error:",
               {
-                matchId: match.id,
+                matchId:
+                  match.id,
+
                 externalId:
                   match.external_id,
-                error,
+
+                error:
+                  error?.message ||
+                  error,
               }
             );
           }
         }
       }
 
+      /*
+       * Her pending tahmini puanla.
+       */
       for (
         const prediction of
           predictions
@@ -858,14 +1517,25 @@ export async function GET(request) {
             detail
           );
 
+        /*
+         * Tanınmayan / detay eksik
+         * tahmini yanlış kabul ETME.
+         *
+         * Pending bırak.
+         */
         if (
-          correctness === null
+          correctness ===
+          null
         ) {
-          pendingWithoutResult += 1;
+          pendingWithoutResult +=
+            1;
+
           continue;
         }
 
-        if (correctness) {
+        if (
+          correctness
+        ) {
           correctIds.push(
             prediction.id
           );
@@ -878,17 +1548,24 @@ export async function GET(request) {
     }
 
     /*
-     * Doğru tahminleri toplu güncelle.
+     * --------------------------------------------------
+     * DOĞRU TAHMİNLER
+     * --------------------------------------------------
      */
+
     if (
-      correctIds.length > 0
+      correctIds.length >
+      0
     ) {
       const {
-        error: correctError,
+        error:
+          correctError,
       } = await supabase
         .from("predictions")
         .update({
-          result: "correct",
+          result:
+            "correct",
+
           points: 10,
         })
         .in(
@@ -900,7 +1577,9 @@ export async function GET(request) {
           "pending"
         );
 
-      if (correctError) {
+      if (
+        correctError
+      ) {
         console.error(
           "Correct predictions update error:",
           correctError
@@ -920,17 +1599,24 @@ export async function GET(request) {
     }
 
     /*
-     * Yanlış tahminleri toplu güncelle.
+     * --------------------------------------------------
+     * YANLIŞ TAHMİNLER
+     * --------------------------------------------------
      */
+
     if (
-      wrongIds.length > 0
+      wrongIds.length >
+      0
     ) {
       const {
-        error: wrongError,
+        error:
+          wrongError,
       } = await supabase
         .from("predictions")
         .update({
-          result: "wrong",
+          result:
+            "wrong",
+
           points: 0,
         })
         .in(
@@ -942,7 +1628,9 @@ export async function GET(request) {
           "pending"
         );
 
-      if (wrongError) {
+      if (
+        wrongError
+      ) {
         console.error(
           "Wrong predictions update error:",
           wrongError
@@ -955,31 +1643,51 @@ export async function GET(request) {
               wrongError.message,
           },
           {
-            status: 500
+            status: 500,
           }
         );
       }
     }
 
+    /*
+     * --------------------------------------------------
+     * SONUÇ
+     * --------------------------------------------------
+     */
+
     return NextResponse.json({
       success: true,
+
       message:
         "Puanlama işlemi tamamlandı.",
-      finishedMatches:
+
+      totalMatches:
         matches.length,
+
+      finishedMatches,
+
+      refreshedMatches,
+
       pendingPredictions:
         pendingPredictions.length,
+
       processedMatches,
+
       processedPredictions:
         correctIds.length +
         wrongIds.length,
+
       correctPredictions:
         correctIds.length,
+
       wrongPredictions:
         wrongIds.length,
+
       pendingWithoutResult,
     });
-  } catch (error) {
+  } catch (
+    error
+  ) {
     console.error(
       "Scoring GET server error:",
       error
@@ -988,6 +1696,7 @@ export async function GET(request) {
     return NextResponse.json(
       {
         success: false,
+
         error:
           error?.message ||
           "Puanlama sırasında sunucu hatası oluştu.",
