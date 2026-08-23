@@ -83,28 +83,14 @@ export async function GET(request) {
         requestedId
       );
 
-      /*
-       * Önce Supabase'den arıyoruz.
-       *
-       * MatchCard URL'si:
-       *
-       * /mac/SUPABASE_UUID
-       *
-       * Bu nedenle matches.id üzerinden
-       * doğrudan bulabiliriz.
-       *
-       * Ayrıca external_id üzerinden de arıyoruz.
-       * Böylece eski Maçkolik ID linkleri de çalışır.
-       */
-
       const supabase =
         getSupabaseAdmin();
 
+      /*
+       * Önce Supabase UUID veya
+       * external_id ile arıyoruz.
+       */
       if (supabase) {
-        console.log(
-          "Supabase üzerinden maç aranıyor..."
-        );
-
         const {
           data: supabaseMatch,
           error: supabaseError,
@@ -130,15 +116,9 @@ export async function GET(request) {
           );
 
           /*
-           * Supabase kaydı bulundu.
-           *
-           * Ancak canlı skor / güncel durum
-           * Mackolik'ten gelmeye devam etsin.
-           *
-           * external_id üzerinden Mackolik'teki
-           * güncel maçı bulmayı deniyoruz.
+           * Supabase external_id üzerinden
+           * Mackolik'ten güncel bilgiyi almaya çalış.
            */
-
           let freshMatch = null;
 
           if (
@@ -158,44 +138,41 @@ export async function GET(request) {
           }
 
           /*
-           * Mackolik'ten güncel veri geldiyse
-           * Supabase UUID'sini koruyoruz.
-           *
-           * Böylece predictions.match_id
-           * ile bağlantı bozulmuyor.
+           * Güncel Mackolik verisi varsa
+           * Supabase UUID'sini koruyarak döndür.
            */
-
           if (freshMatch) {
-            const mergedMatch = {
-              ...freshMatch,
-
-              id:
-                supabaseMatch.id,
-
-              external_id:
-                supabaseMatch.external_id ||
-                freshMatch.external_id,
-
-              created_at:
-                supabaseMatch.created_at,
-
-              updated_at:
-                supabaseMatch.updated_at,
-            };
-
             return NextResponse.json(
               {
                 success: true,
-                source: "Mackolik+Supabase",
-                match: mergedMatch,
+                source:
+                  "Mackolik+Supabase",
+                match: {
+                  ...freshMatch,
+
+                  id:
+                    supabaseMatch.id,
+
+                  external_id:
+                    supabaseMatch.external_id,
+
+                  created_at:
+                    supabaseMatch.created_at,
+
+                  updated_at:
+                    supabaseMatch.updated_at,
+                },
+
                 duration_ms:
-                  Date.now() - startedAt,
+                  Date.now() -
+                  startedAt,
               },
               {
                 headers: {
                   "Cache-Control":
                     "no-store, no-cache, must-revalidate, proxy-revalidate",
-                  Pragma: "no-cache",
+                  Pragma:
+                    "no-cache",
                   Expires: "0",
                 },
               }
@@ -203,26 +180,24 @@ export async function GET(request) {
           }
 
           /*
-           * Mackolik'ten güncel veri alınamazsa
-           * Supabase'deki kayıt yine de gösterilir.
-           *
-           * Bu özellikle bitmiş/eski maçlarda
-           * "Maç bulunamadı" sorununu engeller.
+           * Mackolik güncel veri vermezse
+           * Supabase kaydını kullan.
            */
-
           return NextResponse.json(
             {
               success: true,
               source: "Supabase",
               match: supabaseMatch,
               duration_ms:
-                Date.now() - startedAt,
+                Date.now() -
+                startedAt,
             },
             {
               headers: {
                 "Cache-Control":
                   "no-store, no-cache, must-revalidate, proxy-revalidate",
-                Pragma: "no-cache",
+                Pragma:
+                  "no-cache",
                 Expires: "0",
               },
             }
@@ -231,14 +206,9 @@ export async function GET(request) {
       }
 
       /*
-       * Supabase'de bulunamadıysa
-       * mevcut Mackolik sistemini deniyoruz.
+       * Supabase'de bulunamazsa
+       * eski Mackolik aramasını deniyoruz.
        */
-
-      console.log(
-        "Supabase'de bulunamadı. Mackolik aranıyor..."
-      );
-
       const match =
         await getMatch(
           requestedId
@@ -257,16 +227,19 @@ export async function GET(request) {
             success: false,
             error:
               "Maç bulunamadı.",
-            source: "Mackolik",
+            source:
+              "Mackolik",
             duration_ms:
-              Date.now() - startedAt,
+              Date.now() -
+              startedAt,
           },
           {
             status: 404,
             headers: {
               "Cache-Control":
                 "no-store, no-cache, must-revalidate, proxy-revalidate",
-              Pragma: "no-cache",
+              Pragma:
+                "no-cache",
               Expires: "0",
             },
           }
@@ -276,16 +249,19 @@ export async function GET(request) {
       return NextResponse.json(
         {
           success: true,
-          source: "Mackolik",
+          source:
+            "Mackolik",
           match,
           duration_ms:
-            Date.now() - startedAt,
+            Date.now() -
+            startedAt,
         },
         {
           headers: {
             "Cache-Control":
               "no-store, no-cache, must-revalidate, proxy-revalidate",
-            Pragma: "no-cache",
+            Pragma:
+              "no-cache",
             Expires: "0",
           },
         }
@@ -317,6 +293,132 @@ export async function GET(request) {
     let matches =
       allMatches;
 
+    /*
+     * ==================================================
+     * SUPABASE ID EŞLEŞTİRME
+     * ==================================================
+     *
+     * Maçkolik:
+     *
+     * match.external_id
+     *
+     * Supabase:
+     *
+     * matches.external_id
+     *
+     * eşleştiğinde:
+     *
+     * match.id = Supabase UUID
+     *
+     * yapıyoruz.
+     */
+
+    const supabase =
+      getSupabaseAdmin();
+
+    if (
+      supabase &&
+      allMatches.length > 0
+    ) {
+      const externalIds =
+        allMatches
+          .map(
+            (match) =>
+              match?.external_id
+          )
+          .filter(Boolean);
+
+      if (
+        externalIds.length > 0
+      ) {
+        const {
+          data: databaseMatches,
+          error: databaseError,
+        } = await supabase
+          .from("matches")
+          .select(
+            "id, external_id"
+          )
+          .in(
+            "external_id",
+            externalIds
+          );
+
+        if (databaseError) {
+          console.error(
+            "Supabase ID eşleştirme hatası:",
+            databaseError
+          );
+        } else {
+          const idMap =
+            new Map();
+
+          for (
+            const databaseMatch of
+              databaseMatches ||
+              []
+          ) {
+            if (
+              databaseMatch?.external_id &&
+              databaseMatch?.id
+            ) {
+              idMap.set(
+                String(
+                  databaseMatch.external_id
+                ),
+                databaseMatch.id
+              );
+            }
+          }
+
+          matches =
+            allMatches.map(
+              (match) => {
+                const supabaseId =
+                  idMap.get(
+                    String(
+                      match.external_id
+                    )
+                  );
+
+                if (!supabaseId) {
+                  return match;
+                }
+
+                return {
+                  ...match,
+
+                  /*
+                   * ARTIK KARTTA
+                   * SUPABASE UUID
+                   * KULLANILACAK
+                   */
+                  id: supabaseId,
+
+                  /*
+                   * Mackolik ID
+                   * ayrıca korunuyor.
+                   */
+                  external_id:
+                    match.external_id,
+                };
+              }
+            );
+
+          console.log(
+            "Supabase ID eşleşen maç:",
+            idMap.size
+          );
+        }
+      }
+    }
+
+    /*
+     * ==================================================
+     * SPORT FİLTRESİ
+     * ==================================================
+     */
+
     if (sport) {
       const wantedSport =
         sport.toLowerCase();
@@ -330,6 +432,12 @@ export async function GET(request) {
             wantedSport
         );
     }
+
+    /*
+     * ==================================================
+     * STATUS FİLTRESİ
+     * ==================================================
+     */
 
     if (status) {
       const wantedStatus =
@@ -353,18 +461,24 @@ export async function GET(request) {
     return NextResponse.json(
       {
         success: true,
-        source: "Mackolik",
+        source:
+          "Mackolik+Supabase",
+
         count:
           matches.length,
+
         matches,
+
         duration_ms:
-          Date.now() - startedAt,
+          Date.now() -
+          startedAt,
       },
       {
         headers: {
           "Cache-Control":
             "no-store, no-cache, must-revalidate, proxy-revalidate",
-          Pragma: "no-cache",
+          Pragma:
+            "no-cache",
           Expires: "0",
         },
       }
@@ -389,21 +503,30 @@ export async function GET(request) {
     return NextResponse.json(
       {
         success: false,
-        source: "Mackolik",
+
+        source:
+          "Mackolik",
+
         error:
           error?.message ||
           "Maç verileri alınamadı.",
+
         error_name:
-          error?.name || null,
+          error?.name ||
+          null,
+
         duration_ms:
-          Date.now() - startedAt,
+          Date.now() -
+          startedAt,
       },
       {
         status: 500,
+
         headers: {
           "Cache-Control":
             "no-store, no-cache, must-revalidate, proxy-revalidate",
-          Pragma: "no-cache",
+          Pragma:
+            "no-cache",
           Expires: "0",
         },
       }
