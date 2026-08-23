@@ -1,3 +1,5 @@
+"app/api/predictions/route.js"
+
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -20,13 +22,150 @@ function getSupabase() {
   });
 }
 
+/*
+ * Mackolik/API maç ID'si UUID değildir.
+ *
+ * Örnek:
+ * c6f9csiwtzkjr2ei2wekrs8pg
+ *
+ * Supabase:
+ * matches.id = UUID
+ *
+ * Bu fonksiyon dışarıdan gelen maç ID'sini
+ * önce external_id üzerinden bulur ve
+ * Supabase UUID'sini döndürür.
+ */
+async function resolveMatch(supabase, incomingMatchId) {
+  if (!incomingMatchId) {
+    return {
+      match: null,
+      error: "Maç bilgisi gerekli.",
+    };
+  }
+
+  const value = String(incomingMatchId).trim();
+
+  if (!value) {
+    return {
+      match: null,
+      error: "Maç bilgisi gerekli.",
+    };
+  }
+
+  /*
+   * Önce external_id üzerinden ara.
+   *
+   * Mackolik ID'leri burada tutuluyor.
+   */
+  const { data: externalMatch, error: externalError } =
+    await supabase
+      .from("matches")
+      .select("id, external_id, source_id, status")
+      .eq("external_id", value)
+      .maybeSingle();
+
+  if (externalError) {
+    console.error(
+      "Match external_id lookup error:",
+      externalError
+    );
+
+    return {
+      match: null,
+      error: externalError.message,
+    };
+  }
+
+  if (externalMatch) {
+    return {
+      match: externalMatch,
+      error: null,
+    };
+  }
+
+  /*
+   * Bazı eski kayıtlarımız source_id kullanıyor olabilir.
+   */
+  const { data: sourceMatch, error: sourceError } =
+    await supabase
+      .from("matches")
+      .select("id, external_id, source_id, status")
+      .eq("source_id", value)
+      .maybeSingle();
+
+  if (sourceError) {
+    console.error(
+      "Match source_id lookup error:",
+      sourceError
+    );
+
+    return {
+      match: null,
+      error: sourceError.message,
+    };
+  }
+
+  if (sourceMatch) {
+    return {
+      match: sourceMatch,
+      error: null,
+    };
+  }
+
+  /*
+   * Son olarak gelen değer gerçekten UUID ise
+   * matches.id üzerinden aramayı deneyebiliriz.
+   *
+   * Böylece eski sistemle oluşturulmuş linkler de
+   * çalışmaya devam eder.
+   */
+  const uuidRegex =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+  if (uuidRegex.test(value)) {
+    const { data: uuidMatch, error: uuidError } =
+      await supabase
+        .from("matches")
+        .select("id, external_id, source_id, status")
+        .eq("id", value)
+        .maybeSingle();
+
+    if (uuidError) {
+      console.error(
+        "Match UUID lookup error:",
+        uuidError
+      );
+
+      return {
+        match: null,
+        error: uuidError.message,
+      };
+    }
+
+    if (uuidMatch) {
+      return {
+        match: uuidMatch,
+        error: null,
+      };
+    }
+  }
+
+  return {
+    match: null,
+    error: "Maç bulunamadı.",
+  };
+}
+
 export async function GET(request) {
   try {
     const supabase = getSupabase();
     const { searchParams } = new URL(request.url);
 
-    const matchId = searchParams.get("match_id");
-    const userId = searchParams.get("user_id");
+    const incomingMatchId =
+      searchParams.get("match_id");
+
+    const userId =
+      searchParams.get("user_id");
 
     let query = supabase
       .from("predictions")
@@ -50,6 +189,8 @@ export async function GET(request) {
         ),
         matches (
           id,
+          external_id,
+          source_id,
           league,
           home_team,
           away_team,
@@ -59,20 +200,57 @@ export async function GET(request) {
           status
         )
       `)
-      .order("created_at", { ascending: false });
+      .order("created_at", {
+        ascending: false,
+      });
 
-    if (matchId) {
-      query = query.eq("match_id", matchId);
+    /*
+     * Dışarıdan Mackolik ID geliyorsa
+     * önce gerçek Supabase UUID'sini bul.
+     */
+    if (incomingMatchId) {
+      const resolved =
+        await resolveMatch(
+          supabase,
+          incomingMatchId
+        );
+
+      if (resolved.error) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: resolved.error,
+          },
+          { status: 404 }
+        );
+      }
+
+      query = query.eq(
+        "match_id",
+        resolved.match.id
+      );
     }
 
+    /*
+     * Kullanıcı filtresi.
+     */
     if (userId) {
-      query = query.eq("user_id", userId);
+      query = query.eq(
+        "user_id",
+        userId
+      );
     }
 
-    const { data, error } = await query;
+    const {
+      data,
+      error,
+    } = await query;
 
     if (error) {
-      console.error("Predictions GET error:", error);
+      console.error(
+        "Predictions GET error:",
+        error
+      );
 
       return NextResponse.json(
         {
@@ -88,12 +266,16 @@ export async function GET(request) {
       predictions: data || [],
     });
   } catch (error) {
-    console.error("Predictions GET server error:", error);
+    console.error(
+      "Predictions GET server error:",
+      error
+    );
 
     return NextResponse.json(
       {
         success: false,
-        error: "Tahminler alınırken bir sunucu hatası oluştu.",
+        error:
+          "Tahminler alınırken bir sunucu hatası oluştu.",
       },
       { status: 500 }
     );
@@ -102,29 +284,47 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
-    const body = await request.json();
+    const body =
+      await request.json();
 
-    const userId = body?.user_id;
-    const matchId = body?.match_id;
-    const prediction = body?.prediction;
-    const confidence = body?.confidence ?? null;
-    const message = body?.message ?? null;
+    const userId =
+      body?.user_id;
+
+    /*
+     * Buradaki match_id Mackolik ID'si olabilir.
+     *
+     * Örnek:
+     * c6f9csiwtzkjr2ei2wekrs8pg
+     */
+    const incomingMatchId =
+      body?.match_id;
+
+    const prediction =
+      body?.prediction;
+
+    const confidence =
+      body?.confidence ?? null;
+
+    const message =
+      body?.message ?? null;
 
     if (!userId) {
       return NextResponse.json(
         {
           success: false,
-          error: "Kullanıcı bilgisi gerekli.",
+          error:
+            "Kullanıcı bilgisi gerekli.",
         },
         { status: 400 }
       );
     }
 
-    if (!matchId) {
+    if (!incomingMatchId) {
       return NextResponse.json(
         {
           success: false,
-          error: "Maç bilgisi gerekli.",
+          error:
+            "Maç bilgisi gerekli.",
         },
         { status: 400 }
       );
@@ -153,12 +353,14 @@ export async function POST(request) {
       "HT1",
       "HTX",
       "HT2",
+
       "HTU05",
       "HTO05",
       "HTU15",
       "HTO15",
       "HTU25",
       "HTO25",
+
       "HTDC1X",
       "HTDC12",
       "HTDCX2",
@@ -169,6 +371,7 @@ export async function POST(request) {
 
       "ODD",
       "EVEN",
+
       "GOAL_RANGE_0_1",
       "GOAL_RANGE_2_3",
       "GOAL_RANGE_4_5",
@@ -186,11 +389,16 @@ export async function POST(request) {
       "MOST_GOALS_2H",
     ];
 
-    if (!allowedPredictions.includes(prediction)) {
+    if (
+      !allowedPredictions.includes(
+        prediction
+      )
+    ) {
       return NextResponse.json(
         {
           success: false,
-          error: "Geçersiz tahmin seçimi.",
+          error:
+            "Geçersiz tahmin seçimi.",
         },
         { status: 400 }
       );
@@ -198,14 +406,19 @@ export async function POST(request) {
 
     if (
       confidence !== null &&
-      (!Number.isInteger(Number(confidence)) ||
+      (
+        !Number.isInteger(
+          Number(confidence)
+        ) ||
         Number(confidence) < 1 ||
-        Number(confidence) > 100)
+        Number(confidence) > 100
+      )
     ) {
       return NextResponse.json(
         {
           success: false,
-          error: "Güven oranı 1 ile 100 arasında olmalıdır.",
+          error:
+            "Güven oranı 1 ile 100 arasında olmalıdır.",
         },
         { status: 400 }
       );
@@ -213,24 +426,34 @@ export async function POST(request) {
 
     let cleanMessage = null;
 
-    if (message !== null && message !== undefined) {
-      if (typeof message !== "string") {
+    if (
+      message !== null &&
+      message !== undefined
+    ) {
+      if (
+        typeof message !== "string"
+      ) {
         return NextResponse.json(
           {
             success: false,
-            error: "Analiz metni geçersiz.",
+            error:
+              "Analiz metni geçersiz.",
           },
           { status: 400 }
         );
       }
 
-      cleanMessage = message.trim();
+      cleanMessage =
+        message.trim();
 
-      if (cleanMessage.length > 2000) {
+      if (
+        cleanMessage.length > 2000
+      ) {
         return NextResponse.json(
           {
             success: false,
-            error: "Analiz en fazla 2000 karakter olabilir.",
+            error:
+              "Analiz en fazla 2000 karakter olabilir.",
           },
           { status: 400 }
         );
@@ -241,21 +464,32 @@ export async function POST(request) {
       }
     }
 
-    const supabase = getSupabase();
+    const supabase =
+      getSupabase();
 
-    const { data: user, error: userError } = await supabase
+    /*
+     * KULLANICI KONTROLÜ
+     */
+    const {
+      data: user,
+      error: userError,
+    } = await supabase
       .from("users")
       .select("id")
       .eq("id", userId)
       .maybeSingle();
 
     if (userError) {
-      console.error("Prediction user lookup error:", userError);
+      console.error(
+        "Prediction user lookup error:",
+        userError
+      );
 
       return NextResponse.json(
         {
           success: false,
-          error: userError.message,
+          error:
+            userError.message,
         },
         { status: 500 }
       );
@@ -265,47 +499,65 @@ export async function POST(request) {
       return NextResponse.json(
         {
           success: false,
-          error: "Kullanıcı bulunamadı.",
+          error:
+            "Kullanıcı bulunamadı.",
         },
         { status: 404 }
       );
     }
 
-    const { data: match, error: matchError } = await supabase
-      .from("matches")
-      .select("id, status")
-      .eq("id", matchId)
+    /*
+     * MAÇI ÇÖZÜMLE
+     *
+     * Burada artık:
+     *
+     * c6f9csiwtzkjr2ei2wekrs8pg
+     *
+     * gibi Mackolik ID'sini doğrudan
+     * UUID alanına göndermiyoruz.
+     */
+    const resolved =
+      await resolveMatch(
+        supabase,
+        incomingMatchId
+      );
+
+    if (resolved.error) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            resolved.error,
+        },
+        { status: 404 }
+      );
+    }
+
+    const match =
+      resolved.match;
+
+    /*
+     * Bundan sonra kullanılacak ID:
+     *
+     * matches.id
+     *
+     * yani gerçek Supabase UUID'si.
+     */
+    const matchUuid =
+      match.id;
+
+    /*
+     * MEVCUT TAHMİN KONTROLÜ
+     */
+    const {
+      data: existingPrediction,
+      error: existingError,
+    } = await supabase
+      .from("predictions")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("match_id", matchUuid)
       .maybeSingle();
-
-    if (matchError) {
-      console.error("Prediction match lookup error:", matchError);
-
-      return NextResponse.json(
-        {
-          success: false,
-          error: matchError.message,
-        },
-        { status: 500 }
-      );
-    }
-
-    if (!match) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Maç bulunamadı.",
-        },
-        { status: 404 }
-      );
-    }
-
-    const { data: existingPrediction, error: existingError } =
-      await supabase
-        .from("predictions")
-        .select("id")
-        .eq("user_id", userId)
-        .eq("match_id", matchId)
-        .maybeSingle();
 
     if (existingError) {
       console.error(
@@ -316,7 +568,8 @@ export async function POST(request) {
       return NextResponse.json(
         {
           success: false,
-          error: existingError.message,
+          error:
+            existingError.message,
         },
         { status: 500 }
       );
@@ -326,21 +579,40 @@ export async function POST(request) {
       return NextResponse.json(
         {
           success: false,
-          error: "Bu maç için zaten bir tahmin yaptınız.",
+          error:
+            "Bu maç için zaten bir tahmin yaptınız.",
         },
         { status: 409 }
       );
     }
 
-    const { data, error } = await supabase
+    /*
+     * TAHMİNİ KAYDET
+     *
+     * predictions.match_id artık
+     * Mackolik ID'si değil,
+     * Supabase matches.id UUID'si.
+     */
+    const {
+      data,
+      error,
+    } = await supabase
       .from("predictions")
       .insert({
         user_id: userId,
-        match_id: matchId,
+
+        match_id:
+          matchUuid,
+
         prediction,
+
         confidence:
-          confidence === null ? null : Number(confidence),
-        message: cleanMessage,
+          confidence === null
+            ? null
+            : Number(confidence),
+
+        message:
+          cleanMessage,
       })
       .select(`
         id,
@@ -362,6 +634,8 @@ export async function POST(request) {
         ),
         matches (
           id,
+          external_id,
+          source_id,
           league,
           home_team,
           away_team,
@@ -374,12 +648,16 @@ export async function POST(request) {
       .single();
 
     if (error) {
-      console.error("Predictions POST error:", error);
+      console.error(
+        "Predictions POST error:",
+        error
+      );
 
       return NextResponse.json(
         {
           success: false,
-          error: error.message,
+          error:
+            error.message,
         },
         { status: 500 }
       );
@@ -388,17 +666,35 @@ export async function POST(request) {
     return NextResponse.json(
       {
         success: true,
+
+        /*
+         * Debug/istemci tarafında
+         * hangi ID'nin kullanıldığını
+         * görmek için ikisini de döndürüyoruz.
+         */
+        match_id:
+          matchUuid,
+
+        external_match_id:
+          match.external_id ||
+          match.source_id ||
+          null,
+
         prediction: data,
       },
       { status: 201 }
     );
   } catch (error) {
-    console.error("Predictions POST server error:", error);
+    console.error(
+      "Predictions POST server error:",
+      error
+    );
 
     return NextResponse.json(
       {
         success: false,
-        error: "Tahmin gönderilirken bir sunucu hatası oluştu.",
+        error:
+          "Tahmin gönderilirken bir sunucu hatası oluştu.",
       },
       { status: 500 }
     );
