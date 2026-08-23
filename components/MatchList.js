@@ -1,6 +1,7 @@
 "use client";
 
 import MatchCard from "./MatchCard";
+import AdsGramTask from "./AdsGramTask";
 
 export default function MatchList({
   matches = [],
@@ -27,15 +28,19 @@ export default function MatchList({
 
   return (
     <div className="match-list">
-      {matches.map((match) => (
-        <MatchCard
-          key={
-            match.id ||
-            match.external_id
-          }
-          match={match}
-        />
+      {matches.map((match, index) => (
+        <div key={
+          match.id ||
+          match.external_id ||
+          index
+        }>
+          <MatchCard match={match} />
+
+          {(index + 1) % 3 === 0 ? (
+            <AdsGramTask />
+          ) : null}
+        </div>
       ))}
     </div>
   );
-} 
+}
