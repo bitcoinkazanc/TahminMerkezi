@@ -3,457 +3,644 @@ import { NextResponse } from "next/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const MATCH_ID =
-  "8egmmudq1251oapfinzu5ixas";
+const DEFAULT_MATCH_URL =
+  "https://www.mackolik.com/mac/fenerbah%C3%A7e-vs-konyaspor/c8ba0e24rm37o4iokkw42ntas";
 
-const MATCH_URL =
-  `https://www.mackolik.com/mac/cruz-azul-vs-fc-atlas/${MATCH_ID}`;
+const REQUEST_TIMEOUT = 15000;
 
-function findUrls(
-  value: unknown,
-  path = "root",
-  results: Array<{
-    path: string;
-    value: string;
-  }> = []
+function addUnique(
+  list: string[],
+  value: unknown
 ) {
   if (
-    value === null ||
-    value === undefined
+    typeof value !== "string" ||
+    !value.trim()
   ) {
-    return results;
+    return;
   }
 
-  if (
-    typeof value === "string"
+  const clean = value.trim();
+
+  if (!list.includes(clean)) {
+    list.push(clean);
+  }
+}
+
+function absoluteUrl(
+  value: string,
+  baseUrl: string
+) {
+  try {
+    return new URL(
+      value,
+      baseUrl
+    ).toString();
+  } catch {
+    return value;
+  }
+}
+
+function extractUrls(
+  html: string,
+  baseUrl: string
+) {
+  const allUrls: string[] = [];
+  const logoLikeUrls: string[] = [];
+  const mackolikFeedUrls: string[] = [];
+  const mackolikImageUrls: string[] = [];
+
+  /*
+   * src="..."
+   * src='...'
+   * href="..."
+   * content="..."
+   */
+  const attributeRegex =
+    /(?:src|href|content)\s*=\s*["']([^"']+)["']/gi;
+
+  let match;
+
+  while (
+    (match =
+      attributeRegex.exec(html)) !== null
   ) {
-    const lower =
-      value.toLowerCase();
+    const raw = match[1];
 
     if (
-      value.startsWith("http://") ||
-      value.startsWith("https://") ||
-      lower.includes("mackolik") ||
-      lower.includes("logo") ||
-      lower.includes(".gif") ||
-      lower.includes(".png") ||
-      lower.includes(".jpg") ||
-      lower.includes(".webp")
+      !raw ||
+      raw.startsWith("data:") ||
+      raw.startsWith("javascript:")
     ) {
-      results.push({
-        path,
-        value,
-      });
+      continue;
     }
 
-    return results;
-  }
+    const url =
+      absoluteUrl(
+        raw,
+        baseUrl
+      );
 
-  if (
-    Array.isArray(value)
-  ) {
-    value.forEach(
+    addUnique(
+      allUrls,
+      url
+    );
+
+    const lower =
+      url.toLowerCase();
+
+    if (
+      lower.includes(
+        "mackolikfeeds"
+      )
+    ) {
+      addUnique(
+        mackolikFeedUrls,
+        url
+      );
+    }
+
+    if (
+      lower.includes(
+        "mackolik"
+      ) &&
       (
-        item,
-        index
-      ) => {
-        findUrls(
-          item,
-          `${path}[${index}]`,
-          results
-        );
-      }
-    );
+        lower.includes("logo") ||
+        lower.includes("team") ||
+        lower.includes("club") ||
+        lower.endsWith(".png") ||
+        lower.endsWith(".jpg") ||
+        lower.endsWith(".jpeg") ||
+        lower.endsWith(".webp") ||
+        lower.endsWith(".gif") ||
+        lower.includes(".svg")
+      )
+    ) {
+      addUnique(
+        mackolikImageUrls,
+        url
+      );
+    }
 
-    return results;
+    if (
+      lower.includes("logo") ||
+      lower.includes("team") ||
+      lower.includes("club") ||
+      lower.includes("crest") ||
+      lower.includes("badge")
+    ) {
+      addUnique(
+        logoLikeUrls,
+        url
+      );
+    }
   }
 
-  if (
-    typeof value === "object"
+  /*
+   * srcset="..."
+   */
+  const srcsetRegex =
+    /srcset\s*=\s*["']([^"']+)["']/gi;
+
+  while (
+    (match =
+      srcsetRegex.exec(html)) !== null
   ) {
-    Object.entries(
-      value as Record<
-        string,
-        unknown
-      >
-    ).forEach(
-      ([key, child]) => {
-        findUrls(
-          child,
-          `${path}.${key}`,
-          results
-        );
+    const values =
+      match[1].split(",");
+
+    for (const value of values) {
+      const parts =
+        value.trim().split(/\s+/);
+
+      const rawUrl =
+        parts[0];
+
+      if (!rawUrl) {
+        continue;
       }
-    );
-  }
 
-  return results;
-}
-
-function findInterestingKeys(
-  value: unknown,
-  path = "root",
-  results: Array<{
-    path: string;
-    key: string;
-    value: unknown;
-  }> = []
-) {
-  if (
-    !value ||
-    typeof value !== "object"
-  ) {
-    return results;
-  }
-
-  if (
-    Array.isArray(value)
-  ) {
-    value.forEach(
-      (
-        item,
-        index
-      ) => {
-        findInterestingKeys(
-          item,
-          `${path}[${index}]`,
-          results
+      const url =
+        absoluteUrl(
+          rawUrl,
+          baseUrl
         );
-      }
-    );
 
-    return results;
-  }
+      addUnique(
+        allUrls,
+        url
+      );
 
-  Object.entries(
-    value as Record<
-      string,
-      unknown
-    >
-  ).forEach(
-    ([key, child]) => {
-      const lowerKey =
-        key.toLowerCase();
+      const lower =
+        url.toLowerCase();
 
       if (
-        lowerKey.includes("logo") ||
-        lowerKey.includes("image") ||
-        lowerKey.includes("team") ||
-        lowerKey.includes("club") ||
-        lowerKey.includes("crest") ||
-        lowerKey.includes("badge")
+        lower.includes(
+          "mackolikfeeds"
+        )
       ) {
-        results.push({
-          path:
-            `${path}.${key}`,
-          key,
-          value: child,
-        });
+        addUnique(
+          mackolikFeedUrls,
+          url
+        );
       }
 
       if (
-        child &&
-        typeof child === "object"
+        lower.includes("logo") ||
+        lower.includes("team") ||
+        lower.includes("club") ||
+        lower.includes("crest") ||
+        lower.includes("badge")
       ) {
-        findInterestingKeys(
-          child,
-          `${path}.${key}`,
-          results
+        addUnique(
+          logoLikeUrls,
+          url
         );
       }
     }
-  );
+  }
 
-  return results;
-}
+  /*
+   * JSON içindeki URL'leri de yakala.
+   * Özellikle Next.js / React hydration
+   * verilerinde logo bilgisi bulunabilir.
+   */
+  const jsonUrlRegex =
+    /https?:\/\/[^"'\\\s<>]+/gi;
 
-async function fetchJson(
-  url: string
-) {
-  const response =
-    await fetch(
-      url,
-      {
-        method: "GET",
+  while (
+    (match =
+      jsonUrlRegex.exec(html)) !== null
+  ) {
+    let url =
+      match[0];
 
-        headers: {
-          Accept:
-            "application/json, text/plain, */*",
+    url =
+      url.replace(
+        /[\\'",}\]\)>]+$/,
+        ""
+      );
 
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36",
-
-          Referer:
-            MATCH_URL,
-
-          Origin:
-            "https://www.mackolik.com",
-        },
-
-        cache: "no-store",
-      }
+    addUnique(
+      allUrls,
+      url
     );
 
-  const text =
-    await response.text();
+    const lower =
+      url.toLowerCase();
 
-  let json: unknown = null;
+    if (
+      lower.includes(
+        "mackolikfeeds"
+      )
+    ) {
+      addUnique(
+        mackolikFeedUrls,
+        url
+      );
+    }
 
-  try {
-    json =
-      JSON.parse(text);
-  } catch {
-    json = null;
+    if (
+      lower.includes("logo") ||
+      lower.includes("team") ||
+      lower.includes("club") ||
+      lower.includes("crest") ||
+      lower.includes("badge")
+    ) {
+      addUnique(
+        logoLikeUrls,
+        url
+      );
+    }
   }
 
   return {
-    url,
-    status:
-      response.status,
-    ok:
-      response.ok,
-    contentType:
-      response.headers.get(
-        "content-type"
-      ),
-    json,
-    text: json
-      ? null
-      : text.substring(
-          0,
-          10000
-        ),
+    allUrls,
+    logoLikeUrls,
+    mackolikFeedUrls,
+    mackolikImageUrls,
   };
 }
 
-export async function GET() {
-  const results: unknown[] = [];
+function extractMeta(
+  html: string,
+  baseUrl: string
+) {
+  const result: Record<
+    string,
+    string
+  > = {};
 
-  /*
-   * 1 — MAÇ SAYFASI
-   */
+  const metaRegex =
+    /<meta\b[^>]*>/gi;
+
+  const metas =
+    html.match(metaRegex) || [];
+
+  for (const tag of metas) {
+    const propertyMatch =
+      tag.match(
+        /(?:property|name)\s*=\s*["']([^"']+)["']/i
+      );
+
+    const contentMatch =
+      tag.match(
+        /content\s*=\s*["']([^"']+)["']/i
+      );
+
+    if (
+      !propertyMatch ||
+      !contentMatch
+    ) {
+      continue;
+    }
+
+    const key =
+      propertyMatch[1]
+        .trim()
+        .toLowerCase();
+
+    const value =
+      absoluteUrl(
+        contentMatch[1].trim(),
+        baseUrl
+      );
+
+    if (
+      key === "og:image" ||
+      key === "twitter:image" ||
+      key === "og:image:url"
+    ) {
+      result[key] = value;
+    }
+  }
+
+  return result;
+}
+
+function findTeamNames(
+  html: string
+) {
+  const names: string[] = [
+    "Fenerbahçe",
+    "Konyaspor",
+  ];
+
+  const found: string[] = [];
+
+  for (const name of names) {
+    if (
+      html
+        .toLocaleLowerCase("tr-TR")
+        .includes(
+          name.toLocaleLowerCase(
+            "tr-TR"
+          )
+        )
+    ) {
+      found.push(name);
+    }
+  }
+
+  return found;
+}
+
+function findRelevantHtml(
+  html: string
+) {
+  const lower =
+    html.toLowerCase();
+
+  const keywords = [
+    "fenerbahçe",
+    "konyaspor",
+    "logo",
+    "mackolikfeeds",
+    "team",
+    "club",
+    "crest",
+    "badge",
+  ];
+
+  const results: string[] = [];
+
+  for (const keyword of keywords) {
+    let start = 0;
+    let count = 0;
+
+    while (count < 5) {
+      const index =
+        lower.indexOf(
+          keyword,
+          start
+        );
+
+      if (index === -1) {
+        break;
+      }
+
+      const from =
+        Math.max(
+          0,
+          index - 250
+        );
+
+      const to =
+        Math.min(
+          html.length,
+          index + 500
+        );
+
+      const snippet =
+        html.slice(
+          from,
+          to
+        );
+
+      addUnique(
+        results,
+        snippet
+      );
+
+      start =
+        index + keyword.length;
+
+      count++;
+    }
+  }
+
+  return results;
+}
+
+export async function GET(
+  request: Request
+) {
+  const controller =
+    new AbortController();
+
+  const timeout =
+    setTimeout(
+      () =>
+        controller.abort(),
+      REQUEST_TIMEOUT
+    );
 
   try {
+    const requestUrl =
+      new URL(request.url);
+
+    const targetUrl =
+      requestUrl.searchParams.get(
+        "url"
+      ) ||
+      DEFAULT_MATCH_URL;
+
+    let parsedUrl: URL;
+
+    try {
+      parsedUrl =
+        new URL(
+          targetUrl
+        );
+    } catch {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Geçersiz Maçkolik URL'si.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    if (
+      parsedUrl.hostname !==
+        "www.mackolik.com" &&
+      parsedUrl.hostname !==
+        "mackolik.com"
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Sadece mackolik.com URL'leri test edilebilir.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
     const response =
       await fetch(
-        MATCH_URL,
+        parsedUrl.toString(),
         {
           method: "GET",
-
           headers: {
             Accept:
-              "text/html,application/xhtml+xml",
+              "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
 
             "User-Agent":
-              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36",
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
 
             Referer:
               "https://www.mackolik.com/",
+
+            "Accept-Language":
+              "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
           },
 
-          cache: "no-store",
+          cache:
+            "no-store",
+
+          signal:
+            controller.signal,
         }
       );
 
     const html =
       await response.text();
 
-    const foundUrls =
-      html.match(
-        /https?:\/\/[^"'\\\s<>]+/gi
-      ) || [];
-
-    const logoLike =
-      foundUrls.filter(
-        (
-          url
-        ) => {
-          const lower =
-            url.toLowerCase();
-
-          return (
-            lower.includes("logo") ||
-            lower.includes("team") ||
-            lower.includes("club") ||
-            lower.includes("crest") ||
-            lower.includes("badge") ||
-            lower.includes(".gif") ||
-            lower.includes(".png") ||
-            lower.includes(".webp") ||
-            lower.includes(".jpg")
-          );
-        }
-      );
-
-    results.push({
-      test:
-        "match-page",
-
-      status:
-        response.status,
-
-      ok:
-        response.ok,
-
-      htmlLength:
-        html.length,
-
-      logoLikeUrls:
-        Array.from(
-          new Set(
-            logoLike
-          )
-        ),
-    });
-
-  } catch (
-    error
-  ) {
-    results.push({
-      test:
-        "match-page",
-
-      error:
-        error instanceof Error
-          ? error.message
-          : String(error),
-    });
-  }
-
-  /*
-   * 2 — CANLI SKOR API
-   */
-
-  const endpoint =
-    "https://www.mackolik.com/perform/p0/ajax/components/competition/livescores/json";
-
-  try {
-    const now =
-      new Date();
-
-    const dateParts =
-      new Intl.DateTimeFormat(
-        "en-CA",
+    if (!response.ok) {
+      return NextResponse.json(
         {
-          timeZone:
-            "Europe/Istanbul",
-
-          year:
-            "numeric",
-
-          month:
-            "2-digit",
-
-          day:
-            "2-digit",
+          success: false,
+          status:
+            response.status,
+          statusText:
+            response.statusText,
+          url:
+            parsedUrl.toString(),
+          htmlLength:
+            html.length,
+          preview:
+            html.slice(
+              0,
+              1000
+            ),
+        },
+        {
+          status: 200,
         }
-      ).formatToParts(
-        now
+      );
+    }
+
+    const extracted =
+      extractUrls(
+        html,
+        parsedUrl.toString()
       );
 
-    const year =
-      dateParts.find(
-        (item) =>
-          item.type ===
-          "year"
-      )?.value;
-
-    const month =
-      dateParts.find(
-        (item) =>
-          item.type ===
-          "month"
-      )?.value;
-
-    const day =
-      dateParts.find(
-        (item) =>
-          item.type ===
-          "day"
-      )?.value;
-
-    const date =
-      `${year}-${month}-${day}`;
-
-    const url =
-      new URL(
-        endpoint
+    const meta =
+      extractMeta(
+        html,
+        parsedUrl.toString()
       );
 
-    url.searchParams.set(
-      "matchDate",
-      date
+    const teamNames =
+      findTeamNames(
+        html
+      );
+
+    const relevantHtml =
+      findRelevantHtml(
+        html
+      );
+
+    /*
+     * HTML'in tamamını göndermiyoruz.
+     * Sadece teşhis için gerekli bilgileri döndürüyoruz.
+     */
+    return NextResponse.json(
+      {
+        success: true,
+
+        targetUrl:
+          parsedUrl.toString(),
+
+        httpStatus:
+          response.status,
+
+        htmlLength:
+          html.length,
+
+        teamNames,
+
+        meta,
+
+        logoLikeUrls:
+          extracted.logoLikeUrls,
+
+        mackolikFeedUrls:
+          extracted.mackolikFeedUrls,
+
+        mackolikImageUrls:
+          extracted.mackolikImageUrls,
+
+        allImageLikeUrls:
+          extracted.allUrls.filter(
+            (url) => {
+              const lower =
+                url.toLowerCase();
+
+              return (
+                lower.endsWith(
+                  ".png"
+                ) ||
+                lower.endsWith(
+                  ".jpg"
+                ) ||
+                lower.endsWith(
+                  ".jpeg"
+                ) ||
+                lower.endsWith(
+                  ".webp"
+                ) ||
+                lower.endsWith(
+                  ".gif"
+                ) ||
+                lower.includes(
+                  ".svg"
+                )
+              );
+            }
+          ),
+
+        relevantHtml,
+
+        message:
+          "Maçkolik HTML kaynağı tarandı.",
+      },
+      {
+        status: 200,
+        headers: {
+          "Cache-Control":
+            "no-store",
+        },
+      }
+    );
+  } catch (error) {
+    console.error(
+      "Mackolik test error:",
+      error
     );
 
-    url.searchParams.append(
-      "sports[]",
-      "Soccer"
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Bilinmeyen hata.",
+      },
+      {
+        status: 500,
+      }
     );
-
-    const result =
-      await fetchJson(
-        url.toString()
-      );
-
-    results.push({
-      test:
-        "livescores",
-
-      url:
-        result.url,
-
-      status:
-        result.status,
-
-      ok:
-        result.ok,
-
-      contentType:
-        result.contentType,
-
-      interestingKeys:
-        findInterestingKeys(
-          result.json
-        ),
-
-      urls:
-        findUrls(
-          result.json
-        ),
-
-      data:
-        result.json,
-    });
-
-  } catch (
-    error
-  ) {
-    results.push({
-      test:
-        "livescores",
-
-      error:
-        error instanceof Error
-          ? error.message
-          : String(error),
-    });
+  } finally {
+    clearTimeout(
+      timeout
+    );
   }
-
-  return NextResponse.json({
-    success:
-      true,
-
-    testMatch: {
-      id:
-        MATCH_ID,
-
-      url:
-        MATCH_URL,
-    },
-
-    message:
-      "Mackolik kaynak testi tamamlandı.",
-
-    results,
-  });
 }
