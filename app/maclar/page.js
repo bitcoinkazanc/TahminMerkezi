@@ -4,15 +4,15 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import MatchList from "../../components/MatchList";
 import Loading from "../../components/Loading";
+import { sortMatches } from "../../lib/match-utils";
 
 const INITIAL_VISIBLE_COUNT = 20;
 const LOAD_MORE_COUNT = 10;
 
 export default function MatchesPage() {
   const [matches, setMatches] = useState([]);
-  const [visibleCount, setVisibleCount] = useState(
-    INITIAL_VISIBLE_COUNT
-  );
+  const [visibleCount, setVisibleCount] =
+    useState(INITIAL_VISIBLE_COUNT);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -48,8 +48,14 @@ export default function MatchesPage() {
           ? result.matches
           : [];
 
+      /*
+       * Ana sayfa ile aynı sıralama
+       * sistemini kullan.
+       */
       setMatches(
-        loadedMatches
+        sortMatches(
+          loadedMatches
+        )
       );
 
       setVisibleCount(
