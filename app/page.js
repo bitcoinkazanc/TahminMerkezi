@@ -4,13 +4,21 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import MatchList from "../components/MatchList";
 import Loading from "../components/Loading";
+import {
+  getMatchStatus,
+  sortMatches,
+} from "../lib/match-utils";
+
+const INITIAL_VISIBLE_COUNT = 10;
+const LOAD_MORE_COUNT = 10;
 
 export default function HomePage() {
   const [matches, setMatches] = useState([]);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState("");
-  const [visibleCount, setVisibleCount] = useState(10);
+  const [visibleCount, setVisibleCount] =
+    useState(INITIAL_VISIBLE_COUNT);
 
   useEffect(() => {
     async function initializeApp() {
@@ -36,10 +44,24 @@ export default function HomePage() {
           }
         );
 
-        const result = await response.json();
+        const result =
+          await response.json();
 
-        if (response.ok && result.success) {
-          setMatches(result.matches || []);
+        if (
+          response.ok &&
+          result.success
+        ) {
+          setMatches(
+            Array.isArray(
+              result.matches
+            )
+              ? result.matches
+              : []
+          );
+
+          setVisibleCount(
+            INITIAL_VISIBLE_COUNT
+          );
         }
       } catch (error) {
         console.error(
@@ -55,11 +77,15 @@ export default function HomePage() {
   }, []);
 
   async function authenticateTelegram() {
-    if (typeof window === "undefined") {
+    if (
+      typeof window ===
+      "undefined"
+    ) {
       return;
     }
 
-    const telegram = window.Telegram?.WebApp;
+    const telegram =
+      window.Telegram?.WebApp;
 
     if (!telegram) {
       throw new Error(
@@ -70,7 +96,8 @@ export default function HomePage() {
     telegram.ready();
     telegram.expand();
 
-    const initData = telegram.initData;
+    const initData =
+      telegram.initData;
 
     if (!initData) {
       throw new Error(
@@ -78,22 +105,28 @@ export default function HomePage() {
       );
     }
 
-    const response = await fetch(
-      "/api/telegram/auth",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          initData,
-        }),
-      }
-    );
+    const response =
+      await fetch(
+        "/api/telegram/auth",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            initData,
+          }),
+        }
+      );
 
-    const result = await response.json();
+    const result =
+      await response.json();
 
-    if (!response.ok || !result.success) {
+    if (
+      !response.ok ||
+      !result.success
+    ) {
       throw new Error(
         result.error ||
           "Telegram doğrulaması başarısız."
@@ -105,7 +138,9 @@ export default function HomePage() {
 
       localStorage.setItem(
         "tm_user",
-        JSON.stringify(result.user)
+        JSON.stringify(
+          result.user
+        )
       );
     }
   }
@@ -123,7 +158,9 @@ export default function HomePage() {
               Telegram Giriş Hatası
             </h1>
 
-            <p>{authError}</p>
+            <p>
+              {authError}
+            </p>
 
             <Link
               href="/"
@@ -142,85 +179,15 @@ export default function HomePage() {
     user?.username ||
     "";
 
-  const leaguePriority = [
-    "Turkish Super League",
-    "Turkish First League",
-    "Turkish Second League",
-    "Turkish Third League",
-    "English Premier League",
-    "Spanish La Liga",
-    "Italian Serie A",
-    "Bundesliga",
-    "French Ligue 1",
-    "Netherlands Eredivisie",
-    "Portuguese Primeira Liga",
-    "Belgian Pro League",
-  ];
-
-  const activeMatches =
-    matches.filter((match) => {
-      const status =
-        String(
-          match?.status || ""
-        ).toLowerCase();
-
-      return (
-        status === "live" ||
-        status === "scheduled" ||
-        status === "upcoming"
-      );
-    });
-
-  const sortedMatches = [
-    ...activeMatches,
-  ].sort((a, b) => {
-    const leagueA = (
-      a?.league || ""
-    ).toLowerCase();
-
-    const leagueB = (
-      b?.league || ""
-    ).toLowerCase();
-
-    const indexA =
-      leaguePriority.findIndex(
-        (league) =>
-          leagueA.includes(
-            league.toLowerCase()
-          )
-      );
-
-    const indexB =
-      leaguePriority.findIndex(
-        (league) =>
-          leagueB.includes(
-            league.toLowerCase()
-          )
-      );
-
-    const priorityA =
-      indexA === -1
-        ? leaguePriority.length
-        : indexA;
-
-    const priorityB =
-      indexB === -1
-        ? leaguePriority.length
-        : indexB;
-
-    if (
-      priorityA !== priorityB
-    ) {
-      return (
-        priorityA - priorityB
-      );
-    }
-
-    return (
-      new Date(a.match_date) -
-      new Date(b.match_date)
-    );
-  });
+  /*
+   * Maçları artık önceki gibi
+   * filtrelemiyoruz.
+   *
+   * Biten maçlar da ana sayfaya
+   * gelebilir.
+   */
+  const sortedMatches =
+    sortMatches(matches);
 
   const visibleMatches =
     sortedMatches.slice(
@@ -254,7 +221,7 @@ export default function HomePage() {
 
           {displayName ? (
             <div className="home-welcome">
-              Hoş geldin,{" "}
+              Hoş geldin{" "}
               <strong>
                 {displayName}
               </strong>
@@ -279,7 +246,8 @@ export default function HomePage() {
 
           {loading ? (
             <Loading />
-          ) : sortedMatches.length === 0 ? (
+          ) : sortedMatches.length ===
+            0 ? (
             <div className="empty-state small">
               <div className="empty-icon">
                 ⚽
@@ -290,8 +258,9 @@ export default function HomePage() {
               </h3>
 
               <p>
-                Maçlar sisteme eklendiğinde
-                burada görünecek.
+                Maçlar sisteme
+                eklendiğinde burada
+                görünecek.
               </p>
 
               <Link
@@ -304,7 +273,9 @@ export default function HomePage() {
           ) : (
             <>
               <MatchList
-                matches={visibleMatches}
+                matches={
+                  visibleMatches
+                }
               />
 
               {hasMoreMatches ? (
@@ -313,7 +284,8 @@ export default function HomePage() {
                     display: "flex",
                     justifyContent:
                       "center",
-                    padding: "16px",
+                    padding:
+                      "16px",
                   }}
                 >
                   <button
@@ -323,7 +295,8 @@ export default function HomePage() {
                       setVisibleCount(
                         (current) =>
                           Math.min(
-                            current + 10,
+                            current +
+                              LOAD_MORE_COUNT,
                             50
                           )
                       )
