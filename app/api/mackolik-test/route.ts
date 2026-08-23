@@ -9,21 +9,36 @@ const MATCH_ID =
 const MATCH_URL =
   `https://www.mackolik.com/mac/cruz-azul-vs-fc-atlas/${MATCH_ID}`;
 
-function findUrls(value, path = "root", results = []) {
-  if (value === null || value === undefined) {
+function findUrls(
+  value: unknown,
+  path = "root",
+  results: Array<{
+    path: string;
+    value: string;
+  }> = []
+) {
+  if (
+    value === null ||
+    value === undefined
+  ) {
     return results;
   }
 
-  if (typeof value === "string") {
+  if (
+    typeof value === "string"
+  ) {
+    const lower =
+      value.toLowerCase();
+
     if (
       value.startsWith("http://") ||
       value.startsWith("https://") ||
-      value.includes("mackolik") ||
-      value.includes("logo") ||
-      value.includes(".gif") ||
-      value.includes(".png") ||
-      value.includes(".jpg") ||
-      value.includes(".webp")
+      lower.includes("mackolik") ||
+      lower.includes("logo") ||
+      lower.includes(".gif") ||
+      lower.includes(".png") ||
+      lower.includes(".jpg") ||
+      lower.includes(".webp")
     ) {
       results.push({
         path,
@@ -34,124 +49,169 @@ function findUrls(value, path = "root", results = []) {
     return results;
   }
 
-  if (Array.isArray(value)) {
-    value.forEach((item, index) => {
-      findUrls(
+  if (
+    Array.isArray(value)
+  ) {
+    value.forEach(
+      (
         item,
-        `${path}[${index}]`,
-        results
-      );
-    });
+        index
+      ) => {
+        findUrls(
+          item,
+          `${path}[${index}]`,
+          results
+        );
+      }
+    );
 
     return results;
   }
 
-  if (typeof value === "object") {
-    for (const [key, child] of Object.entries(value)) {
-      findUrls(
-        child,
-        `${path}.${key}`,
-        results
-      );
-    }
+  if (
+    typeof value === "object"
+  ) {
+    Object.entries(
+      value as Record<
+        string,
+        unknown
+      >
+    ).forEach(
+      ([key, child]) => {
+        findUrls(
+          child,
+          `${path}.${key}`,
+          results
+        );
+      }
+    );
   }
 
   return results;
 }
 
 function findInterestingKeys(
-  value,
+  value: unknown,
   path = "root",
-  results = []
+  results: Array<{
+    path: string;
+    key: string;
+    value: unknown;
+  }> = []
 ) {
-  if (!value || typeof value !== "object") {
+  if (
+    !value ||
+    typeof value !== "object"
+  ) {
     return results;
   }
 
-  if (Array.isArray(value)) {
-    value.forEach((item, index) => {
-      findInterestingKeys(
+  if (
+    Array.isArray(value)
+  ) {
+    value.forEach(
+      (
         item,
-        `${path}[${index}]`,
-        results
-      );
-    });
+        index
+      ) => {
+        findInterestingKeys(
+          item,
+          `${path}[${index}]`,
+          results
+        );
+      }
+    );
 
     return results;
   }
 
-  for (const [key, child] of Object.entries(value)) {
-    const lowerKey =
-      key.toLowerCase();
+  Object.entries(
+    value as Record<
+      string,
+      unknown
+    >
+  ).forEach(
+    ([key, child]) => {
+      const lowerKey =
+        key.toLowerCase();
 
-    if (
-      lowerKey.includes("logo") ||
-      lowerKey.includes("image") ||
-      lowerKey.includes("team") ||
-      lowerKey.includes("club") ||
-      lowerKey.includes("crest") ||
-      lowerKey.includes("badge")
-    ) {
-      results.push({
-        path: `${path}.${key}`,
-        key,
-        value: child,
-      });
-    }
+      if (
+        lowerKey.includes("logo") ||
+        lowerKey.includes("image") ||
+        lowerKey.includes("team") ||
+        lowerKey.includes("club") ||
+        lowerKey.includes("crest") ||
+        lowerKey.includes("badge")
+      ) {
+        results.push({
+          path:
+            `${path}.${key}`,
+          key,
+          value: child,
+        });
+      }
 
-    if (
-      child &&
-      typeof child === "object"
-    ) {
-      findInterestingKeys(
-        child,
-        `${path}.${key}`,
-        results
-      );
+      if (
+        child &&
+        typeof child === "object"
+      ) {
+        findInterestingKeys(
+          child,
+          `${path}.${key}`,
+          results
+        );
+      }
     }
-  }
+  );
 
   return results;
 }
 
 async function fetchJson(
-  url
+  url: string
 ) {
   const response =
-    await fetch(url, {
-      method: "GET",
-      headers: {
-        Accept:
-          "application/json, text/plain, */*",
+    await fetch(
+      url,
+      {
+        method: "GET",
 
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36",
+        headers: {
+          Accept:
+            "application/json, text/plain, */*",
 
-        Referer:
-          MATCH_URL,
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36",
 
-        Origin:
-          "https://www.mackolik.com",
-      },
+          Referer:
+            MATCH_URL,
 
-      cache: "no-store",
-    });
+          Origin:
+            "https://www.mackolik.com",
+        },
+
+        cache: "no-store",
+      }
+    );
 
   const text =
     await response.text();
 
-  let json = null;
+  let json: unknown = null;
 
   try {
-    json = JSON.parse(text);
+    json =
+      JSON.parse(text);
   } catch {
     json = null;
   }
 
   return {
     url,
-    status: response.status,
-    ok: response.ok,
+    status:
+      response.status,
+    ok:
+      response.ok,
     contentType:
       response.headers.get(
         "content-type"
@@ -167,12 +227,12 @@ async function fetchJson(
 }
 
 export async function GET() {
-  const results = [];
+  const results: unknown[] = [];
 
   /*
-   * 1
-   * Maç sayfasının kendisini kontrol ediyoruz.
+   * 1 — MAÇ SAYFASI
    */
+
   try {
     const response =
       await fetch(
@@ -205,7 +265,9 @@ export async function GET() {
 
     const logoLike =
       foundUrls.filter(
-        (url) => {
+        (
+          url
+        ) => {
           const lower =
             url.toLowerCase();
 
@@ -213,59 +275,114 @@ export async function GET() {
             lower.includes("logo") ||
             lower.includes("team") ||
             lower.includes("club") ||
+            lower.includes("crest") ||
+            lower.includes("badge") ||
             lower.includes(".gif") ||
             lower.includes(".png") ||
-            lower.includes(".webp")
+            lower.includes(".webp") ||
+            lower.includes(".jpg")
           );
         }
       );
 
     results.push({
-      test: "match-page",
-      status: response.status,
-      ok: response.ok,
-      htmlLength: html.length,
-      logoLikeUrls:
-        [
-          ...new Set(
-            logoLike
-          ),
-        ],
-      });
+      test:
+        "match-page",
 
-  } catch (error) {
+      status:
+        response.status,
+
+      ok:
+        response.ok,
+
+      htmlLength:
+        html.length,
+
+      logoLikeUrls:
+        Array.from(
+          new Set(
+            logoLike
+          )
+        ),
+    });
+
+  } catch (
+    error
+  ) {
     results.push({
-      test: "match-page",
+      test:
+        "match-page",
+
       error:
-        error.message,
+        error instanceof Error
+          ? error.message
+          : String(error),
     });
   }
 
   /*
-   * 2
-   * Mevcut canlı skor endpoint'i.
+   * 2 — CANLI SKOR API
    */
+
   const endpoint =
     "https://www.mackolik.com/perform/p0/ajax/components/competition/livescores/json";
 
   try {
-    const url =
-      new URL(endpoint);
+    const now =
+      new Date();
 
-    url.searchParams.set(
-      "matchDate",
+    const dateParts =
       new Intl.DateTimeFormat(
         "en-CA",
         {
           timeZone:
             "Europe/Istanbul",
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
+
+          year:
+            "numeric",
+
+          month:
+            "2-digit",
+
+          day:
+            "2-digit",
         }
-      ).format(
-        new Date()
-      )
+      ).formatToParts(
+        now
+      );
+
+    const year =
+      dateParts.find(
+        (item) =>
+          item.type ===
+          "year"
+      )?.value;
+
+    const month =
+      dateParts.find(
+        (item) =>
+          item.type ===
+          "month"
+      )?.value;
+
+    const day =
+      dateParts.find(
+        (item) =>
+          item.type ===
+          "day"
+      )?.value;
+
+    const date =
+      `${year}-${month}-${day}`;
+
+    const url =
+      new URL(
+        endpoint
+      );
+
+    url.searchParams.set(
+      "matchDate",
+      date
     );
 
     url.searchParams.append(
@@ -281,32 +398,57 @@ export async function GET() {
     results.push({
       test:
         "livescores",
-      ...result,
+
+      url:
+        result.url,
+
+      status:
+        result.status,
+
+      ok:
+        result.ok,
+
+      contentType:
+        result.contentType,
+
       interestingKeys:
         findInterestingKeys(
           result.json
         ),
+
       urls:
         findUrls(
           result.json
         ),
+
+      data:
+        result.json,
     });
 
-  } catch (error) {
+  } catch (
+    error
+  ) {
     results.push({
       test:
         "livescores",
+
       error:
-        error.message,
+        error instanceof Error
+          ? error.message
+          : String(error),
     });
   }
 
   return NextResponse.json({
-    success: true,
+    success:
+      true,
 
     testMatch: {
-      id: MATCH_ID,
-      url: MATCH_URL,
+      id:
+        MATCH_ID,
+
+      url:
+        MATCH_URL,
     },
 
     message:
