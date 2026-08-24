@@ -607,7 +607,9 @@ export async function POST(request) {
 export async function DELETE(request) {
   try {
     const supabase = getSupabase();
-    const { searchParams } = new URL(request.url);
+    const { searchParams } = new URL(
+      request.url
+    );
 
     const predictionId =
       searchParams.get("id");
@@ -641,21 +643,18 @@ export async function DELETE(request) {
       );
     }
 
-    /*
-     * Sadece tahminin sahibi kendi tahminini silebilir.
-     */
     const {
       data: prediction,
       error: predictionError,
     } = await supabase
       .from("predictions")
-      .select(`
-        id,
-        user_id,
-        result,
-        points
-      `)
-      .eq("id", predictionId)
+      .select(
+        "id, user_id"
+      )
+      .eq(
+        "id",
+        predictionId
+      )
       .maybeSingle();
 
     if (predictionError) {
@@ -705,36 +704,23 @@ export async function DELETE(request) {
       );
     }
 
-    /*
-     * Sonucu belirlenmiş tahminler silinmez.
-     */
-    if (
-      prediction.result !== null &&
-      prediction.result !== undefined
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Sonucu belirlenmiş tahmin silinemez.",
-        },
-        {
-          status: 409,
-        }
-      );
-    }
-
     const {
       error: deleteError,
     } = await supabase
       .from("predictions")
       .delete()
-      .eq("id", predictionId)
-      .eq("user_id", userId);
+      .eq(
+        "id",
+        predictionId
+      )
+      .eq(
+        "user_id",
+        userId
+      );
 
     if (deleteError) {
       console.error(
-        "Prediction DELETE error:",
+        "Prediction delete error:",
         deleteError
       );
 
