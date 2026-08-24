@@ -1,818 +1,969 @@
- import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+"use client";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import ProfileCard from "../../components/ProfileCard";
+import Loading from "../../components/Loading";
 
-function getSupabase() {
-  const url =
-    process.env.NEXT_PUBLIC_SUPABASE_URL;
+export default function ProfilePage() {
+  const searchParams = useSearchParams();
 
-  const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const [user, setUser] = useState(null);
+  const [predictions, setPredictions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  if (!url || !key) {
-    throw new Error(
-      "Supabase environment variables are missing."
-    );
-  }
+  const [currentUser, setCurrentUser] =
+    useState(null);
 
-  return createClient(
-    url,
-    key,
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    }
-  );
-}
+  const [isFollowing, setIsFollowing] =
+    useState(false);
 
-/*
- * ==================================================
- * UUID KONTROLÜ
- * ==================================================
- */
+  const [followersCount, setFollowersCount] =
+    useState(0);
 
-function isValidUuid(value) {
-  if (
-    typeof value !==
-    "string"
-  ) {
-    return false;
-  }
+  const [followingCount, setFollowingCount] =
+    useState(0);
 
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    value.trim()
-  );
-}
+  const [followLoading, setFollowLoading] =
+    useState(false);
 
-/*
- * ==================================================
- * KULLANICI KONTROLÜ
- * ==================================================
- */
+  const profileUserId =
+    searchParams.get("user_id");
 
-async function userExists(
-  supabase,
-  userId
-) {
-  const {
-    data,
-    error,
-  } = await supabase
-    .from("users")
-    .select("id")
-    .eq(
-      "id",
-      userId
-    )
-    .maybeSingle();
+  /*
+   * ==================================================
+   * MEVCUT TELEGRAM KULLANICISINI BUL
+   * ==================================================
+   */
 
-  if (error) {
-    throw error;
-  }
+  useEffect(() => {
+    try {
+      const savedUser =
+        localStorage.getItem("tm_user");
 
-  return !!data;
-}
-
-/*
- * ==================================================
- * GET
- * ==================================================
- *
- * Kullanıcıların takip durumunu getirir.
- *
- * Kullanım:
- *
- * /api/follows?follower_id=UUID&following_id=UUID
- *
- * Dönen bilgiler:
- *
- * is_following
- * followers_count
- * following_count
- */
-
-export async function GET(
-  request
-) {
-  try {
-    const supabase =
-      getSupabase();
-
-    const {
-      searchParams,
-    } = new URL(
-      request.url
-    );
-
-    const followerId =
-      searchParams.get(
-        "follower_id"
-      );
-
-    const followingId =
-      searchParams.get(
-        "following_id"
-      );
-
-    /*
-     * --------------------------------------------------
-     * PARAMETRE KONTROLÜ
-     * --------------------------------------------------
-     */
-
-    if (
-      !followerId ||
-      !followingId
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "follower_id ve following_id gerekli.",
-        },
-        {
-          status: 400,
-        }
-      );
-    }
-
-    if (
-      !isValidUuid(
-        followerId
-      ) ||
-      !isValidUuid(
-        followingId
-      )
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Geçersiz kullanıcı ID.",
-        },
-        {
-          status: 400,
-        }
-      );
-    }
-
-    /*
-     * --------------------------------------------------
-     * KULLANICILARI KONTROL ET
-     * --------------------------------------------------
-     */
-
-    const followerExists =
-      await userExists(
-        supabase,
-        followerId
-      );
-
-    const followingExists =
-      await userExists(
-        supabase,
-        followingId
-      );
-
-    if (
-      !followerExists ||
-      !followingExists
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Kullanıcı bulunamadı.",
-        },
-        {
-          status: 404,
-        }
-      );
-    }
-
-    /*
-     * --------------------------------------------------
-     * TAKİP DURUMU
-     * --------------------------------------------------
-     */
-
-    const {
-      data: follow,
-      error: followError,
-    } = await supabase
-      .from("follows")
-      .select("id")
-      .eq(
-        "follower_id",
-        followerId
-      )
-      .eq(
-        "following_id",
-        followingId
-      )
-      .maybeSingle();
-
-    if (followError) {
-      console.error(
-        "Follow status error:",
-        followError
-      );
-
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            followError.message,
-        },
-        {
-          status: 500,
-        }
-      );
-    }
-
-    /*
-     * --------------------------------------------------
-     * TAKİPÇİ SAYISI
-     * --------------------------------------------------
-     */
-
-    const {
-      count:
-        followersCount,
-      error:
-        followersError,
-    } = await supabase
-      .from("follows")
-      .select(
-        "id",
-        {
-          count: "exact",
-          head: true,
-        }
-      )
-      .eq(
-        "following_id",
-        followingId
-      );
-
-    if (followersError) {
-      console.error(
-        "Followers count error:",
-        followersError
-      );
-
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            followersError.message,
-        },
-        {
-          status: 500,
-        }
-      );
-    }
-
-    /*
-     * --------------------------------------------------
-     * TAKİP EDİLEN SAYISI
-     * --------------------------------------------------
-     */
-
-    const {
-      count:
-        followingCount,
-      error:
-        followingError,
-    } = await supabase
-      .from("follows")
-      .select(
-        "id",
-        {
-          count: "exact",
-          head: true,
-        }
-      )
-      .eq(
-        "follower_id",
-        followingId
-      );
-
-    if (followingError) {
-      console.error(
-        "Following count error:",
-        followingError
-      );
-
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            followingError.message,
-        },
-        {
-          status: 500,
-        }
-      );
-    }
-
-    return NextResponse.json({
-      success: true,
-      is_following:
-        !!follow,
-      follow_id:
-        follow?.id ||
-        null,
-      followers_count:
-        followersCount ||
-        0,
-      following_count:
-        followingCount ||
-        0,
-    });
-  } catch (error) {
-    console.error(
-      "Follows GET server error:",
-      error
-    );
-
-    return NextResponse.json(
-      {
-        success: false,
-        error:
-          "Takip bilgileri alınırken bir sunucu hatası oluştu.",
-      },
-      {
-        status: 500,
+      if (!savedUser) {
+        return;
       }
-    );
-  }
-}
 
-/*
- * ==================================================
- * POST
- * ==================================================
- *
- * Kullanıcı takip eder.
- *
- * Body:
- *
- * {
- *   "follower_id": "UUID",
- *   "following_id": "UUID"
- * }
- */
+      const parsedUser =
+        JSON.parse(savedUser);
 
-export async function POST(
-  request
-) {
-  try {
-    const body =
-      await request.json();
-
-    const followerId =
-      body?.follower_id;
-
-    const followingId =
-      body?.following_id;
-
-    /*
-     * --------------------------------------------------
-     * PARAMETRE KONTROLÜ
-     * --------------------------------------------------
-     */
-
-    if (
-      !followerId ||
-      !followingId
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "follower_id ve following_id gerekli.",
-        },
-        {
-          status: 400,
-        }
-      );
-    }
-
-    if (
-      !isValidUuid(
-        followerId
-      ) ||
-      !isValidUuid(
-        followingId
-      )
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Geçersiz kullanıcı ID.",
-        },
-        {
-          status: 400,
-        }
-      );
-    }
-
-    /*
-     * --------------------------------------------------
-     * KENDİNİ TAKİP ETME
-     * --------------------------------------------------
-     */
-
-    if (
-      followerId ===
-      followingId
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Kendinizi takip edemezsiniz.",
-        },
-        {
-          status: 400,
-        }
-      );
-    }
-
-    const supabase =
-      getSupabase();
-
-    /*
-     * --------------------------------------------------
-     * KULLANICI KONTROLÜ
-     * --------------------------------------------------
-     */
-
-    const followerExists =
-      await userExists(
-        supabase,
-        followerId
-      );
-
-    if (
-      !followerExists
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Takip eden kullanıcı bulunamadı.",
-        },
-        {
-          status: 404,
-        }
-      );
-    }
-
-    const followingExists =
-      await userExists(
-        supabase,
-        followingId
-      );
-
-    if (
-      !followingExists
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Takip edilecek kullanıcı bulunamadı.",
-        },
-        {
-          status: 404,
-        }
-      );
-    }
-
-    /*
-     * --------------------------------------------------
-     * ZATEN TAKİP EDİLİYOR MU?
-     * --------------------------------------------------
-     */
-
-    const {
-      data: existingFollow,
-      error:
-        existingFollowError,
-    } = await supabase
-      .from("follows")
-      .select("id")
-      .eq(
-        "follower_id",
-        followerId
-      )
-      .eq(
-        "following_id",
-        followingId
-      )
-      .maybeSingle();
-
-    if (
-      existingFollowError
-    ) {
+      if (parsedUser?.id) {
+        setCurrentUser(parsedUser);
+      }
+    } catch (error) {
       console.error(
-        "Existing follow lookup error:",
-        existingFollowError
-      );
-
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            existingFollowError.message,
-        },
-        {
-          status: 500,
-        }
+        "Current user lookup error:",
+        error
       );
     }
+  }, []);
 
-    if (
-      existingFollow
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Bu kullanıcıyı zaten takip ediyorsunuz.",
-          follow_id:
-            existingFollow.id,
-        },
-        {
-          status: 409,
-        }
-      );
-    }
+  /*
+   * ==================================================
+   * PROFİLİ YÜKLE
+   * ==================================================
+   */
 
-    /*
-     * --------------------------------------------------
-     * TAKİP KAYDI OLUŞTUR
-     * --------------------------------------------------
-     */
+  useEffect(() => {
+    async function loadProfile() {
+      try {
+        setLoading(true);
+        setError("");
+        setUser(null);
+        setPredictions([]);
 
-    const {
-      data,
-      error,
-    } = await supabase
-      .from("follows")
-      .insert({
-        follower_id:
-          followerId,
+        let profileUser = null;
 
-        following_id:
-          followingId,
-      })
-      .select(
-        `
-          id,
-          follower_id,
-          following_id,
-          created_at
-        `
-      )
-      .single();
+        if (profileUserId) {
+          const response = await fetch(
+            `/api/users/${encodeURIComponent(
+              profileUserId
+            )}`,
+            {
+              cache: "no-store",
+            }
+          );
 
-    if (error) {
-      /*
-       * UNIQUE constraint nedeniyle
-       * aynı anda ikinci istek geldiyse
-       * bunu da düzgün şekilde yakala.
-       */
+          const result =
+            await response.json();
 
-      if (
-        error.code ===
-        "23505"
-      ) {
-        return NextResponse.json(
-          {
-            success: false,
-            error:
-              "Bu kullanıcıyı zaten takip ediyorsunuz.",
-          },
-          {
-            status: 409,
+          if (
+            !response.ok ||
+            !result.success
+          ) {
+            throw new Error(
+              result.error ||
+                "Kullanıcı profili alınamadı."
+            );
           }
+
+          profileUser =
+            result.user;
+        } else {
+          const savedUser =
+            localStorage.getItem(
+              "tm_user"
+            );
+
+          if (!savedUser) {
+            setLoading(false);
+            return;
+          }
+
+          const parsedUser =
+            JSON.parse(savedUser);
+
+          if (!parsedUser?.id) {
+            setLoading(false);
+            return;
+          }
+
+          profileUser =
+            parsedUser;
+        }
+
+        setUser(profileUser);
+
+        /*
+         * --------------------------------------------------
+         * TAHMİNLERİ YÜKLE
+         * --------------------------------------------------
+         */
+
+        const response =
+          await fetch(
+            `/api/predictions?user_id=${encodeURIComponent(
+              profileUser.id
+            )}`,
+            {
+              cache: "no-store",
+            }
+          );
+
+        const result =
+          await response.json();
+
+        if (
+          response.ok &&
+          result.success
+        ) {
+          setPredictions(
+            result.predictions || []
+          );
+        }
+      } catch (error) {
+        console.error(
+          "Profile loading error:",
+          error
+        );
+
+        setError(
+          error.message ||
+            "Profil yüklenirken bir hata oluştu."
+        );
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadProfile();
+  }, [profileUserId]);
+
+  /*
+   * ==================================================
+   * TAKİP BİLGİLERİNİ YÜKLE
+   * ==================================================
+   */
+
+  useEffect(() => {
+    async function loadFollowStatus() {
+      if (
+        !user?.id ||
+        !currentUser?.id
+      ) {
+        setIsFollowing(false);
+        setFollowersCount(0);
+        setFollowingCount(0);
+        return;
+      }
+
+      try {
+        const response =
+          await fetch(
+            `/api/follows?follower_id=${encodeURIComponent(
+              currentUser.id
+            )}&following_id=${encodeURIComponent(
+              user.id
+            )}`,
+            {
+              cache: "no-store",
+            }
+          );
+
+        const result =
+          await response.json();
+
+        if (
+          !response.ok ||
+          !result.success
+        ) {
+          throw new Error(
+            result.error ||
+              "Takip bilgileri alınamadı."
+          );
+        }
+
+        setIsFollowing(
+          !!result.is_following
+        );
+
+        setFollowersCount(
+          Number(
+            result.followers_count
+          ) || 0
+        );
+
+        setFollowingCount(
+          Number(
+            result.following_count
+          ) || 0
+        );
+      } catch (error) {
+        console.error(
+          "Follow status loading error:",
+          error
         );
       }
+    }
 
+    loadFollowStatus();
+  }, [
+    user?.id,
+    currentUser?.id,
+  ]);
+
+  /*
+   * ==================================================
+   * TAKİP ET / TAKİBİ BIRAK
+   * ==================================================
+   */
+
+  async function handleFollowToggle() {
+    if (
+      followLoading ||
+      !currentUser?.id ||
+      !user?.id
+    ) {
+      return;
+    }
+
+    if (
+      currentUser.id ===
+      user.id
+    ) {
+      return;
+    }
+
+    try {
+      setFollowLoading(true);
+
+      if (isFollowing) {
+        const response =
+          await fetch(
+            `/api/follows?follower_id=${encodeURIComponent(
+              currentUser.id
+            )}&following_id=${encodeURIComponent(
+              user.id
+            )}`,
+            {
+              method: "DELETE",
+              cache: "no-store",
+            }
+          );
+
+        const result =
+          await response.json();
+
+        if (
+          !response.ok ||
+          !result.success
+        ) {
+          throw new Error(
+            result.error ||
+              "Takip bırakılamadı."
+          );
+        }
+
+        setIsFollowing(false);
+
+        setFollowersCount(
+          (value) =>
+            Math.max(
+              0,
+              value - 1
+            )
+        );
+      } else {
+        const response =
+          await fetch(
+            "/api/follows",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+              body: JSON.stringify({
+                follower_id:
+                  currentUser.id,
+                following_id:
+                  user.id,
+              }),
+              cache: "no-store",
+            }
+          );
+
+        const result =
+          await response.json();
+
+        if (
+          !response.ok ||
+          !result.success
+        ) {
+          throw new Error(
+            result.error ||
+              "Takip edilemedi."
+          );
+        }
+
+        setIsFollowing(true);
+
+        setFollowersCount(
+          (value) =>
+            value + 1
+        );
+      }
+    } catch (error) {
       console.error(
-        "Follow INSERT error:",
+        "Follow toggle error:",
         error
       );
 
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            error.message,
-        },
-        {
-          status: 500,
-        }
+      alert(
+        error.message ||
+          "Takip işlemi gerçekleştirilemedi."
       );
+    } finally {
+      setFollowLoading(false);
     }
+  }
 
-    return NextResponse.json(
-      {
-        success: true,
-        following: true,
-        follow: data,
-      },
-      {
-        status: 201,
-      }
-    );
-  } catch (error) {
-    console.error(
-      "Follows POST server error:",
-      error
-    );
+  if (loading) {
+    return <Loading />;
+  }
 
-    return NextResponse.json(
-      {
-        success: false,
-        error:
-          "Takip işlemi sırasında bir sunucu hatası oluştu.",
-      },
-      {
-        status: 500,
-      }
+  if (error) {
+    return (
+      <main
+        className="page"
+        style={{
+          width: "100%",
+          maxWidth: "100%",
+          minWidth: 0,
+          overflowX: "hidden",
+          boxSizing: "border-box",
+          paddingBottom: "100px",
+        }}
+      >
+        <div
+          className="page-container"
+          style={{
+            width: "100%",
+            maxWidth: "100%",
+            minWidth: 0,
+            boxSizing: "border-box",
+          }}
+        >
+          <div className="error-box">
+            <h2>
+              Bir sorun oluştu
+            </h2>
+
+            <p>{error}</p>
+
+            <Link
+              href="/"
+              className="primary-button"
+            >
+              Ana Sayfaya Dön
+            </Link>
+          </div>
+        </div>
+      </main>
     );
   }
-}
 
-/*
- * ==================================================
- * DELETE
- * ==================================================
- *
- * Takibi bırakır.
- *
- * Kullanım:
- *
- * /api/follows?follower_id=UUID&following_id=UUID
- */
+  if (!user) {
+    return (
+      <main
+        className="page"
+        style={{
+          width: "100%",
+          maxWidth: "100%",
+          minWidth: 0,
+          overflowX: "hidden",
+          boxSizing: "border-box",
+          paddingBottom: "100px",
+        }}
+      >
+        <div
+          className="page-container"
+          style={{
+            width: "100%",
+            maxWidth: "100%",
+            minWidth: 0,
+            boxSizing: "border-box",
+          }}
+        >
+          <div className="empty-state profile-empty">
+            <div className="empty-icon">
+              👤
+            </div>
 
-export async function DELETE(
-  request
-) {
-  try {
-    const supabase =
-      getSupabase();
+            <h1>Profil</h1>
 
-    const {
-      searchParams,
-    } = new URL(
-      request.url
-    );
+            <p>
+              Profil bilgilerini görmek için
+              Telegram üzerinden uygulamayı
+              açmalısın.
+            </p>
 
-    const followerId =
-      searchParams.get(
-        "follower_id"
-      );
-
-    const followingId =
-      searchParams.get(
-        "following_id"
-      );
-
-    /*
-     * --------------------------------------------------
-     * PARAMETRE KONTROLÜ
-     * --------------------------------------------------
-     */
-
-    if (
-      !followerId ||
-      !followingId
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "follower_id ve following_id gerekli.",
-        },
-        {
-          status: 400,
-        }
-      );
-    }
-
-    if (
-      !isValidUuid(
-        followerId
-      ) ||
-      !isValidUuid(
-        followingId
-      )
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Geçersiz kullanıcı ID.",
-        },
-        {
-          status: 400,
-        }
-      );
-    }
-
-    /*
-     * --------------------------------------------------
-     * TAKİP KAYDINI SİL
-     * --------------------------------------------------
-     */
-
-    const {
-      data,
-      error,
-    } = await supabase
-      .from("follows")
-      .delete()
-      .eq(
-        "follower_id",
-        followerId
-      )
-      .eq(
-        "following_id",
-        followingId
-      )
-      .select(
-        `
-          id,
-          follower_id,
-          following_id,
-          created_at
-        `
-      );
-
-    if (error) {
-      console.error(
-        "Follow DELETE error:",
-        error
-      );
-
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            error.message,
-        },
-        {
-          status: 500,
-        }
-      );
-    }
-
-    if (
-      !data ||
-      data.length === 0
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Bu kullanıcıyı zaten takip etmiyorsunuz.",
-        },
-        {
-          status: 404,
-        }
-      );
-    }
-
-    return NextResponse.json({
-      success: true,
-      following: false,
-      follow: data[0],
-    });
-  } catch (error) {
-    console.error(
-      "Follows DELETE server error:",
-      error
-    );
-
-    return NextResponse.json(
-      {
-        success: false,
-        error:
-          "Takip bırakma sırasında bir sunucu hatası oluştu.",
-      },
-      {
-        status: 500,
-      }
+            <Link
+              href="/"
+              className="primary-button"
+            >
+              Ana Sayfaya Dön
+            </Link>
+          </div>
+        </div>
+      </main>
     );
   }
+
+  /*
+   * ==================================================
+   * PROFİL İSTATİSTİKLERİ
+   * ==================================================
+   */
+
+  const totalPredictions =
+    predictions.length;
+
+  const correctPredictions =
+    predictions.filter(
+      (item) =>
+        item.result ===
+        "correct"
+    ).length;
+
+  const wrongPredictions =
+    predictions.filter(
+      (item) =>
+        item.result ===
+        "wrong"
+    ).length;
+
+  const pendingPredictions =
+    predictions.filter(
+      (item) =>
+        !item.result ||
+        item.result ===
+          "pending"
+    ).length;
+
+  const completedPredictions =
+    correctPredictions +
+    wrongPredictions;
+
+  const successRate =
+    completedPredictions > 0
+      ? Math.round(
+          (correctPredictions /
+            completedPredictions) *
+            100
+        )
+      : 0;
+
+  const totalPoints =
+    predictions.reduce(
+      (total, item) =>
+        total +
+        (Number(item.points) || 0),
+      0
+    );
+
+  const isOwnProfile =
+    currentUser?.id &&
+    user?.id &&
+    String(
+      currentUser.id
+    ) ===
+      String(user.id);
+
+  return (
+    <main
+      className="page"
+      style={{
+        width: "100%",
+        maxWidth: "100%",
+        minWidth: 0,
+        overflowX: "hidden",
+        boxSizing: "border-box",
+        paddingBottom: "100px",
+      }}
+    >
+      <div
+        className="page-container"
+        style={{
+          width: "100%",
+          maxWidth: "100%",
+          minWidth: 0,
+          boxSizing: "border-box",
+          overflowX: "hidden",
+        }}
+      >
+        <ProfileCard user={user} />
+
+        /*
+         * Takip butonu ve takip sayıları
+         */
+        {!isOwnProfile &&
+        currentUser?.id ? (
+          <section
+            style={{
+              width: "100%",
+              maxWidth: "100%",
+              minWidth: 0,
+              marginTop: "12px",
+              marginBottom: "12px",
+              boxSizing: "border-box",
+            }}
+          >
+            <button
+              type="button"
+              onClick={
+                handleFollowToggle
+              }
+              disabled={
+                followLoading
+              }
+              style={{
+                width: "100%",
+                minHeight: "42px",
+                border:
+                  isFollowing
+                    ? "1px solid var(--border)"
+                    : "1px solid var(--primary)",
+                borderRadius: "10px",
+                background:
+                  isFollowing
+                    ? "var(--surface-soft)"
+                    : "var(--primary)",
+                color:
+                  isFollowing
+                    ? "var(--text)"
+                    : "#fff",
+                fontSize: "13px",
+                fontWeight: 800,
+                cursor:
+                  followLoading
+                    ? "not-allowed"
+                    : "pointer",
+                opacity:
+                  followLoading
+                    ? 0.6
+                    : 1,
+                boxSizing:
+                  "border-box",
+              }}
+            >
+              {followLoading
+                ? "İşleniyor..."
+                : isFollowing
+                  ? "✓ Takiptesin"
+                  : "+ Takip Et"}
+            </button>
+          </section>
+        ) : null}
+
+        <section
+          className="profile-stats"
+          style={{
+            width: "100%",
+            maxWidth: "100%",
+            minWidth: 0,
+          }}
+        >
+          <div className="stat-card">
+            <strong>
+              {totalPredictions}
+            </strong>
+
+            <span>
+              Toplam Tahmin
+            </span>
+          </div>
+
+          <div className="stat-card">
+            <strong>
+              {successRate}%
+            </strong>
+
+            <span>
+              Başarı Oranı
+            </span>
+          </div>
+
+          <div className="stat-card">
+            <strong>
+              {totalPoints}
+            </strong>
+
+            <span>
+              Puan
+            </span>
+          </div>
+        </section>
+
+        <section
+          style={{
+            display: "grid",
+            gridTemplateColumns:
+              "1fr 1fr",
+            gap: "10px",
+            width: "100%",
+            maxWidth: "100%",
+            minWidth: 0,
+            marginTop: "10px",
+            marginBottom: "14px",
+            boxSizing: "border-box",
+          }}
+        >
+          <div
+            className="stat-card"
+            style={{
+              minWidth: 0,
+              boxSizing: "border-box",
+            }}
+          >
+            <strong>
+              {followersCount}
+            </strong>
+
+            <span>
+              Takipçi
+            </span>
+          </div>
+
+          <div
+            className="stat-card"
+            style={{
+              minWidth: 0,
+              boxSizing: "border-box",
+            }}
+          >
+            <strong>
+              {followingCount}
+            </strong>
+
+            <span>
+              Takip
+            </span>
+          </div>
+        </section>
+
+        <section
+          className="section-card"
+          style={{
+            width: "100%",
+            maxWidth: "100%",
+            minWidth: 0,
+            boxSizing: "border-box",
+            overflow: "hidden",
+          }}
+        >
+          <div className="section-title">
+            <h2>
+              Tahminlerim
+            </h2>
+
+            <p>
+              Daha önce yaptığı tahminler.
+            </p>
+          </div>
+
+          {predictions.length === 0 ? (
+            <div className="empty-state small">
+              <div className="empty-icon">
+                🎯
+              </div>
+
+              <h3>
+                Henüz tahmin yok
+              </h3>
+
+              <p>
+                Bu kullanıcının henüz
+                yaptığı bir tahmin bulunmuyor.
+              </p>
+            </div>
+          ) : (
+            <div
+              className="my-predictions"
+              style={{
+                width: "100%",
+                maxWidth: "100%",
+                minWidth: 0,
+                boxSizing: "border-box",
+                overflow: "hidden",
+              }}
+            >
+              {predictions.map(
+                (item) => {
+                  const match =
+                    item.matches;
+
+                  const matchName =
+                    match
+                      ? `${match.home_team} - ${match.away_team}`
+                      : "Maç bilgisi yok";
+
+                  const predictionLabel =
+                    item.prediction ===
+                    "MS1"
+                      ? "MS 1"
+                      : item.prediction ===
+                        "MSX"
+                        ? "MS X"
+                        : item.prediction ===
+                          "MS2"
+                          ? "MS 2"
+                          : item.prediction;
+
+                  const date =
+                    item.created_at
+                      ? new Date(
+                          item.created_at
+                        ).toLocaleDateString(
+                          "tr-TR"
+                        )
+                      : "";
+
+                  const resultLabel =
+                    item.result ===
+                    "correct"
+                      ? "✓ Doğru"
+                      : item.result ===
+                        "wrong"
+                        ? "✕ Yanlış"
+                        : "⏳ Bekliyor";
+
+                  const points =
+                    Number(
+                      item.points
+                    ) || 0;
+
+                  const content = (
+                    <div
+                      className="my-prediction-item"
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        width: "100%",
+                        maxWidth: "100%",
+                        minWidth: 0,
+                        boxSizing: "border-box",
+                        overflow: "hidden",
+                      }}
+                    >
+                      <div
+                        className="my-prediction-info"
+                        style={{
+                          flex: "1 1 auto",
+                          width: 0,
+                          minWidth: 0,
+                          maxWidth: "100%",
+                          boxSizing: "border-box",
+                          overflow: "hidden",
+                        }}
+                      >
+                        <strong
+                          style={{
+                            display: "block",
+                            width: "100%",
+                            maxWidth: "100%",
+                            minWidth: 0,
+                            overflow: "hidden",
+                            textOverflow:
+                              "ellipsis",
+                            whiteSpace:
+                              "nowrap",
+                            boxSizing:
+                              "border-box",
+                          }}
+                        >
+                          {matchName}
+                        </strong>
+
+                        <span
+                          style={{
+                            display: "block",
+                            width: "100%",
+                            maxWidth: "100%",
+                            minWidth: 0,
+                            overflow: "hidden",
+                            textOverflow:
+                              "ellipsis",
+                            whiteSpace:
+                              "nowrap",
+                          }}
+                        >
+                          {match?.league ||
+                            "Futbol"}
+                        </span>
+
+                        <small>
+                          {date}
+                        </small>
+                      </div>
+
+                      <div
+                        className="my-prediction-value"
+                        style={{
+                          flex:
+                            "0 0 auto",
+                          width: "78px",
+                          minWidth: "78px",
+                          maxWidth: "78px",
+                          boxSizing:
+                            "border-box",
+                          overflow:
+                            "hidden",
+                          textAlign:
+                            "center",
+                          display: "flex",
+                          flexDirection:
+                            "column",
+                          alignItems:
+                            "center",
+                          justifyContent:
+                            "center",
+                        }}
+                      >
+                        <strong
+                          style={{
+                            display:
+                              "block",
+                            maxWidth:
+                              "100%",
+                            overflow:
+                              "hidden",
+                            textOverflow:
+                              "ellipsis",
+                            whiteSpace:
+                              "nowrap",
+                          }}
+                        >
+                          {
+                            predictionLabel
+                          }
+                        </strong>
+
+                        <small
+                          style={{
+                            display:
+                              "block",
+                            maxWidth:
+                              "100%",
+                            overflow:
+                              "hidden",
+                            textOverflow:
+                              "ellipsis",
+                            whiteSpace:
+                              "nowrap",
+                          }}
+                        >
+                          {resultLabel}
+                        </small>
+
+                        <small
+                          style={{
+                            display:
+                              "block",
+                            maxWidth:
+                              "100%",
+                            overflow:
+                              "hidden",
+                            textOverflow:
+                              "ellipsis",
+                            whiteSpace:
+                              "nowrap",
+                          }}
+                        >
+                          +{points} puan
+                        </small>
+                      </div>
+                    </div>
+                  );
+
+                  if (match?.id) {
+                    return (
+                      <Link
+                        key={item.id}
+                        href={`/mac/${match.id}`}
+                        style={{
+                          display: "block",
+                          width: "100%",
+                          maxWidth: "100%",
+                          minWidth: 0,
+                          boxSizing:
+                            "border-box",
+                          overflow:
+                            "hidden",
+                          textDecoration:
+                            "none",
+                        }}
+                      >
+                        {content}
+                      </Link>
+                    );
+                  }
+
+                  return (
+                    <div
+                      key={item.id}
+                      style={{
+                        width: "100%",
+                        maxWidth: "100%",
+                        minWidth: 0,
+                        boxSizing:
+                          "border-box",
+                        overflow:
+                          "hidden",
+                      }}
+                    >
+                      {content}
+                    </div>
+                  );
+                }
+              )}
+            </div>
+          )}
+        </section>
+      </div>
+    </main>
+  );
 }
