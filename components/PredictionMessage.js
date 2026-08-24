@@ -75,21 +75,44 @@ export default function PredictionMessage({
       return;
     }
 
+    /*
+     * Tahmini yapan kullanıcının Telegram ID'sini gönderiyoruz.
+     *
+     * API tarafı bu Telegram ID'yi Supabase users.id
+     * ile eşleştirerek gerçek kullanıcıyı buluyor.
+     */
+    const telegramUserId =
+      user?.telegram_id;
+
+    if (!telegramUserId) {
+      alert(
+        "Kullanıcı bilgisi bulunamadı."
+      );
+      return;
+    }
+
     try {
       setDeleting(true);
 
       const response = await fetch(
         `/api/predictions?id=${encodeURIComponent(
           prediction.id
+        )}&user_id=${encodeURIComponent(
+          telegramUserId
         )}`,
         {
           method: "DELETE",
+          cache: "no-store",
         }
       );
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
-      if (!response.ok || !data.success) {
+      if (
+        !response.ok ||
+        !data.success
+      ) {
         throw new Error(
           data?.error ||
             "Tahmin silinemedi."
