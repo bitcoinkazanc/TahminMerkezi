@@ -85,6 +85,77 @@ async function findMatch(supabase, matchId) {
   return uuidMatch || null;
 }
 
+async function findUser(supabase, userId) {
+  if (!userId) {
+    return null;
+  }
+
+  const requestedId = String(userId).trim();
+
+  if (!requestedId) {
+    return null;
+  }
+
+  /*
+   * 1. Önce Supabase users.id UUID olarak kontrol et.
+   */
+  const {
+    data: userById,
+    error: userByIdError,
+  } = await supabase
+    .from("users")
+    .select("id, telegram_id")
+    .eq("id", requestedId)
+    .maybeSingle();
+
+  if (userByIdError) {
+    if (
+      userByIdError.code !== "22P02" &&
+      !userByIdError.message?.includes(
+        "invalid input syntax for type uuid"
+      )
+    ) {
+      console.error(
+        "User UUID lookup error:",
+        userByIdError
+      );
+
+      throw userByIdError;
+    }
+  }
+
+  if (userById) {
+    return userById;
+  }
+
+  /*
+   * 2. Eğer gelen değer Telegram ID ise
+   * users.telegram_id üzerinden bul.
+   */
+  const {
+    data: userByTelegramId,
+    error: telegramError,
+  } = await supabase
+    .from("users")
+    .select("id, telegram_id")
+    .eq(
+      "telegram_id",
+      requestedId
+    )
+    .maybeSingle();
+
+  if (telegramError) {
+    console.error(
+      "User Telegram ID lookup error:",
+      telegramError
+    );
+
+    throw telegramError;
+  }
+
+  return userByTelegramId || null;
+}
+
 export async function GET(request) {
   try {
     const supabase = getSupabase();
@@ -149,9 +220,21 @@ export async function GET(request) {
     }
 
     if (userId) {
+      const user = await findUser(
+        supabase,
+        userId
+      );
+
+      if (!user) {
+        return NextResponse.json({
+          success: true,
+          predictions: [],
+        });
+      }
+
       query = query.eq(
         "user_id",
-        userId
+        user.id
       );
     }
 
@@ -383,32 +466,10 @@ export async function POST(request) {
     const supabase =
       getSupabase();
 
-    const {
-      data: user,
-      error: userError,
-    } = await supabase
-      .from("users")
-      .select("id")
-      .eq("id", userId)
-      .maybeSingle();
-
-    if (userError) {
-      console.error(
-        "Prediction user lookup error:",
-        userError
-      );
-
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            userError.message,
-        },
-        {
-          status: 500,
-        }
-      );
-    }
+    const user = await findUser(
+      supabase,
+      userId
+    );
 
     if (!user) {
       return NextResponse.json(
@@ -423,31 +484,10 @@ export async function POST(request) {
       );
     }
 
-    let match;
-
-    try {
-      match = await findMatch(
-        supabase,
-        matchId
-      );
-    } catch (matchLookupError) {
-      console.error(
-        "Prediction match lookup error:",
-        matchLookupError
-      );
-
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            matchLookupError.message ||
-            "Maç kontrol edilemedi.",
-        },
-        {
-          status: 500,
-        }
-      );
-    }
+    const match = await findMatch(
+      supabase,
+      matchId
+    );
 
     if (!match) {
       return NextResponse.json(
@@ -472,7 +512,7 @@ export async function POST(request) {
       .select("id")
       .eq(
         "user_id",
-        userId
+        user.id
       )
       .eq(
         "match_id",
@@ -517,7 +557,7 @@ export async function POST(request) {
     } = await supabase
       .from("predictions")
       .insert({
-        user_id: userId,
+        user_id: user.id,
         match_id: match.id,
         prediction,
         confidence:
@@ -643,6 +683,28 @@ export async function DELETE(request) {
       );
     }
 
+    /*
+     * Gelen user_id ister Supabase UUID
+     * ister Telegram ID olsun gerçek kullanıcıyı bul.
+     */
+    const user = await findUser(
+      supabase,
+      userId
+    );
+
+    if (!user) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Kullanıcı bulunamadı.",
+        },
+        {
+          status: 404,
+        }
+      );
+    }
+
     const {
       data: prediction,
       error: predictionError,
@@ -688,9 +750,13 @@ export async function DELETE(request) {
       );
     }
 
+    /*
+     * Tahminin sahibi ile isteği yapan
+     * gerçek Supabase kullanıcı UUID'sini karşılaştır.
+     */
     if (
       String(prediction.user_id) !==
-      String(userId)
+      String(user.id)
     ) {
       return NextResponse.json(
         {
@@ -705,6 +771,7 @@ export async function DELETE(request) {
     }
 
     const {
+      data: deletedPrediction,
       error: deleteError,
     } = await supabase
       .from("predictions")
@@ -715,8 +782,10 @@ export async function DELETE(request) {
       )
       .eq(
         "user_id",
-        userId
-      );
+        user.id
+      )
+      .select("id")
+      .maybeSingle();
 
     if (deleteError) {
       console.error(
@@ -729,6 +798,19 @@ export async function DELETE(request) {
           success: false,
           error:
             deleteError.message,
+        },
+        {
+          status: 500,
+        }
+      );
+    }
+
+    if (!deletedPrediction) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Tahmin silinemedi.",
         },
         {
           status: 500,
