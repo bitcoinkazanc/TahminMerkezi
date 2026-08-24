@@ -44,6 +44,21 @@ export default function MatchList({
     },
   ];
 
+  /*
+   * ==================================================
+   * MACKOLIK ARAMA
+   * ==================================================
+   *
+   * Arama kutusuna yazıldığında:
+   *
+   * /api/matches?search=Fas
+   *
+   * şeklinde API çağrılır.
+   *
+   * API tarafı bugün + son 3 gün içindeki
+   * Mackolik maçlarını tarar.
+   */
+
   useEffect(() => {
     if (!enableFilters) {
       return;
@@ -79,6 +94,7 @@ export default function MatchList({
               await fetch(
                 `/api/matches?${params.toString()}`,
                 {
+                  method: "GET",
                   cache: "no-store",
                   signal:
                     controller.signal,
@@ -137,15 +153,34 @@ export default function MatchList({
     enableFilters,
   ]);
 
+  /*
+   * ==================================================
+   * KAYNAK MAÇLAR
+   * ==================================================
+   *
+   * Arama varsa API'den gelen sonuçlar,
+   * arama yoksa normal maç listesi kullanılır.
+   */
+
   const sourceMatches =
     search.trim()
       ? searchResults
-      : matches;
+      : Array.isArray(matches)
+        ? matches
+        : [];
+
+  /*
+   * ==================================================
+   * FİLTRELEME
+   * ==================================================
+   */
 
   const filteredMatches =
     useMemo(() => {
       if (!enableFilters) {
-        return matches;
+        return Array.isArray(matches)
+          ? matches
+          : [];
       }
 
       return sourceMatches.filter(
@@ -172,33 +207,279 @@ export default function MatchList({
       statusFilter,
     ]);
 
+  /*
+   * ==================================================
+   * FİLTRELERİ TEMİZLE
+   * ==================================================
+   */
+
   function clearFilters() {
     setStatusFilter("all");
     setSearch("");
     setSearchResults([]);
+    setSearchLoading(false);
   }
+
+  /*
+   * ==================================================
+   * BOŞ DURUM
+   * ==================================================
+   *
+   * ÖNEMLİ:
+   *
+   * Arama aktifse matches boş olsa bile
+   * burada çıkış yapılmaz.
+   *
+   * Böylece kullanıcı "Fas" yazabilir.
+   */
 
   if (
     !Array.isArray(matches) ||
     matches.length === 0
   ) {
-    return (
-      <div className="empty-state small">
-        <div className="empty-icon">
-          ⚽
-        </div>
+    if (
+      enableFilters &&
+      search.trim()
+    ) {
+      // Arama devam eder.
+    } else if (
+      enableFilters
+    ) {
+      return (
+        <>
+          <div
+            style={{
+              border:
+                "1px solid var(--border)",
+              borderRadius:
+                "12px",
+              padding:
+                "10px",
+              marginBottom:
+                "12px",
+              background:
+                "var(--surface-soft)",
+            }}
+          >
+            {/* DURUM FİLTRELERİ */}
 
-        <h3>
-          Maç bulunamadı
-        </h3>
+            <div
+              style={{
+                display:
+                  "flex",
+                gap: "6px",
+                overflowX:
+                  "auto",
+                paddingBottom:
+                  "8px",
+                marginBottom:
+                  "9px",
+                scrollbarWidth:
+                  "thin",
+              }}
+            >
+              {filterCategories.map(
+                (category) => {
+                  const active =
+                    statusFilter ===
+                    category.id;
 
-        <p>
-          Şu anda gösterilecek bir maç
-          bulunmuyor.
-        </p>
-      </div>
-    );
+                  return (
+                    <button
+                      key={
+                        category.id
+                      }
+                      type="button"
+                      onClick={() =>
+                        setStatusFilter(
+                          category.id
+                        )
+                      }
+                      style={{
+                        flexShrink:
+                          0,
+                        border:
+                          active
+                            ? "1px solid var(--primary)"
+                            : "1px solid var(--border)",
+                        borderRadius:
+                          "8px",
+                        background:
+                          active
+                            ? "var(--primary)"
+                            : "var(--surface)",
+                        color:
+                          active
+                            ? "#fff"
+                            : "var(--text)",
+                        padding:
+                          "7px 10px",
+                        fontSize:
+                          "10px",
+                        fontWeight:
+                          800,
+                        cursor:
+                          "pointer",
+                        boxShadow:
+                          active
+                            ? "0 2px 7px rgba(0,0,0,0.12)"
+                            : "none",
+                      }}
+                    >
+                      {
+                        category.label
+                      }
+                    </button>
+                  );
+                }
+              )}
+            </div>
+
+            {/* ARAMA */}
+
+            <div
+              style={{
+                position:
+                  "relative",
+                display:
+                  "flex",
+                alignItems:
+                  "center",
+                gap:
+                  "6px",
+              }}
+            >
+              <div
+                style={{
+                  position:
+                    "relative",
+                  flex:
+                    1,
+                  minWidth:
+                    0,
+                }}
+              >
+                <span
+                  style={{
+                    position:
+                      "absolute",
+                    left:
+                      "10px",
+                    top:
+                      "50%",
+                    transform:
+                      "translateY(-50%)",
+                    fontSize:
+                      "12px",
+                    pointerEvents:
+                      "none",
+                    opacity:
+                      0.7,
+                  }}
+                >
+                  🔎
+                </span>
+
+                <input
+                  type="text"
+                  value={
+                    search
+                  }
+                  onChange={(
+                    event
+                  ) =>
+                    setSearch(
+                      event
+                        .target
+                        .value
+                    )
+                  }
+                  placeholder="Takım veya lig ara..."
+                  style={{
+                    width:
+                      "100%",
+                    minWidth:
+                      0,
+                    height:
+                      "36px",
+                    boxSizing:
+                      "border-box",
+                    padding:
+                      "7px 30px 7px 29px",
+                    border:
+                      "1px solid var(--border)",
+                    borderRadius:
+                      "9px",
+                    background:
+                      "var(--surface)",
+                    color:
+                      "var(--text)",
+                    outline:
+                      "none",
+                    fontSize:
+                      "11px",
+                    fontWeight:
+                      600,
+                  }}
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={
+                  clearFilters
+                }
+                style={{
+                  flexShrink:
+                    0,
+                  height:
+                    "36px",
+                  padding:
+                    "0 10px",
+                  border:
+                    "1px solid var(--border)",
+                  borderRadius:
+                    "9px",
+                  background:
+                    "var(--surface)",
+                  color:
+                    "var(--text)",
+                  fontSize:
+                    "10px",
+                  fontWeight:
+                    800,
+                  cursor:
+                    "pointer",
+                }}
+              >
+                Temizle
+              </button>
+            </div>
+          </div>
+
+          <div className="empty-state small">
+            <div className="empty-icon">
+              ⚽
+            </div>
+
+            <h3>
+              Maç bulunamadı
+            </h3>
+
+            <p>
+              Şu anda gösterilecek
+              bir maç bulunmuyor.
+            </p>
+          </div>
+        </>
+      );
   }
+
+  /*
+   * ==================================================
+   * NORMAL RETURN
+   * ==================================================
+   */
 
   return (
     <>
@@ -207,9 +488,12 @@ export default function MatchList({
           style={{
             border:
               "1px solid var(--border)",
-            borderRadius: "12px",
-            padding: "10px",
-            marginBottom: "12px",
+            borderRadius:
+              "12px",
+            padding:
+              "10px",
+            marginBottom:
+              "12px",
             background:
               "var(--surface-soft)",
           }}
@@ -218,12 +502,18 @@ export default function MatchList({
 
           <div
             style={{
-              display: "flex",
-              gap: "6px",
-              overflowX: "auto",
-              paddingBottom: "8px",
-              marginBottom: "9px",
-              scrollbarWidth: "thin",
+              display:
+                "flex",
+              gap:
+                "6px",
+              overflowX:
+                "auto",
+              paddingBottom:
+                "8px",
+              marginBottom:
+                "9px",
+              scrollbarWidth:
+                "thin",
             }}
           >
             {filterCategories.map(
@@ -244,7 +534,8 @@ export default function MatchList({
                       )
                     }
                     style={{
-                      flexShrink: 0,
+                      flexShrink:
+                        0,
                       border:
                         active
                           ? "1px solid var(--primary)"
@@ -288,33 +579,40 @@ export default function MatchList({
             style={{
               position:
                 "relative",
-              display: "flex",
+              display:
+                "flex",
               alignItems:
                 "center",
-              gap: "6px",
+              gap:
+                "6px",
             }}
           >
             <div
               style={{
                 position:
                   "relative",
-                flex: 1,
-                minWidth: 0,
+                flex:
+                  1,
+                minWidth:
+                  0,
               }}
             >
               <span
                 style={{
                   position:
                     "absolute",
-                  left: "10px",
-                  top: "50%",
+                  left:
+                    "10px",
+                  top:
+                    "50%",
                   transform:
                     "translateY(-50%)",
                   fontSize:
                     "12px",
                   pointerEvents:
                     "none",
-                  opacity: 0.7,
+                  opacity:
+                    0.7,
                 }}
               >
                 🔎
@@ -322,7 +620,9 @@ export default function MatchList({
 
               <input
                 type="text"
-                value={search}
+                value={
+                  search
+                }
                 onChange={(
                   event
                 ) =>
@@ -333,9 +633,12 @@ export default function MatchList({
                 }
                 placeholder="Takım veya lig ara..."
                 style={{
-                  width: "100%",
-                  minWidth: 0,
-                  height: "36px",
+                  width:
+                    "100%",
+                  minWidth:
+                    0,
+                  height:
+                    "36px",
                   boxSizing:
                     "border-box",
                   padding:
@@ -348,7 +651,8 @@ export default function MatchList({
                     "var(--surface)",
                   color:
                     "var(--text)",
-                  outline: "none",
+                  outline:
+                    "none",
                   fontSize:
                     "11px",
                   fontWeight:
@@ -361,13 +665,16 @@ export default function MatchList({
                   style={{
                     position:
                       "absolute",
-                    right: "10px",
-                    top: "50%",
+                    right:
+                      "10px",
+                    top:
+                      "50%",
                     transform:
                       "translateY(-50%)",
                     fontSize:
                       "10px",
-                    opacity: 0.65,
+                    opacity:
+                      0.65,
                   }}
                 >
                   ⏳
@@ -386,8 +693,10 @@ export default function MatchList({
                   clearFilters
                 }
                 style={{
-                  flexShrink: 0,
-                  height: "36px",
+                  flexShrink:
+                    0,
+                  height:
+                    "36px",
                   padding:
                     "0 10px",
                   border:
@@ -436,7 +745,7 @@ export default function MatchList({
             >
               {searchLoading
                 ? "Geçmiş maçlar aranıyor..."
-                : "Bugün ve son 3 gündeki maçlar aranıyor."}
+                : `${searchResults.length} arama sonucu bulundu.`}
             </div>
           ) : null}
 
@@ -444,18 +753,22 @@ export default function MatchList({
 
           <div
             style={{
-              display: "flex",
+              display:
+                "flex",
               justifyContent:
                 "space-between",
               alignItems:
                 "center",
-              marginTop: "8px",
+              marginTop:
+                "8px",
               padding:
                 "0 2px",
-              fontSize: "9px",
+              fontSize:
+                "9px",
               color:
                 "var(--muted)",
-              fontWeight: 700,
+              fontWeight:
+                700,
             }}
           >
             <span>
@@ -513,7 +826,9 @@ export default function MatchList({
                 }
               >
                 <MatchCard
-                  match={match}
+                  match={
+                    match
+                  }
                 />
 
                 {(index + 1) %
