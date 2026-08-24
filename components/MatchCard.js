@@ -3,42 +3,64 @@
 import Link from "next/link";
 import { getMatchStatus } from "../lib/match-utils";
 
-export default function MatchCard({ match }) {
+export default function MatchCard({
+  match,
+}) {
   if (!match) {
     return null;
   }
 
-  const normalizedStatus =
+  const currentStatus =
     getMatchStatus(match);
 
-  const matchDate = match.match_date
-    ? new Date(match.match_date)
-    : null;
+  const isLive =
+    currentStatus === "live";
+
+  const isFinished =
+    currentStatus === "finished";
+
+  const isScheduled =
+    currentStatus === "scheduled";
+
+  const canPredict =
+    isLive ||
+    isScheduled;
+
+  const matchDate =
+    match.match_date
+      ? new Date(
+          match.match_date
+        )
+      : null;
 
   const validDate =
     matchDate &&
-    !Number.isNaN(matchDate.getTime());
+    !Number.isNaN(
+      matchDate.getTime()
+    );
 
-  const formattedDate = validDate
-    ? matchDate.toLocaleDateString(
-        "tr-TR",
-        {
-          day: "2-digit",
-          month: "2-digit",
-          year: "numeric",
-        }
-      )
-    : "";
+  const formattedDate =
+    validDate
+      ? matchDate.toLocaleDateString(
+          "tr-TR",
+          {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+          }
+        )
+      : "";
 
-  const formattedTime = validDate
-    ? matchDate.toLocaleTimeString(
-        "tr-TR",
-        {
-          hour: "2-digit",
-          minute: "2-digit",
-        }
-      )
-    : "";
+  const formattedTime =
+    validDate
+      ? matchDate.toLocaleTimeString(
+          "tr-TR",
+          {
+            hour: "2-digit",
+            minute: "2-digit",
+          }
+        )
+      : "";
 
   const statusLabels = {
     scheduled: "Yaklaşan",
@@ -51,74 +73,44 @@ export default function MatchCard({ match }) {
 
   const statusLabel =
     statusLabels[
-      normalizedStatus
+      currentStatus
     ] ||
-    match.status ||
+    statusLabels[
+      match.status
+    ] ||
     "Yaklaşan";
 
-  const isLive =
-    normalizedStatus === "live";
-
-  const isFinished =
-    normalizedStatus === "finished";
-
-  /*
-   * Skoru sadece gerçekten skor
-   * bilgisi varsa göster.
-   *
-   * Böylece null değerler
-   * yanlışlıkla 0-0 görünmez.
-   */
-  const hasHomeScore =
-    match.home_score !== null &&
-    match.home_score !== undefined &&
-    match.home_score !== "";
-
-  const hasAwayScore =
-    match.away_score !== null &&
-    match.away_score !== undefined &&
-    match.away_score !== "";
-
   const hasScore =
-    (isLive || isFinished) &&
-    hasHomeScore &&
-    hasAwayScore;
+    isLive ||
+    isFinished;
 
   const homeScore =
-    hasHomeScore
+    match.home_score !==
+      null &&
+    match.home_score !==
+      undefined
       ? match.home_score
-      : null;
+      : 0;
 
   const awayScore =
-    hasAwayScore
+    match.away_score !==
+      null &&
+    match.away_score !==
+      undefined
       ? match.away_score
-      : null;
+      : 0;
 
-  const liveMinute =
-    match.live_minute !== null &&
-    match.live_minute !== undefined
-      ? match.live_minute
-      : null;
-
-  return (
-    <Link
-      href={`/mac/${encodeURIComponent(
-        match.id ||
-          match.external_id
-      )}`}
-      className="match-card"
-    >
+  const cardContent = (
+    <>
       <div className="match-card-top">
         <div className="match-league">
           {match.league_logo ? (
             <img
-              src={match.league_logo}
+              src={
+                match.league_logo
+              }
               alt=""
               className="league-logo"
-              onError={(event) => {
-                event.currentTarget.style.display =
-                  "none";
-              }}
             />
           ) : null}
 
@@ -132,15 +124,10 @@ export default function MatchCard({ match }) {
           className={`match-status ${
             isLive
               ? "live"
-              : normalizedStatus ===
-                "finished"
-              ? "finished"
               : ""
           }`}
         >
-          {isLive
-            ? "CANLI"
-            : statusLabel}
+          {statusLabel}
         </span>
       </div>
 
@@ -148,25 +135,13 @@ export default function MatchCard({ match }) {
         <div className="match-team">
           {match.home_logo ? (
             <img
-              src={match.home_logo}
+              src={
+                match.home_logo
+              }
               alt={
-                match.home_team ||
-                ""
+                match.home_team
               }
               className="team-logo"
-              width="48"
-              height="48"
-              loading="lazy"
-              onError={(event) => {
-                event.currentTarget.style.display =
-                  "none";
-              }}
-              style={{
-                width: "48px",
-                height: "48px",
-                objectFit: "contain",
-                display: "block",
-              }}
             />
           ) : (
             <div className="team-logo-placeholder">
@@ -181,42 +156,10 @@ export default function MatchCard({ match }) {
 
         <div className="match-vs-small">
           {hasScore ? (
-            <div
-              style={{
-                display: "flex",
-                flexDirection:
-                  "column",
-                alignItems:
-                  "center",
-                justifyContent:
-                  "center",
-                gap: "3px",
-              }}
-            >
-              <strong>
-                {homeScore} -{" "}
-                {awayScore}
-              </strong>
-
-              {isLive &&
-              liveMinute !== null ? (
-                <span
-                  style={{
-                    fontSize:
-                      "12px",
-                    fontWeight:
-                      "800",
-                    color:
-                      "#dc2626",
-                    whiteSpace:
-                      "nowrap",
-                  }}
-                >
-                  🔴{" "}
-                  {liveMinute}'
-                </span>
-              ) : null}
-            </div>
+            <strong>
+              {homeScore} -{" "}
+              {awayScore}
+            </strong>
           ) : (
             "VS"
           )}
@@ -229,25 +172,13 @@ export default function MatchCard({ match }) {
 
           {match.away_logo ? (
             <img
-              src={match.away_logo}
+              src={
+                match.away_logo
+              }
               alt={
-                match.away_team ||
-                ""
+                match.away_team
               }
               className="team-logo"
-              width="48"
-              height="48"
-              loading="lazy"
-              onError={(event) => {
-                event.currentTarget.style.display =
-                  "none";
-              }}
-              style={{
-                width: "48px",
-                height: "48px",
-                objectFit: "contain",
-                display: "block",
-              }}
             />
           ) : (
             <div className="team-logo-placeholder">
@@ -271,10 +202,51 @@ export default function MatchCard({ match }) {
           ) : null}
         </div>
 
-        <span className="match-prediction-button">
-          Tahmin Yap →
-        </span>
+        {canPredict ? (
+          <span className="match-prediction-button">
+            Tahmin Yap →
+          </span>
+        ) : (
+          <span
+            className="match-prediction-button"
+            style={{
+              opacity: 0.6,
+              cursor: "default",
+            }}
+          >
+            Biten maçlara tahmin
+            yapılamaz
+          </span>
+        )}
       </div>
-    </Link>
+    </>
+  );
+
+  /*
+   * Sadece canlı ve başlamamış
+   * maçlar tahmin ekranına
+   * açılabilir.
+   */
+
+  if (canPredict) {
+    return (
+      <Link
+        href={`/mac/${match.id}`}
+        className="match-card"
+      >
+        {cardContent}
+      </Link>
+    );
+  }
+
+  /*
+   * Biten / ertelenen / iptal
+   * maçlar link değildir.
+   */
+
+  return (
+    <div className="match-card">
+      {cardContent}
+    </div>
   );
 }
