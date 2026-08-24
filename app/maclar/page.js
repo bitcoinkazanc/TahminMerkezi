@@ -8,8 +8,10 @@ import { sortMatches } from "../../lib/match-utils";
 
 export default function MatchesPage() {
   const [matches, setMatches] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [loading, setLoading] =
+    useState(true);
+  const [error, setError] =
+    useState("");
 
   async function loadMatches() {
     try {
@@ -23,7 +25,8 @@ export default function MatchesPage() {
         }
       );
 
-      const result = await response.json();
+      const result =
+        await response.json();
 
       if (
         !response.ok ||
@@ -35,13 +38,18 @@ export default function MatchesPage() {
         );
       }
 
-      const sortedMatches = sortMatches(
-        Array.isArray(result.matches)
-          ? result.matches
-          : []
-      );
+      const sortedMatches =
+        sortMatches(
+          Array.isArray(
+            result.matches
+          )
+            ? result.matches
+            : []
+        );
 
-      setMatches(sortedMatches);
+      setMatches(
+        sortedMatches
+      );
     } catch (err) {
       console.error(err);
 
@@ -65,21 +73,29 @@ export default function MatchesPage() {
         <section
           className="home-hero"
           style={{
-            position: "relative",
+            position:
+              "relative",
           }}
         >
           <button
             type="button"
             className="refresh-button"
-            onClick={loadMatches}
-            disabled={loading}
+            onClick={
+              loadMatches
+            }
+            disabled={
+              loading
+            }
             aria-label="Maçları yenile"
             style={{
-              position: "absolute",
+              position:
+                "absolute",
               top: "8px",
               right: "8px",
-              transform: "scale(0.75)",
-              transformOrigin: "top right",
+              transform:
+                "scale(0.75)",
+              transformOrigin:
+                "top right",
               zIndex: 10,
             }}
           >
@@ -103,7 +119,8 @@ export default function MatchesPage() {
           <p
             className="home-hero-text"
             style={{
-              marginBottom: "10px",
+              marginBottom:
+                "10px",
             }}
           >
             Başarı oranın ne kadar yüksekse,
@@ -138,12 +155,15 @@ export default function MatchesPage() {
               <button
                 type="button"
                 className="primary-button"
-                onClick={loadMatches}
+                onClick={
+                  loadMatches
+                }
               >
                 Tekrar Dene
               </button>
             </div>
-          ) : matches.length === 0 ? (
+          ) : matches.length ===
+            0 ? (
             <div className="empty-state small">
               <div className="empty-icon">
                 ⚽
@@ -169,7 +189,12 @@ export default function MatchesPage() {
           ) : (
             <>
               <MatchList
-                matches={matches}
+                matches={
+                  matches
+                }
+                enableFilters={
+                  true
+                }
               />
 
               <div className="home-disclaimer">
