@@ -1,19 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import ProfileFollowList from "./ProfileFollowList";
 
 export default function ProfileCard({ user }) {
-  const [followersCount, setFollowersCount] =
-    useState(0);
-
-  const [followingCount, setFollowingCount] =
-    useState(0);
-
-  const [loadingFollows, setLoadingFollows] =
-    useState(true);
-
-  const [listType, setListType] =
-    useState(null);
+  const [followList, setFollowList] = useState(null);
 
   if (!user) {
     return (
@@ -37,76 +28,6 @@ export default function ProfileCard({ user }) {
     .charAt(0)
     .toUpperCase();
 
-  /*
-   * ==================================================
-   * TAKİP SAYILARINI AL
-   * ==================================================
-   */
-
-  useEffect(() => {
-    async function loadFollowCounts() {
-      if (!user?.id) {
-        setLoadingFollows(false);
-        return;
-      }
-
-      try {
-        setLoadingFollows(true);
-
-        /*
-         * Kendi profilinde:
-         *
-         * follower_id = kullanıcı
-         * following_id = kullanıcı
-         *
-         * Mevcut API takip durumunu ve
-         * ilgili sayı bilgisini döndürüyor.
-         */
-
-        const response =
-          await fetch(
-            `/api/follows?follower_id=${encodeURIComponent(
-              user.id
-            )}&following_id=${encodeURIComponent(
-              user.id
-            )}`,
-            {
-              cache: "no-store",
-            }
-          );
-
-        const result =
-          await response.json();
-
-        if (
-          response.ok &&
-          result.success
-        ) {
-          setFollowersCount(
-            Number(
-              result.followers_count
-            ) || 0
-          );
-
-          setFollowingCount(
-            Number(
-              result.following_count
-            ) || 0
-          );
-        }
-      } catch (error) {
-        console.error(
-          "Follow counts loading error:",
-          error
-        );
-      } finally {
-        setLoadingFollows(false);
-      }
-    }
-
-    loadFollowCounts();
-  }, [user?.id]);
-
   function openTelegram() {
     if (!user.username) {
       return;
@@ -119,29 +40,11 @@ export default function ProfileCard({ user }) {
     );
   }
 
-  /*
-   * ==================================================
-   * TAKİPÇİ LİSTESİ
-   * ==================================================
-   */
+  const followersCount =
+    Number(user.followers_count) || 0;
 
-  function openFollowers() {
-    setListType("followers");
-  }
-
-  /*
-   * ==================================================
-   * TAKİP EDİLENLER LİSTESİ
-   * ==================================================
-   */
-
-  function openFollowing() {
-    setListType("following");
-  }
-
-  function closeList() {
-    setListType(null);
-  }
+  const followingCount =
+    Number(user.following_count) || 0;
 
   return (
     <>
@@ -213,37 +116,22 @@ export default function ProfileCard({ user }) {
               boxSizing: "border-box",
             }}
           >
-            {user.username ? (
-              <p
-                style={{
-                  flex: "1 1 auto",
-                  width: 0,
-                  minWidth: 0,
-                  maxWidth: "100%",
-                  margin: 0,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                @{user.username}
-              </p>
-            ) : (
-              <p
-                style={{
-                  flex: "1 1 auto",
-                  width: 0,
-                  minWidth: 0,
-                  maxWidth: "100%",
-                  margin: 0,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                Telegram kullanıcısı
-              </p>
-            )}
+            <p
+              style={{
+                flex: "1 1 auto",
+                width: 0,
+                minWidth: 0,
+                maxWidth: "100%",
+                margin: 0,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {user.username
+                ? `@${user.username}`
+                : "Telegram kullanıcısı"}
+            </p>
 
             {user.username ? (
               <button
@@ -269,204 +157,70 @@ export default function ProfileCard({ user }) {
             ) : null}
           </div>
 
-          {/* ==================================================
-              TAKİP İSTATİSTİKLERİ
-              ================================================== */}
-
           <div
             style={{
               display: "flex",
               alignItems: "center",
-              gap: "18px",
-              marginTop: "10px",
+              gap: "6px",
+              marginTop: "8px",
+              width: "100%",
+              maxWidth: "100%",
+              minWidth: 0,
             }}
           >
             <button
               type="button"
-              onClick={openFollowers}
+              onClick={() => setFollowList("followers")}
               style={{
                 border: "none",
-                padding: 0,
-                margin: 0,
                 background: "transparent",
-                color: "inherit",
+                padding: "2px 5px",
+                margin: 0,
                 cursor: "pointer",
-                textAlign: "left",
+                fontSize: "11px",
+                lineHeight: 1.2,
+                color: "inherit",
+                display: "flex",
+                alignItems: "center",
+                gap: "3px",
+                whiteSpace: "nowrap",
               }}
             >
-              <strong
-                style={{
-                  display: "block",
-                  fontSize: "15px",
-                  lineHeight: "1.2",
-                }}
-              >
-                {loadingFollows
-                  ? "..."
-                  : followersCount}
-              </strong>
-
-              <span
-                style={{
-                  display: "block",
-                  marginTop: "2px",
-                  fontSize: "11px",
-                  opacity: 0.7,
-                }}
-              >
-                Takipçi
-              </span>
+              <strong>{followersCount}</strong>
+              <span>Takipçi</span>
             </button>
 
             <button
               type="button"
-              onClick={openFollowing}
+              onClick={() => setFollowList("following")}
               style={{
                 border: "none",
-                padding: 0,
-                margin: 0,
                 background: "transparent",
-                color: "inherit",
+                padding: "2px 5px",
+                margin: 0,
                 cursor: "pointer",
-                textAlign: "left",
+                fontSize: "11px",
+                lineHeight: 1.2,
+                color: "inherit",
+                display: "flex",
+                alignItems: "center",
+                gap: "3px",
+                whiteSpace: "nowrap",
               }}
             >
-              <strong
-                style={{
-                  display: "block",
-                  fontSize: "15px",
-                  lineHeight: "1.2",
-                }}
-              >
-                {loadingFollows
-                  ? "..."
-                  : followingCount}
-              </strong>
-
-              <span
-                style={{
-                  display: "block",
-                  marginTop: "2px",
-                  fontSize: "11px",
-                  opacity: 0.7,
-                }}
-              >
-                Takip
-              </span>
+              <strong>{followingCount}</strong>
+              <span>Takip</span>
             </button>
           </div>
         </div>
       </section>
 
-      {/* ==================================================
-          TAKİPÇİ / TAKİP EDİLEN PENCERESİ
-          ================================================== */}
-
-      {listType ? (
-        <div
-          onClick={closeList}
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 9999,
-            background:
-              "rgba(0, 0, 0, 0.55)",
-            display: "flex",
-            alignItems: "flex-end",
-            justifyContent: "center",
-          }}
-        >
-          <div
-            onClick={(event) =>
-              event.stopPropagation()
-            }
-            style={{
-              width: "100%",
-              maxWidth: "520px",
-              maxHeight: "75vh",
-              background:
-                "var(--background, #fff)",
-              borderRadius:
-                "18px 18px 0 0",
-              overflow: "hidden",
-              boxSizing: "border-box",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent:
-                  "space-between",
-                padding: "16px",
-                borderBottom:
-                  "1px solid rgba(128,128,128,0.2)",
-              }}
-            >
-              <strong>
-                {listType ===
-                "followers"
-                  ? "Takipçiler"
-                  : "Takip Ettikleri"}
-              </strong>
-
-              <button
-                type="button"
-                onClick={closeList}
-                style={{
-                  border: "none",
-                  background:
-                    "transparent",
-                  fontSize: "22px",
-                  cursor: "pointer",
-                  color: "inherit",
-                }}
-              >
-                ×
-              </button>
-            </div>
-
-            <div
-              style={{
-                padding: "24px 16px",
-                textAlign: "center",
-                opacity: 0.7,
-              }}
-            >
-              <div
-                style={{
-                  fontSize: "32px",
-                  marginBottom: "8px",
-                }}
-              >
-                👥
-              </div>
-
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: "13px",
-                }}
-              >
-                {listType ===
-                "followers"
-                  ? "Takipçi listesi"
-                  : "Takip edilen kullanıcılar"}
-              </p>
-
-              <small
-                style={{
-                  display: "block",
-                  marginTop: "6px",
-                  opacity: 0.7,
-                }}
-              >
-                Liste bağlantısı bir sonraki
-                adımda eklenecek.
-              </small>
-            </div>
-          </div>
-        </div>
+      {followList ? (
+        <ProfileFollowList
+          userId={user.id}
+          type={followList}
+          onClose={() => setFollowList(null)}
+        />
       ) : null}
     </>
   );
