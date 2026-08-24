@@ -3,29 +3,21 @@
 import { useEffect, useState } from "react";
 
 export default function ProfileCard({ user }) {
-  const [followersCount, setFollowersCount] =
-    useState(0);
+  const [followersCount, setFollowersCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followLoading, setFollowLoading] = useState(false);
 
-  const [followingCount, setFollowingCount] =
-    useState(0);
-
-  const [followList, setFollowList] =
-    useState(null);
-
-  const [listLoading, setListLoading] =
-    useState(false);
+  const [followList, setFollowList] = useState(null);
+  const [listLoading, setListLoading] = useState(false);
 
   if (!user) {
     return (
       <section className="profile-card">
-        <div className="profile-avatar-placeholder">
-          ?
-        </div>
+        <div className="profile-avatar-placeholder">?</div>
 
         <div className="profile-info">
-          <p>
-            Profil bilgileri yüklenemedi.
-          </p>
+          <p>Profil bilgileri yüklenemedi.</p>
         </div>
       </section>
     );
@@ -39,24 +31,50 @@ export default function ProfileCard({ user }) {
     .charAt(0)
     .toUpperCase();
 
+  /*
+   * ==================================================
+   * TAKİP BİLGİLERİNİ AL
+   * ==================================================
+   */
+
   useEffect(() => {
-    async function loadFollowCounts() {
+    async function loadFollowData() {
       if (!user?.id) {
         return;
       }
 
       try {
-        const response =
-          await fetch(
-            `/api/follows?follower_id=${encodeURIComponent(
-              user.id
-            )}&following_id=${encodeURIComponent(
-              user.id
-            )}`,
-            {
-              cache: "no-store",
-            }
-          );
+        const savedUser =
+          localStorage.getItem("tm_user");
+
+        let currentUserId = null;
+
+        if (savedUser) {
+          try {
+            const parsedUser =
+              JSON.parse(savedUser);
+
+            currentUserId =
+              parsedUser?.id || null;
+          } catch {
+            currentUserId = null;
+          }
+        }
+
+        /*
+         * Profil sahibinin takipçi / takip sayıları
+         */
+
+        const response = await fetch(
+          `/api/follows?follower_id=${encodeURIComponent(
+            currentUserId || user.id
+          )}&following_id=${encodeURIComponent(
+            user.id
+          )}`,
+          {
+            cache: "no-store",
+          }
+        );
 
         const result =
           await response.json();
@@ -66,25 +84,206 @@ export default function ProfileCard({ user }) {
           result.success
         ) {
           setFollowersCount(
-            result.followers_count || 0
+            Number(
+              result.followers_count
+            ) || 0
           );
 
           setFollowingCount(
-            result.following_count || 0
+            Number(
+              result.following_count
+            ) || 0
           );
+
+          /*
+           * Kendi profili değilse gerçek takip durumu
+           * result.is_following üzerinden gelir.
+           */
+          if (
+            currentUserId &&
+            currentUserId !== user.id
+          ) {
+            setIsFollowing(
+              !!result.is_following
+            );
+          }
         }
       } catch (error) {
         console.error(
-          "Follow count loading error:",
+          "Follow data loading error:",
           error
         );
       }
     }
 
-    loadFollowCounts();
+    loadFollowData();
   }, [user?.id]);
 
-  async function openFollowList(type) {
+  /*
+   * ==================================================
+   * TELEGRAM
+   * ==================================================
+   */
+
+  function openTelegram() {
+    if (!user.username) {
+      return;
+    }
+
+    window.open(
+      `https://t.me/${user.username}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
+  }
+
+  /*
+   * ==================================================
+   * TAKİP ET / TAKİPTEN ÇIK
+   * ==================================================
+   */
+
+  async function toggleFollow() {
+    if (
+      followLoading ||
+      !user?.id
+    ) {
+      return;
+    }
+
+    try {
+      setFollowLoading(true);
+
+      const savedUser =
+        localStorage.getItem(
+          "tm_user"
+        );
+
+      if (!savedUser) {
+        return;
+      }
+
+      const currentUser =
+        JSON.parse(savedUser);
+
+      if (!currentUser?.id) {
+        return;
+      }
+
+      if (
+        currentUser.id === user.id
+      ) {
+        return;
+      }
+
+      /*
+       * TAKİPTEN ÇIK
+       */
+
+      if (isFollowing) {
+        const response =
+          await fetch(
+            `/api/follows?follower_id=${encodeURIComponent(
+              currentUser.id
+            )}&following_id=${encodeURIComponent(
+              user.id
+            )}`,
+            {
+              method: "DELETE",
+            }
+          );
+
+        const result =
+          await response.json();
+
+        if (
+          !response.ok ||
+          !result.success
+        ) {
+          throw new Error(
+            result.error ||
+              "Takipten çıkılamadı."
+          );
+        }
+
+        setIsFollowing(false);
+
+        setFollowersCount(
+          (count) =>
+            Math.max(
+              0,
+              count - 1
+            )
+        );
+
+        return;
+      }
+
+      /*
+       * TAKİP ET
+       */
+
+      const response =
+        await fetch(
+          "/api/follows",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body: JSON.stringify({
+              follower_id:
+                currentUser.id,
+              following_id:
+                user.id,
+            }),
+          }
+        );
+
+      const result =
+        await response.json();
+
+      if (
+        !response.ok ||
+        !result.success
+      ) {
+        throw new Error(
+          result.error ||
+            "Takip edilemedi."
+        );
+      }
+
+      setIsFollowing(true);
+
+      setFollowersCount(
+        (count) =>
+          count + 1
+      );
+    } catch (error) {
+      console.error(
+        "Follow toggle error:",
+        error
+      );
+
+      alert(
+        error.message ||
+          "Takip işlemi sırasında bir hata oluştu."
+      );
+    } finally {
+      setFollowLoading(false);
+    }
+  }
+
+  /*
+   * ==================================================
+   * TAKİP LİSTESİ
+   * ==================================================
+   */
+
+  async function openFollowList(
+    type
+  ) {
     if (!user?.id) {
       return;
     }
@@ -144,17 +343,11 @@ export default function ProfileCard({ user }) {
     setFollowList(null);
   }
 
-  function openTelegram() {
-    if (!user.username) {
-      return;
-    }
-
-    window.open(
-      `https://t.me/${user.username}`,
-      "_blank",
-      "noopener,noreferrer"
-    );
-  }
+  /*
+   * ==================================================
+   * PROFİL
+   * ==================================================
+   */
 
   return (
     <>
@@ -224,44 +417,26 @@ export default function ProfileCard({ user }) {
               width: "100%",
               maxWidth: "100%",
               minWidth: 0,
-              boxSizing: "border-box",
             }}
           >
-            {user.username ? (
-              <p
-                style={{
-                  flex: "1 1 auto",
-                  width: 0,
-                  minWidth: 0,
-                  maxWidth: "100%",
-                  margin: 0,
-                  overflow: "hidden",
-                  textOverflow:
-                    "ellipsis",
-                  whiteSpace:
-                    "nowrap",
-                }}
-              >
-                @{user.username}
-              </p>
-            ) : (
-              <p
-                style={{
-                  flex: "1 1 auto",
-                  width: 0,
-                  minWidth: 0,
-                  maxWidth: "100%",
-                  margin: 0,
-                  overflow: "hidden",
-                  textOverflow:
-                    "ellipsis",
-                  whiteSpace:
-                    "nowrap",
-                }}
-              >
-                Telegram kullanıcısı
-              </p>
-            )}
+            <p
+              style={{
+                flex: "1 1 auto",
+                width: 0,
+                minWidth: 0,
+                maxWidth: "100%",
+                margin: 0,
+                overflow: "hidden",
+                textOverflow:
+                  "ellipsis",
+                whiteSpace:
+                  "nowrap",
+              }}
+            >
+              {user.username
+                ? `@${user.username}`
+                : "Telegram kullanıcısı"}
+            </p>
 
             {user.username ? (
               <button
@@ -272,7 +447,6 @@ export default function ProfileCard({ user }) {
                 style={{
                   flex:
                     "0 0 auto",
-                  flexShrink: 0,
                   padding:
                     "6px 10px",
                   minHeight:
@@ -301,7 +475,7 @@ export default function ProfileCard({ user }) {
             style={{
               display: "flex",
               alignItems: "center",
-              gap: "8px",
+              gap: "12px",
               marginTop: "10px",
             }}
           >
@@ -318,7 +492,8 @@ export default function ProfileCard({ user }) {
                   "transparent",
                 padding: 0,
                 margin: 0,
-                cursor: "pointer",
+                cursor:
+                  "pointer",
                 color:
                   "inherit",
                 textAlign:
@@ -351,14 +526,6 @@ export default function ProfileCard({ user }) {
               </span>
             </button>
 
-            <span
-              style={{
-                opacity: 0.25,
-              }}
-            >
-              ·
-            </span>
-
             <button
               type="button"
               onClick={() =>
@@ -372,7 +539,8 @@ export default function ProfileCard({ user }) {
                   "transparent",
                 padding: 0,
                 margin: 0,
-                cursor: "pointer",
+                cursor:
+                  "pointer",
                 color:
                   "inherit",
                 textAlign:
@@ -404,6 +572,87 @@ export default function ProfileCard({ user }) {
                 Takip
               </span>
             </button>
+
+            {(() => {
+              const savedUser =
+                typeof window !==
+                "undefined"
+                  ? localStorage.getItem(
+                      "tm_user"
+                    )
+                  : null;
+
+              let currentUserId =
+                null;
+
+              if (savedUser) {
+                try {
+                  currentUserId =
+                    JSON.parse(
+                      savedUser
+                    )?.id ||
+                    null;
+                } catch {
+                  currentUserId =
+                    null;
+                }
+              }
+
+              if (
+                !currentUserId ||
+                currentUserId ===
+                  user.id
+              ) {
+                return null;
+              }
+
+              return (
+                <button
+                  type="button"
+                  onClick={
+                    toggleFollow
+                  }
+                  disabled={
+                    followLoading
+                  }
+                  style={{
+                    border: "none",
+                    borderRadius:
+                      "8px",
+                    padding:
+                      "7px 12px",
+                    background:
+                      isFollowing
+                        ? "rgba(128,128,128,0.15)"
+                        : "var(--primary)",
+                    color:
+                      isFollowing
+                        ? "inherit"
+                        : "#fff",
+                    fontSize:
+                      "11px",
+                    fontWeight:
+                      800,
+                    cursor:
+                      followLoading
+                        ? "default"
+                        : "pointer",
+                    opacity:
+                      followLoading
+                        ? 0.6
+                        : 1,
+                    whiteSpace:
+                      "nowrap",
+                  }}
+                >
+                  {followLoading
+                    ? "..."
+                    : isFollowing
+                      ? "Takipten Çık"
+                      : "Takip Et"}
+                </button>
+              );
+            })()}
           </div>
         </div>
       </section>
@@ -523,12 +772,9 @@ export default function ProfileCard({ user }) {
                     color: "#d33",
                   }}
                 >
-                  {
-                    followList.error
-                  }
+                  {followList.error}
                 </div>
-              ) : followList.users
-                  .length ===
+              ) : followList.users.length ===
                 0 ? (
                 <div
                   style={{
@@ -555,17 +801,13 @@ export default function ProfileCard({ user }) {
                         .filter(
                           Boolean
                         )
-                        .join(
-                          " "
-                        ) ||
+                        .join(" ") ||
                       item.username ||
                       "Telegram kullanıcısı";
 
                     return (
                       <div
-                        key={
-                          item.id
-                        }
+                        key={item.id}
                         style={{
                           display:
                             "flex",
@@ -581,15 +823,9 @@ export default function ProfileCard({ user }) {
                             src={
                               item.avatar_url
                             }
-                            alt={
-                              name
-                            }
-                            width={
-                              44
-                            }
-                            height={
-                              44
-                            }
+                            alt={name}
+                            width={44}
+                            height={44}
                             style={{
                               width:
                                 "44px",
@@ -676,10 +912,7 @@ export default function ProfileCard({ user }) {
                                   0.65,
                               }}
                             >
-                              @
-                              {
-                                item.username
-                              }
+                              @{item.username}
                             </span>
                           ) : null}
                         </div>
