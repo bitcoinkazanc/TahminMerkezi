@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import {
   getMatches,
+  getSearchMatches,
   getMatch,
 } from "../../../lib/football-api";
 
@@ -179,13 +180,9 @@ function isTurkishLeague(match) {
       match.league_country
     );
 
-  /*
-   * Türkiye / Turkey ifadeleri.
-   */
   if (
     league.includes("türkiye") ||
     league.includes("turkiye") ||
-    league.includes("türkiye") ||
     league.includes("turkey") ||
     country.includes("türkiye") ||
     country.includes("turkiye") ||
@@ -194,9 +191,6 @@ function isTurkishLeague(match) {
     return true;
   }
 
-  /*
-   * Yaygın Türkiye ligleri.
-   */
   const turkishLeagueKeywords = [
     "süper lig",
     "super lig",
@@ -224,15 +218,6 @@ function isTurkishLeague(match) {
     return true;
   }
 
-  /*
-   * Bazı Mackolik verilerinde ülke/lig
-   * doğrudan görünmeyebilir.
-   *
-   * Bu durumda takım isimlerine göre
-   * Türkiye tespiti yapmıyoruz.
-   *
-   * Çünkü yanlış pozitif üretmemek daha doğru.
-   */
   if (
     leagueId === "turkey" ||
     competitionId === "turkey"
@@ -247,28 +232,6 @@ function isTurkishLeague(match) {
  * --------------------------------------------------
  * MAÇ SIRALAMA
  * --------------------------------------------------
- *
- * ÖNCELİK:
- *
- * 1. Canlı Türkiye maçları
- * 2. Diğer canlı maçlar
- * 3. Yaklaşan maçlar
- * 4. Bitmiş maçlar
- *
- * CANLI MAÇLAR:
- *
- * dakika büyük -> üstte
- *
- * örnek:
- *
- * 87'
- * 72'
- * 45'
- * 12'
- * dakika bilgisi yok
- *
- * Dakika bilgisi olmayan canlı maçlar
- * yine canlı grubunda kalır.
  */
 
 function sortMatches(matches) {
@@ -292,12 +255,6 @@ function sortMatches(matches) {
       const bFinished =
         isFinishedMatch(b);
 
-      /*
-       * --------------------------------------------
-       * CANLI / CANLI OLMAYAN GRUPLAMA
-       * --------------------------------------------
-       */
-
       if (
         aLive &&
         !bLive
@@ -312,12 +269,6 @@ function sortMatches(matches) {
         return 1;
       }
 
-      /*
-       * --------------------------------------------
-       * İKİSİ DE CANLI
-       * --------------------------------------------
-       */
-
       if (
         aLive &&
         bLive
@@ -328,10 +279,6 @@ function sortMatches(matches) {
         const bTurkish =
           isTurkishLeague(b);
 
-        /*
-         * Türkiye canlı maçları
-         * diğer canlılardan önce.
-         */
         if (
           aTurkish &&
           !bTurkish
@@ -346,20 +293,12 @@ function sortMatches(matches) {
           return 1;
         }
 
-        /*
-         * Dakika bilgisi.
-         */
         const aMinute =
           getLiveMinute(a);
 
         const bMinute =
           getLiveMinute(b);
 
-        /*
-         * İkisinin de dakikası varsa:
-         *
-         * büyük dakika üstte.
-         */
         if (
           aMinute !== null &&
           bMinute !== null
@@ -374,10 +313,6 @@ function sortMatches(matches) {
           }
         }
 
-        /*
-         * Dakikası olan canlı maç,
-         * dakikası olmayandan önce.
-         */
         if (
           aMinute !== null &&
           bMinute === null
@@ -392,10 +327,6 @@ function sortMatches(matches) {
           return 1;
         }
 
-        /*
-         * Dakika eşitse maç başlangıç
-         * zamanına bak.
-         */
         const aTime =
           getMatchTimestamp(a);
 
@@ -413,15 +344,6 @@ function sortMatches(matches) {
         return 0;
       }
 
-      /*
-       * --------------------------------------------
-       * CANLI DEĞİL
-       * --------------------------------------------
-       */
-
-      /*
-       * Bitmiş maçlar en alta.
-       */
       if (
         aFinished &&
         !bFinished
@@ -436,10 +358,6 @@ function sortMatches(matches) {
         return -1;
       }
 
-      /*
-       * İkisi de bitmişse:
-       * en son biten üstte.
-       */
       if (
         aFinished &&
         bFinished
@@ -455,13 +373,6 @@ function sortMatches(matches) {
         );
       }
 
-      /*
-       * --------------------------------------------
-       * PLANLANAN MAÇLAR
-       * --------------------------------------------
-       *
-       * Başlama zamanı yakın olan üstte.
-       */
       const aTime =
         getMatchTimestamp(a);
 
@@ -477,7 +388,106 @@ function sortMatches(matches) {
 
 /*
  * --------------------------------------------------
- * TEK MAÇ / TÜM MAÇLAR
+ * SUPABASE ID EŞLEŞTİRME
+ * --------------------------------------------------
+ */
+
+async function attachSupabaseIds(
+  matches,
+  supabase
+) {
+  if (
+    !supabase ||
+    !Array.isArray(matches) ||
+    matches.length === 0
+  ) {
+    return matches;
+  }
+
+  const externalIds =
+    matches
+      .map(
+        (match) =>
+          match?.external_id
+      )
+      .filter(Boolean);
+
+  if (
+    externalIds.length === 0
+  ) {
+    return matches;
+  }
+
+  const {
+    data: databaseMatches,
+    error: databaseError,
+  } =
+    await supabase
+      .from("matches")
+      .select(
+        "id, external_id"
+      )
+      .in(
+        "external_id",
+        externalIds
+      );
+
+  if (databaseError) {
+    console.error(
+      "Supabase ID eşleştirme hatası:",
+      databaseError
+    );
+
+    return matches;
+  }
+
+  const idMap =
+    new Map();
+
+  for (
+    const databaseMatch of
+      databaseMatches || []
+  ) {
+    if (
+      databaseMatch?.external_id &&
+      databaseMatch?.id
+    ) {
+      idMap.set(
+        String(
+          databaseMatch.external_id
+        ),
+        databaseMatch.id
+      );
+    }
+  }
+
+  return matches.map(
+    (match) => {
+      const supabaseId =
+        idMap.get(
+          String(
+            match.external_id
+          )
+        );
+
+      if (!supabaseId) {
+        return match;
+      }
+
+      return {
+        ...match,
+        id:
+          supabaseId,
+        external_id:
+          match.external_id,
+      };
+    }
+  );
+}
+
+/*
+ * --------------------------------------------------
+ * GET
  * --------------------------------------------------
  */
 
@@ -500,6 +510,9 @@ export async function GET(request) {
 
     const status =
       searchParams.get("status");
+
+    const search =
+      searchParams.get("search");
 
     console.log(
       "================================="
@@ -525,6 +538,11 @@ export async function GET(request) {
     );
 
     console.log(
+      "search:",
+      search
+    );
+
+    console.log(
       "================================="
     );
 
@@ -543,10 +561,6 @@ export async function GET(request) {
       const supabase =
         getSupabaseAdmin();
 
-      /*
-       * Önce Supabase UUID veya
-       * external_id ile arıyoruz.
-       */
       if (supabase) {
         const {
           data: supabaseMatch,
@@ -576,10 +590,6 @@ export async function GET(request) {
           let freshMatch =
             null;
 
-          /*
-           * external_id varsa
-           * Mackolik'ten güncel maçı almaya çalış.
-           */
           if (
             supabaseMatch.external_id
           ) {
@@ -600,26 +610,19 @@ export async function GET(request) {
             return NextResponse.json(
               {
                 success: true,
-
                 source:
                   "Mackolik+Supabase",
-
                 match: {
                   ...freshMatch,
-
                   id:
                     supabaseMatch.id,
-
                   external_id:
                     supabaseMatch.external_id,
-
                   created_at:
                     supabaseMatch.created_at,
-
                   updated_at:
                     supabaseMatch.updated_at,
                 },
-
                 duration_ms:
                   Date.now() -
                   startedAt,
@@ -628,12 +631,8 @@ export async function GET(request) {
                 headers: {
                   "Cache-Control":
                     "no-store, no-cache, must-revalidate, proxy-revalidate",
-
-                  Pragma:
-                    "no-cache",
-
-                  Expires:
-                    "0",
+                  Pragma: "no-cache",
+                  Expires: "0",
                 },
               }
             );
@@ -642,13 +641,10 @@ export async function GET(request) {
           return NextResponse.json(
             {
               success: true,
-
               source:
                 "Supabase",
-
               match:
                 supabaseMatch,
-
               duration_ms:
                 Date.now() -
                 startedAt,
@@ -657,22 +653,14 @@ export async function GET(request) {
               headers: {
                 "Cache-Control":
                   "no-store, no-cache, must-revalidate, proxy-revalidate",
-
-                Pragma:
-                  "no-cache",
-
-                Expires:
-                  "0",
+                Pragma: "no-cache",
+                Expires: "0",
               },
             }
           );
         }
       }
 
-      /*
-       * Supabase'de bulunamazsa
-       * Mackolik'ten ara.
-       */
       const match =
         await getMatch(
           requestedId
@@ -689,29 +677,21 @@ export async function GET(request) {
         return NextResponse.json(
           {
             success: false,
-
             error:
               "Maç bulunamadı.",
-
             source:
               "Mackolik",
-
             duration_ms:
               Date.now() -
               startedAt,
           },
           {
             status: 404,
-
             headers: {
               "Cache-Control":
                 "no-store, no-cache, must-revalidate, proxy-revalidate",
-
-              Pragma:
-                "no-cache",
-
-              Expires:
-                "0",
+              Pragma: "no-cache",
+              Expires: "0",
             },
           }
         );
@@ -720,12 +700,9 @@ export async function GET(request) {
       return NextResponse.json(
         {
           success: true,
-
           source:
             "Mackolik",
-
           match,
-
           duration_ms:
             Date.now() -
             startedAt,
@@ -734,12 +711,8 @@ export async function GET(request) {
           headers: {
             "Cache-Control":
               "no-store, no-cache, must-revalidate, proxy-revalidate",
-
-            Pragma:
-              "no-cache",
-
-            Expires:
-              "0",
+            Pragma: "no-cache",
+            Expires: "0",
           },
         }
       );
@@ -747,23 +720,44 @@ export async function GET(request) {
 
     /*
      * ==================================================
-     * TÜM MAÇLAR
+     * TÜM MAÇLAR / ARAMA MAÇLARI
      * ==================================================
+     *
+     * search varsa:
+     *
+     * bugün + son 3 gün
+     *
+     * search yoksa:
+     *
+     * sadece bugün
+     *
+     * Böylece ana maç listesine geçmiş maçlar
+     * gereksiz yere eklenmez.
      */
 
-    console.log(
-      "Maçkolik getMatches() çağrılıyor..."
-    );
+    let allMatches;
 
-    const allMatches =
-      await getMatches();
+    if (
+      search &&
+      search.trim()
+    ) {
+      console.log(
+        "Arama modu: bugün + son 3 gün"
+      );
+
+      allMatches =
+        await getSearchMatches();
+    } else {
+      console.log(
+        "Normal mod: sadece bugün"
+      );
+
+      allMatches =
+        await getMatches();
+    }
 
     console.log(
-      "Maçkolik getMatches() tamamlandı."
-    );
-
-    console.log(
-      "Toplam maç:",
+      "Maçkolik maç sayısı:",
       allMatches.length
     );
 
@@ -779,95 +773,11 @@ export async function GET(request) {
     const supabase =
       getSupabaseAdmin();
 
-    if (
-      supabase &&
-      allMatches.length > 0
-    ) {
-      const externalIds =
-        allMatches
-          .map(
-            (match) =>
-              match?.external_id
-          )
-          .filter(Boolean);
-
-      if (
-        externalIds.length > 0
-      ) {
-        const {
-          data: databaseMatches,
-          error: databaseError,
-        } =
-          await supabase
-            .from("matches")
-            .select(
-              "id, external_id"
-            )
-            .in(
-              "external_id",
-              externalIds
-            );
-
-        if (databaseError) {
-          console.error(
-            "Supabase ID eşleştirme hatası:",
-            databaseError
-          );
-        } else {
-          const idMap =
-            new Map();
-
-          for (
-            const databaseMatch of
-              databaseMatches ||
-              []
-          ) {
-            if (
-              databaseMatch?.external_id &&
-              databaseMatch?.id
-            ) {
-              idMap.set(
-                String(
-                  databaseMatch.external_id
-                ),
-                databaseMatch.id
-              );
-            }
-          }
-
-          matches =
-            allMatches.map(
-              (match) => {
-                const supabaseId =
-                  idMap.get(
-                    String(
-                      match.external_id
-                    )
-                  );
-
-                if (!supabaseId) {
-                  return match;
-                }
-
-                return {
-                  ...match,
-
-                  id:
-                    supabaseId,
-
-                  external_id:
-                    match.external_id,
-                };
-              }
-            );
-
-          console.log(
-            "Supabase ID eşleşen maç:",
-            idMap.size
-          );
-        }
-      }
-    }
+    matches =
+      await attachSupabaseIds(
+        matches,
+        supabase
+      );
 
     /*
      * ==================================================
@@ -886,7 +796,8 @@ export async function GET(request) {
           (match) =>
             normalizeText(
               match.sport
-            ) === wantedSport
+            ) ===
+            wantedSport
         );
     }
 
@@ -907,13 +818,72 @@ export async function GET(request) {
           (match) =>
             normalizeText(
               match.status
-            ) === wantedStatus
+            ) ===
+            wantedStatus
         );
     }
 
     /*
      * ==================================================
-     * YENİ MAÇ SIRALAMASI
+     * ARAMA FİLTRESİ
+     * ==================================================
+     *
+     * Takım + lig aranır.
+     *
+     * Örnek:
+     *
+     * Galatasaray
+     * Fenerbahçe
+     * Liverpool
+     * Süper Lig
+     * Premier League
+     */
+
+    if (
+      search &&
+      search.trim()
+    ) {
+      const searchText =
+        normalizeText(
+          search
+        );
+
+      matches =
+        matches.filter(
+          (match) => {
+            const homeTeam =
+              normalizeText(
+                match?.home_team
+              );
+
+            const awayTeam =
+              normalizeText(
+                match?.away_team
+              );
+
+            const league =
+              normalizeText(
+                match?.league
+              );
+
+            return (
+              homeTeam.includes(
+                searchText
+              ) ||
+              awayTeam.includes(
+                searchText
+              ) ||
+              league.includes(
+                searchText
+              )
+            );
+          }
+        );
+    }
+
+    /*
+     * ==================================================
+     * SIRALAMA
      * ==================================================
      */
 
@@ -927,52 +897,15 @@ export async function GET(request) {
       matches.length
     );
 
-    /*
-     * Debug için ilk 15 maçı göster.
-     */
-    console.log(
-      "İlk sıralanan maçlar:",
-      matches
-        .slice(0, 15)
-        .map(
-          (match) => ({
-            id:
-              match.id,
-
-            league:
-              match.league,
-
-            home:
-              match.home_team,
-
-            away:
-              match.away_team,
-
-            status:
-              match.status,
-
-            state:
-              match.state,
-
-            minute:
-              getLiveMinute(
-                match
-              ),
-
-            turkish:
-              isTurkishLeague(
-                match
-              ),
-          })
-        )
-    );
-
     return NextResponse.json(
       {
         success: true,
 
         source:
-          "Mackolik+Supabase",
+          search &&
+          search.trim()
+            ? "Mackolik+Supabase+Search"
+            : "Mackolik+Supabase",
 
         count:
           matches.length,
@@ -1005,9 +938,7 @@ export async function GET(request) {
       "MACKOLIK /api/matches HATASI"
     );
 
-    console.error(
-      error
-    );
+    console.error(error);
 
     console.error(
       "================================="
