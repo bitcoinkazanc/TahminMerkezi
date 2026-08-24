@@ -36,24 +36,13 @@ export default function MatchesPage() {
         );
       }
 
-      /*
-       * ÖNEMLİ:
-       *
-       * Burada artık sayfanın kendi
-       * sortMatches() fonksiyonunu
-       * kullanmıyoruz.
-       *
-       * lib/match-utils.js içindeki
-       * ortak sıralama kullanılıyor.
-       *
-       * Böylece MatchCard'da "Bitti"
-       * olarak görünen maç aynı şekilde
-       * sıralamada da BİTMİŞ kabul edilir.
-       */
-
       const sortedMatches =
         sortMatches(
-          result.matches || []
+          Array.isArray(
+            result.matches
+          )
+            ? result.matches
+            : []
         );
 
       setMatches(
@@ -78,88 +67,131 @@ export default function MatchesPage() {
   return (
     <main className="page">
       <div className="page-container">
-        <div className="page-header">
-          <div>
-            <span className="page-eyebrow">
-              TAHMİNMERCİZİ
+
+        {/* ANA SAYFADAKİ HERO YAPISI */}
+        <section className="home-hero">
+          <div
+            className="home-hero-title"
+            style={{
+              position: "relative",
+            }}
+          >
+            <span className="home-hero-decoration">
+              ✦
             </span>
 
             <h1>
-              🏆 Bugünün Maçları
+              Başarı oranın ne kadar yüksekse,
+              sesin o kadar gür çıkar
             </h1>
 
-            <p>
-              Maçı seç, tahminini yap,
-              puanını topla!
-            </p>
-
-            <p>
-              Favori maçını seç, tahminini
-              paylaş ve doğru tahminlerle
-              puanını yükselt. Zirve seni
-              bekliyor! 🔥
-            </p>
+            <span className="home-hero-decoration">
+              ✦
+            </span>
           </div>
 
-          <button
-            type="button"
-            className="refresh-button"
-            onClick={loadMatches}
-            disabled={loading}
-            aria-label="Maçları yenile"
+          <p className="home-hero-text">
+            Unutma, en büyük analizciler de tek bir
+            doğru tahminle başladı. Sahadaki heyecana
+            ortak ol, bilgini konuştur ve liderlik
+            kürsüsüne doğru ilk adımını at. 🏆
+          </p>
+        </section>
+
+        {/* MAÇLAR KUTUSU */}
+        <section className="section-card">
+
+          <div
+            className="section-title home-matches-title"
+            style={{
+              position: "relative",
+              justifyContent: "center",
+              textAlign: "center",
+              paddingRight: "52px",
+            }}
           >
-            ↻
-          </button>
-        </div>
-
-        {loading ? (
-          <Loading />
-        ) : error ? (
-          <div className="error-box">
             <h2>
-              Maçlar yüklenemedi
+              Günün maçları seni bekliyor
             </h2>
-
-            <p>
-              {error}
-            </p>
 
             <button
               type="button"
-              className="primary-button"
+              className="refresh-button"
               onClick={loadMatches}
+              disabled={loading}
+              aria-label="Maçları yenile"
+              style={{
+                position: "absolute",
+                right: "16px",
+                top: "50%",
+                transform:
+                  "translateY(-50%)",
+              }}
             >
-              Tekrar Dene
+              ↻
             </button>
           </div>
-        ) : matches.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-icon">
-              ⚽
+
+          {loading ? (
+            <Loading />
+          ) : error ? (
+            <div className="error-box">
+              <h2>
+                Maçlar yüklenemedi
+              </h2>
+
+              <p>
+                {error}
+              </p>
+
+              <button
+                type="button"
+                className="primary-button"
+                onClick={loadMatches}
+              >
+                Tekrar Dene
+              </button>
             </div>
+          ) : matches.length === 0 ? (
+            <div className="empty-state small">
+              <div className="empty-icon">
+                ⚽
+              </div>
 
-            <h2>
-              Henüz maç yok
-            </h2>
+              <h3>
+                Henüz maç yok
+              </h3>
 
-            <p>
-              Sisteme maçlar
-              eklendiğinde burada
-              görüntülenecek.
-            </p>
+              <p>
+                Maçlar sisteme
+                eklendiğinde burada
+                görünecek.
+              </p>
 
-            <Link
-              href="/"
-              className="primary-button"
-            >
-              Ana Sayfaya Dön
-            </Link>
-          </div>
-        ) : (
-          <MatchList
-            matches={matches}
-          />
-        )}
+              <Link
+                href="/"
+                className="primary-button"
+              >
+                Ana Sayfaya Dön
+              </Link>
+            </div>
+          ) : (
+            <>
+              <MatchList
+                matches={matches}
+              />
+
+              <div className="home-disclaimer">
+                <strong>
+                  ❗ Sorumluluk Reddi:
+                </strong>{" "}
+                Tahminler yalnızca eğlence ve bilgi
+                amaçlıdır. Gerçek para ile bahis veya
+                kazanç garantisi içermez.
+              </div>
+            </>
+          )}
+        </section>
       </div>
     </main>
   );
