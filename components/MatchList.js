@@ -18,6 +18,25 @@ export default function MatchList({
   const [search, setSearch] =
     useState("");
 
+  const filterCategories = [
+    {
+      id: "all",
+      label: "🏆 Tümü",
+    },
+    {
+      id: "live",
+      label: "🔴 Canlı",
+    },
+    {
+      id: "scheduled",
+      label: "🟢 Yaklaşan",
+    },
+    {
+      id: "finished",
+      label: "✅ Biten",
+    },
+  ];
+
   const leagues = useMemo(() => {
     const uniqueLeagues = [
       ...new Set(
@@ -56,35 +75,18 @@ export default function MatchList({
           getMatchStatus(match);
 
         if (
-          statusFilter !== "all"
+          statusFilter !== "all" &&
+          status !== statusFilter
         ) {
-          if (
-            statusFilter === "upcoming" &&
-            status !== "scheduled"
-          ) {
-            return false;
-          }
-
-          if (
-            statusFilter === "live" &&
-            status !== "live"
-          ) {
-            return false;
-          }
-
-          if (
-            statusFilter === "finished" &&
-            status !== "finished"
-          ) {
-            return false;
-          }
+          return false;
         }
 
         if (
           leagueFilter !== "all" &&
           String(
             match?.league || ""
-          ) !== leagueFilter
+          ).trim() !==
+            leagueFilter
         ) {
           return false;
         }
@@ -131,6 +133,12 @@ export default function MatchList({
     search,
   ]);
 
+  function clearFilters() {
+    setStatusFilter("all");
+    setLeagueFilter("all");
+    setSearch("");
+  }
+
   if (
     !Array.isArray(matches) ||
     matches.length === 0
@@ -158,108 +166,72 @@ export default function MatchList({
       {enableFilters ? (
         <div
           style={{
-            marginBottom: "16px",
+            border:
+              "1px solid var(--border)",
+            borderRadius: "9px",
+            padding: "8px",
+            marginBottom: "12px",
+            background:
+              "var(--surface-soft)",
           }}
         >
-          {/* TAKIM ARAMA */}
-          <input
-            type="text"
-            value={search}
-            onChange={(event) =>
-              setSearch(
-                event.target.value
-              )
-            }
-            placeholder="🔎 Takım veya lig ara..."
-            style={{
-              width: "100%",
-              boxSizing: "border-box",
-              padding:
-                "12px 14px",
-              borderRadius:
-                "12px",
-              border:
-                "1px solid rgba(255,255,255,0.12)",
-              background:
-                "rgba(255,255,255,0.06)",
-              color: "inherit",
-              outline: "none",
-              marginBottom:
-                "10px",
-            }}
-          />
+          {/* DURUM FİLTRELERİ */}
 
-          {/* DURUM FİLTRESİ */}
           <div
             style={{
               display: "flex",
-              gap: "8px",
+              gap: "6px",
               overflowX: "auto",
-              paddingBottom:
-                "8px",
-              WebkitOverflowScrolling:
-                "touch",
+              paddingBottom: "7px",
+              marginBottom: "8px",
+              scrollbarWidth: "thin",
             }}
           >
-            {[
-              {
-                value: "all",
-                label: "Tümü",
-              },
-              {
-                value: "live",
-                label: "🔴 Canlı",
-              },
-              {
-                value: "upcoming",
-                label: "🟢 Yaklaşan",
-              },
-              {
-                value: "finished",
-                label: "Biten",
-              },
-            ].map(
-              (filter) => {
+            {filterCategories.map(
+              (category) => {
                 const active =
                   statusFilter ===
-                  filter.value;
+                  category.id;
 
                 return (
                   <button
                     key={
-                      filter.value
+                      category.id
                     }
                     type="button"
                     onClick={() =>
                       setStatusFilter(
-                        filter.value
+                        category.id
                       )
                     }
                     style={{
                       flexShrink: 0,
-                      border: "none",
+                      border:
+                        active
+                          ? "1px solid var(--primary)"
+                          : "1px solid var(--border)",
                       borderRadius:
-                        "999px",
-                      padding:
-                        "8px 14px",
+                        "7px",
                       background:
                         active
-                          ? "var(--primary-color, #f5b400)"
-                          : "rgba(255,255,255,0.07)",
+                          ? "var(--primary)"
+                          : "var(--surface)",
                       color:
                         active
-                          ? "#111"
-                          : "inherit",
+                          ? "#fff"
+                          : "var(--text)",
+                      padding:
+                        "6px 9px",
+                      fontSize:
+                        "10px",
                       fontWeight:
-                        active
-                          ? "700"
-                          : "500",
+                        800,
                       cursor:
                         "pointer",
                     }}
                   >
                     {
-                      filter.label
+                      category.label
                     }
                   </button>
                 );
@@ -267,61 +239,222 @@ export default function MatchList({
             )}
           </div>
 
-          {/* LİG FİLTRESİ */}
-          {leagues.length >
-          0 ? (
-            <select
-              value={
-                leagueFilter
-              }
-              onChange={(
-                event
-              ) =>
-                setLeagueFilter(
-                  event.target
-                    .value
-                )
-              }
+          {/* LİG FİLTRELERİ */}
+
+          {leagues.length > 0 ? (
+            <div
               style={{
-                width: "100%",
-                padding:
-                  "11px 12px",
-                borderRadius:
-                  "12px",
-                border:
-                  "1px solid rgba(255,255,255,0.12)",
-                background:
-                  "rgba(255,255,255,0.06)",
-                color:
-                  "inherit",
-                outline:
-                  "none",
-                marginTop:
-                  "2px",
+                display: "flex",
+                gap: "6px",
+                overflowX: "auto",
+                paddingBottom: "7px",
+                marginBottom: "8px",
+                scrollbarWidth: "thin",
               }}
             >
-              <option
-                value="all"
+              <button
+                type="button"
+                onClick={() =>
+                  setLeagueFilter(
+                    "all"
+                  )
+                }
+                style={{
+                  flexShrink: 0,
+                  border:
+                    leagueFilter ===
+                    "all"
+                      ? "1px solid var(--primary)"
+                      : "1px solid var(--border)",
+                  borderRadius:
+                    "7px",
+                  background:
+                    leagueFilter ===
+                    "all"
+                      ? "var(--primary)"
+                      : "var(--surface)",
+                  color:
+                    leagueFilter ===
+                    "all"
+                      ? "#fff"
+                      : "var(--text)",
+                  padding:
+                    "6px 9px",
+                  fontSize:
+                    "10px",
+                  fontWeight:
+                    800,
+                  cursor:
+                    "pointer",
+                }}
               >
                 🏆 Tüm Ligler
-              </option>
+              </button>
 
               {leagues.map(
-                (league) => (
-                  <option
-                    key={
-                      league
-                    }
-                    value={
-                      league
-                    }
-                  >
-                    {league}
-                  </option>
-                )
+                (league) => {
+                  const active =
+                    leagueFilter ===
+                    league;
+
+                  return (
+                    <button
+                      key={
+                        league
+                      }
+                      type="button"
+                      onClick={() =>
+                        setLeagueFilter(
+                          league
+                        )
+                      }
+                      style={{
+                        flexShrink: 0,
+                        border:
+                          active
+                            ? "1px solid var(--primary)"
+                            : "1px solid var(--border)",
+                        borderRadius:
+                          "7px",
+                        background:
+                          active
+                            ? "var(--primary)"
+                            : "var(--surface)",
+                        color:
+                          active
+                            ? "#fff"
+                            : "var(--text)",
+                        padding:
+                          "6px 9px",
+                        fontSize:
+                          "10px",
+                        fontWeight:
+                          800,
+                        cursor:
+                          "pointer",
+                        maxWidth:
+                          "180px",
+                        whiteSpace:
+                          "nowrap",
+                        overflow:
+                          "hidden",
+                        textOverflow:
+                          "ellipsis",
+                      }}
+                    >
+                      {league}
+                    </button>
+                  );
+                }
               )}
-            </select>
+            </div>
           ) : null}
+
+          {/* ARAMA */}
+
+          <div
+            style={{
+              display: "flex",
+              alignItems:
+                "center",
+              gap: "6px",
+            }}
+          >
+            <input
+              type="text"
+              value={search}
+              onChange={(event) =>
+                setSearch(
+                  event.target.value
+                )
+              }
+              placeholder="🔎 Takım veya lig ara..."
+              style={{
+                flex: 1,
+                minWidth: 0,
+                height: "32px",
+                boxSizing:
+                  "border-box",
+                padding:
+                  "6px 9px",
+                border:
+                  "1px solid var(--border)",
+                borderRadius:
+                  "7px",
+                background:
+                  "var(--surface)",
+                color:
+                  "var(--text)",
+                outline: "none",
+                fontSize:
+                  "10px",
+                fontWeight:
+                  600,
+              }}
+            />
+
+            {(statusFilter !==
+              "all" ||
+              leagueFilter !==
+                "all" ||
+              search) ? (
+              <button
+                type="button"
+                onClick={
+                  clearFilters
+                }
+                style={{
+                  flexShrink: 0,
+                  height: "32px",
+                  padding:
+                    "0 9px",
+                  border:
+                    "1px solid var(--border)",
+                  borderRadius:
+                    "7px",
+                  background:
+                    "var(--surface)",
+                  color:
+                    "var(--text)",
+                  fontSize:
+                    "10px",
+                  fontWeight:
+                    800,
+                  cursor:
+                    "pointer",
+                }}
+              >
+                Temizle
+              </button>
+            ) : null}
+          </div>
+
+          {/* SONUÇ SAYISI */}
+
+          <div
+            style={{
+              display: "flex",
+              justifyContent:
+                "space-between",
+              alignItems:
+                "center",
+              marginTop: "8px",
+              padding:
+                "0 2px",
+              fontSize: "9px",
+              color:
+                "var(--muted)",
+              fontWeight: 700,
+            }}
+          >
+            <span>
+              Maçlar
+            </span>
+
+            <span>
+              {filteredMatches.length} maç
+            </span>
+          </div>
         </div>
       ) : null}
 
@@ -344,15 +477,9 @@ export default function MatchList({
           <button
             type="button"
             className="primary-button"
-            onClick={() => {
-              setStatusFilter(
-                "all"
-              );
-              setLeagueFilter(
-                "all"
-              );
-              setSearch("");
-            }}
+            onClick={
+              clearFilters
+            }
           >
             Filtreleri Temizle
           </button>
