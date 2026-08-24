@@ -4,15 +4,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import MatchList from "../../components/MatchList";
 import Loading from "../../components/Loading";
-import { sortMatches } from "../../lib/match-utils";
-
-const INITIAL_VISIBLE_COUNT = 20;
-const LOAD_MORE_COUNT = 10;
 
 export default function MatchesPage() {
   const [matches, setMatches] = useState([]);
-  const [visibleCount, setVisibleCount] =
-    useState(INITIAL_VISIBLE_COUNT);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -22,7 +16,7 @@ export default function MatchesPage() {
       setError("");
 
       const response = await fetch(
-        "/api/matches",
+        "/api/matches?limit=100",
         {
           cache: "no-store",
         }
@@ -41,25 +35,8 @@ export default function MatchesPage() {
         );
       }
 
-      const loadedMatches =
-        Array.isArray(
-          result.matches
-        )
-          ? result.matches
-          : [];
-
-      /*
-       * Ana sayfa ile aynı sıralama
-       * sistemini kullan.
-       */
       setMatches(
-        sortMatches(
-          loadedMatches
-        )
-      );
-
-      setVisibleCount(
-        INITIAL_VISIBLE_COUNT
+        result.matches || []
       );
     } catch (err) {
       console.error(err);
@@ -77,27 +54,6 @@ export default function MatchesPage() {
     loadMatches();
   }, []);
 
-  const visibleMatches =
-    matches.slice(
-      0,
-      visibleCount
-    );
-
-  const hasMore =
-    visibleCount <
-    matches.length;
-
-  function loadMore() {
-    setVisibleCount(
-      (current) =>
-        Math.min(
-          current +
-            LOAD_MORE_COUNT,
-          matches.length
-        )
-    );
-  }
-
   return (
     <main className="page">
       <div className="page-container">
@@ -108,21 +64,26 @@ export default function MatchesPage() {
             </span>
 
             <h1>
-              Maçlar
+              🏆 Bugünün Maçları
             </h1>
 
             <p>
-              Bugünün ve yaklaşan
-              maçlarını keşfet.
+              Maçı seç, tahminini yap,
+              puanını topla!
+            </p>
+
+            <p>
+              Favori maçını seç, tahminini
+              paylaş ve doğru tahminlerle
+              puanını yükselt. Zirve seni
+              bekliyor! 🔥
             </p>
           </div>
 
           <button
             type="button"
             className="refresh-button"
-            onClick={
-              loadMatches
-            }
+            onClick={loadMatches}
             disabled={loading}
             aria-label="Maçları yenile"
           >
@@ -145,9 +106,7 @@ export default function MatchesPage() {
             <button
               type="button"
               className="primary-button"
-              onClick={
-                loadMatches
-              }
+              onClick={loadMatches}
             >
               Tekrar Dene
             </button>
@@ -163,8 +122,8 @@ export default function MatchesPage() {
             </h2>
 
             <p>
-              Maçkolik'ten maç
-              geldiğinde burada
+              Sisteme maçlar
+              eklendiğinde burada
               görüntülenecek.
             </p>
 
@@ -176,56 +135,9 @@ export default function MatchesPage() {
             </Link>
           </div>
         ) : (
-          <>
-            <MatchList
-              matches={
-                visibleMatches
-              }
-            />
-
-            {hasMore && (
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent:
-                    "center",
-                  marginTop:
-                    "20px",
-                  marginBottom:
-                    "20px",
-                }}
-              >
-                <button
-                  type="button"
-                  className="primary-button"
-                  onClick={
-                    loadMore
-                  }
-                >
-                  Daha Fazla
-                </button>
-              </div>
-            )}
-
-            {!hasMore &&
-              matches.length >
-                INITIAL_VISIBLE_COUNT && (
-                <div
-                  style={{
-                    textAlign:
-                      "center",
-                    marginTop:
-                      "20px",
-                    marginBottom:
-                      "20px",
-                    opacity: 0.7,
-                  }}
-                >
-                  Tüm maçlar
-                  gösteriliyor.
-                </div>
-              )}
-          </>
+          <MatchList
+            matches={matches}
+          />
         )}
       </div>
     </main>
