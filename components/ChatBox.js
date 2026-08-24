@@ -1,25 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import supabaseClient from "../lib/supabase-client";
 import ChatMessage from "./ChatMessage";
 import ChatInput from "./ChatInput";
 import Loading from "./Loading";
 
-export default function ChatBox({
-  matchId = null,
-}) {
-  const [messages, setMessages] =
-    useState([]);
-
-  const [loading, setLoading] =
-    useState(true);
-
-  /*
-   * ==================================================
-   * MESAJLARI YÜKLE
-   * ==================================================
-   */
+export default function ChatBox({ matchId = null }) {
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   async function loadMessages() {
     try {
@@ -31,27 +19,19 @@ export default function ChatBox({
           )}&limit=100`
         : "/api/messages?limit=100";
 
-      const response =
-        await fetch(query, {
-          cache: "no-store",
-        });
+      const response = await fetch(query, {
+        cache: "no-store",
+      });
 
-      const result =
-        await response.json();
+      const result = await response.json();
 
-      if (
-        !response.ok ||
-        !result.success
-      ) {
+      if (!response.ok || !result.success) {
         throw new Error(
-          result.error ||
-            "Mesajlar alınamadı."
+          result.error || "Mesajlar alınamadı."
         );
       }
 
-      setMessages(
-        result.messages || []
-      );
+      setMessages(result.messages || []);
     } catch (error) {
       console.error(
         "Chat loading error:",
@@ -62,231 +42,30 @@ export default function ChatBox({
     }
   }
 
-  /*
-   * ==================================================
-   * İLK YÜKLEME
-   * ==================================================
-   */
-
   useEffect(() => {
     loadMessages();
   }, [matchId]);
 
-  /*
-   * ==================================================
-   * SUPABASE REALTIME
-   * ==================================================
-   */
+  function handleMessageCreated(newMessage) {
+    if (!newMessage) return;
 
-  useEffect(() => {
-    if (!supabaseClient) {
-      console.error(
-        "Supabase Realtime client bulunamadı."
+    setMessages((current) => {
+      const exists = current.some(
+        (message) =>
+          String(message.id) ===
+          String(newMessage.id)
       );
 
-      return;
-    }
-
-    const channelName = matchId
-      ? `messages-match-${String(
-          matchId
-        )}`
-      : "messages-global";
-
-    console.log(
-      "Realtime kanal oluşturuluyor:",
-      channelName
-    );
-
-    let channel =
-      supabaseClient.channel(
-        channelName
-      );
-
-    channel =
-      channel.on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "messages",
-
-          ...(matchId
-            ? {
-                filter:
-                  `match_id=eq.${matchId}`,
-              }
-            : {}),
-        },
-        async (payload) => {
-          console.log(
-            "REALTIME YENİ MESAJ:",
-            payload
-          );
-
-          const newMessage =
-            payload?.new;
-
-          if (
-            !newMessage ||
-            !newMessage.id
-          ) {
-            return;
-          }
-
-          /*
-           * Realtime payload'ında users ilişkisi
-           * bulunmadığı için API'den güncel mesaj
-           * listesini tekrar alıyoruz.
-           */
-
-          try {
-            const query =
-              matchId
-                ? `/api/messages?match_id=${encodeURIComponent(
-                    matchId
-                  )}&limit=100`
-                : "/api/messages?limit=100";
-
-            const response =
-              await fetch(query, {
-                cache:
-                  "no-store",
-              });
-
-            const result =
-              await response.json();
-
-            if (
-              !response.ok ||
-              !result.success
-            ) {
-              throw new Error(
-                result.error ||
-                  "Yeni mesaj alınamadı."
-              );
-            }
-
-            const foundMessage =
-              (
-                result.messages ||
-                []
-              ).find(
-                (message) =>
-                  String(
-                    message.id
-                  ) ===
-                  String(
-                    newMessage.id
-                  )
-              );
-
-            if (
-              !foundMessage
-            ) {
-              return;
-            }
-
-            setMessages(
-              (current) => {
-                const exists =
-                  current.some(
-                    (message) =>
-                      String(
-                        message.id
-                      ) ===
-                      String(
-                        foundMessage.id
-                      )
-                  );
-
-                if (
-                  exists
-                ) {
-                  return current;
-                }
-
-                return [
-                  ...current,
-                  foundMessage,
-                ];
-              }
-            );
-          } catch (error) {
-            console.error(
-              "Realtime mesaj yükleme hatası:",
-              error
-            );
-          }
-        }
-      );
-
-    channel.subscribe(
-      (status) => {
-        console.log(
-          "Realtime status:",
-          status
-        );
+      if (exists) {
+        return current;
       }
-    );
 
-    return () => {
-      console.log(
-        "Realtime kanal kapatılıyor:",
-        channelName
-      );
-
-      supabaseClient.removeChannel(
-        channel
-      );
-    };
-  }, [matchId]);
-
-  /*
-   * ==================================================
-   * YENİ MESAJ
-   * ==================================================
-   */
-
-  function handleMessageCreated(
-    newMessage
-  ) {
-    if (!newMessage) {
-      return;
-    }
-
-    setMessages(
-      (current) => {
-        const exists =
-          current.some(
-            (message) =>
-              String(
-                message.id
-              ) ===
-              String(
-                newMessage.id
-              )
-          );
-
-        if (
-          exists
-        ) {
-          return current;
-        }
-
-        return [
-          ...current,
-          newMessage,
-        ];
-      }
-    );
+      return [
+        ...current,
+        newMessage,
+      ];
+    });
   }
-
-  /*
-   * ==================================================
-   * EKRAN
-   * ==================================================
-   */
 
   return (
     <div className="chat-box">
@@ -299,8 +78,7 @@ export default function ChatBox({
 
       {loading ? (
         <Loading />
-      ) : messages.length ===
-        0 ? (
+      ) : messages.length === 0 ? (
         <div className="empty-state small">
           <div className="empty-icon">
             💬
@@ -312,14 +90,12 @@ export default function ChatBox({
         </div>
       ) : (
         <div className="chat-messages">
-          {messages.map(
-            (message) => (
-              <ChatMessage
-                key={message.id}
-                message={message}
-              />
-            )
-          )}
+          {messages.map((message) => (
+            <ChatMessage
+              key={message.id}
+              message={message}
+            />
+          ))}
         </div>
       )}
     </div>
