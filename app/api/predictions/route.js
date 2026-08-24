@@ -85,77 +85,6 @@ async function findMatch(supabase, matchId) {
   return uuidMatch || null;
 }
 
-async function findUser(supabase, userId) {
-  if (!userId) {
-    return null;
-  }
-
-  const requestedId = String(userId).trim();
-
-  if (!requestedId) {
-    return null;
-  }
-
-  /*
-   * 1. Önce Supabase users.id UUID olarak kontrol et.
-   */
-  const {
-    data: userById,
-    error: userByIdError,
-  } = await supabase
-    .from("users")
-    .select("id, telegram_id")
-    .eq("id", requestedId)
-    .maybeSingle();
-
-  if (userByIdError) {
-    if (
-      userByIdError.code !== "22P02" &&
-      !userByIdError.message?.includes(
-        "invalid input syntax for type uuid"
-      )
-    ) {
-      console.error(
-        "User UUID lookup error:",
-        userByIdError
-      );
-
-      throw userByIdError;
-    }
-  }
-
-  if (userById) {
-    return userById;
-  }
-
-  /*
-   * 2. Eğer gelen değer Telegram ID ise
-   * users.telegram_id üzerinden bul.
-   */
-  const {
-    data: userByTelegramId,
-    error: telegramError,
-  } = await supabase
-    .from("users")
-    .select("id, telegram_id")
-    .eq(
-      "telegram_id",
-      requestedId
-    )
-    .maybeSingle();
-
-  if (telegramError) {
-    console.error(
-      "User Telegram ID lookup error:",
-      telegramError
-    );
-
-    throw telegramError;
-  }
-
-  return userByTelegramId || null;
-}
-
 export async function GET(request) {
   try {
     const supabase = getSupabase();
@@ -220,21 +149,9 @@ export async function GET(request) {
     }
 
     if (userId) {
-      const user = await findUser(
-        supabase,
-        userId
-      );
-
-      if (!user) {
-        return NextResponse.json({
-          success: true,
-          predictions: [],
-        });
-      }
-
       query = query.eq(
         "user_id",
-        user.id
+        userId
       );
     }
 
@@ -466,10 +383,32 @@ export async function POST(request) {
     const supabase =
       getSupabase();
 
-    const user = await findUser(
-      supabase,
-      userId
-    );
+    const {
+      data: user,
+      error: userError,
+    } = await supabase
+      .from("users")
+      .select("id")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (userError) {
+      console.error(
+        "Prediction user lookup error:",
+        userError
+      );
+
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            userError.message,
+        },
+        {
+          status: 500,
+        }
+      );
+    }
 
     if (!user) {
       return NextResponse.json(
@@ -484,10 +423,31 @@ export async function POST(request) {
       );
     }
 
-    const match = await findMatch(
-      supabase,
-      matchId
-    );
+    let match;
+
+    try {
+      match = await findMatch(
+        supabase,
+        matchId
+      );
+    } catch (matchLookupError) {
+      console.error(
+        "Prediction match lookup error:",
+        matchLookupError
+      );
+
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            matchLookupError.message ||
+            "Maç kontrol edilemedi.",
+        },
+        {
+          status: 500,
+        }
+      );
+    }
 
     if (!match) {
       return NextResponse.json(
@@ -512,7 +472,7 @@ export async function POST(request) {
       .select("id")
       .eq(
         "user_id",
-        user.id
+        userId
       )
       .eq(
         "match_id",
@@ -557,7 +517,7 @@ export async function POST(request) {
     } = await supabase
       .from("predictions")
       .insert({
-        user_id: user.id,
+        user_id: userId,
         match_id: match.id,
         prediction,
         confidence:
@@ -647,6 +607,7 @@ export async function POST(request) {
 export async function DELETE(request) {
   try {
     const supabase = getSupabase();
+
     const { searchParams } = new URL(
       request.url
     );
@@ -654,8 +615,8 @@ export async function DELETE(request) {
     const predictionId =
       searchParams.get("id");
 
-    const userId =
-      searchParams.get("user_id");
+    const telegramId =
+      searchParams.get("telegram_id");
 
     if (!predictionId) {
       return NextResponse.json(
@@ -670,7 +631,7 @@ export async function DELETE(request) {
       );
     }
 
-    if (!userId) {
+    if (!telegramId) {
       return NextResponse.json(
         {
           success: false,
@@ -684,20 +645,52 @@ export async function DELETE(request) {
     }
 
     /*
-     * Gelen user_id ister Supabase UUID
-     * ister Telegram ID olsun gerçek kullanıcıyı bul.
+     * TELEGRAM KULLANICISINI BUL
+     *
+     * Frontend'den gelen telegram_id,
+     * Supabase users.id ile aynı şey değildir.
+     *
+     * users.telegram_id -> gerçek Telegram hesabı
+     * users.id          -> Supabase UUID
      */
-    const user = await findUser(
-      supabase,
-      userId
-    );
+    const {
+      data: currentUser,
+      error: currentUserError,
+    } = await supabase
+      .from("users")
+      .select(
+        "id, telegram_id"
+      )
+      .eq(
+        "telegram_id",
+        telegramId
+      )
+      .maybeSingle();
 
-    if (!user) {
+    if (currentUserError) {
+      console.error(
+        "Delete user lookup error:",
+        currentUserError
+      );
+
       return NextResponse.json(
         {
           success: false,
           error:
-            "Kullanıcı bulunamadı.",
+            currentUserError.message,
+        },
+        {
+          status: 500,
+        }
+      );
+    }
+
+    if (!currentUser) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Telegram kullanıcısı bulunamadı.",
         },
         {
           status: 404,
@@ -705,6 +698,9 @@ export async function DELETE(request) {
       );
     }
 
+    /*
+     * SİLİNECEK TAHMİNİ BUL
+     */
     const {
       data: prediction,
       error: predictionError,
@@ -751,12 +747,16 @@ export async function DELETE(request) {
     }
 
     /*
-     * Tahminin sahibi ile isteği yapan
-     * gerçek Supabase kullanıcı UUID'sini karşılaştır.
+     * SAHİPLİK KONTROLÜ
+     *
+     * Tahminin user_id değeri,
+     * giriş yapan Telegram kullanıcısının
+     * Supabase users.id değeriyle aynı
+     * olmak zorunda.
      */
     if (
       String(prediction.user_id) !==
-      String(user.id)
+      String(currentUser.id)
     ) {
       return NextResponse.json(
         {
@@ -770,6 +770,9 @@ export async function DELETE(request) {
       );
     }
 
+    /*
+     * SADECE SAHİBİ SİLEBİLİR
+     */
     const {
       data: deletedPrediction,
       error: deleteError,
@@ -782,7 +785,7 @@ export async function DELETE(request) {
       )
       .eq(
         "user_id",
-        user.id
+        currentUser.id
       )
       .select("id")
       .maybeSingle();
@@ -810,10 +813,10 @@ export async function DELETE(request) {
         {
           success: false,
           error:
-            "Tahmin silinemedi.",
+            "Tahmin silinemedi veya bu tahmin size ait değil.",
         },
         {
-          status: 500,
+          status: 403,
         }
       );
     }
