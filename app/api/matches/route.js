@@ -11,11 +11,8 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 function getSupabaseAdmin() {
-  const url =
-    process.env.NEXT_PUBLIC_SUPABASE_URL;
-
-  const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!url || !key) {
     return null;
@@ -53,8 +50,7 @@ function getMatchTimestamp(match) {
       continue;
     }
 
-    const timestamp =
-      new Date(value).getTime();
+    const timestamp = new Date(value).getTime();
 
     if (Number.isFinite(timestamp)) {
       return timestamp;
@@ -86,8 +82,7 @@ function getLiveMinute(match) {
       continue;
     }
 
-    const numeric =
-      Number(value);
+    const numeric = Number(value);
 
     if (
       Number.isFinite(numeric) &&
@@ -106,11 +101,8 @@ function isLiveMatch(match) {
     return false;
   }
 
-  const status =
-    normalizeText(match.status);
-
-  const state =
-    normalizeText(match.state);
+  const status = normalizeText(match.status);
+  const state = normalizeText(match.state);
 
   return (
     status === "live" ||
@@ -129,11 +121,8 @@ function isFinishedMatch(match) {
     return false;
   }
 
-  const status =
-    normalizeText(match.status);
-
-  const state =
-    normalizeText(match.state);
+  const status = normalizeText(match.status);
+  const state = normalizeText(match.state);
 
   return (
     status === "finished" ||
@@ -158,21 +147,15 @@ function isTurkishLeague(match) {
     return false;
   }
 
-  const league =
-    normalizeText(match.league);
+  const league = normalizeText(match.league);
+  const leagueId = normalizeText(match.league_id);
+  const competitionId = normalizeText(match.competition_id);
 
-  const leagueId =
-    normalizeText(match.league_id);
-
-  const competitionId =
-    normalizeText(match.competition_id);
-
-  const country =
-    normalizeText(
-      match.country ||
-        match.country_name ||
-        match.league_country
-    );
+  const country = normalizeText(
+    match.country ||
+      match.country_name ||
+      match.league_country
+  );
 
   if (
     league.includes("türkiye") ||
@@ -204,9 +187,8 @@ function isTurkishLeague(match) {
   ];
 
   if (
-    turkishLeagueKeywords.some(
-      (keyword) =>
-        league.includes(keyword)
+    turkishLeagueKeywords.some((keyword) =>
+      league.includes(keyword)
     )
   ) {
     return true;
@@ -227,105 +209,56 @@ function sortMatches(matches) {
     return [];
   }
 
-  return [...matches].sort(
-    (a, b) => {
-      const aLive =
-        isLiveMatch(a);
+  return [...matches].sort((a, b) => {
+    const aLive = isLiveMatch(a);
+    const bLive = isLiveMatch(b);
 
-      const bLive =
-        isLiveMatch(b);
+    const aFinished = isFinishedMatch(a);
+    const bFinished = isFinishedMatch(b);
 
-      const aFinished =
-        isFinishedMatch(a);
+    if (aLive && !bLive) {
+      return -1;
+    }
 
-      const bFinished =
-        isFinishedMatch(b);
+    if (!aLive && bLive) {
+      return 1;
+    }
 
-      if (aLive && !bLive) {
+    if (aLive && bLive) {
+      const aTurkish = isTurkishLeague(a);
+      const bTurkish = isTurkishLeague(b);
+
+      if (aTurkish && !bTurkish) {
         return -1;
       }
 
-      if (!aLive && bLive) {
+      if (!aTurkish && bTurkish) {
         return 1;
       }
 
-      if (aLive && bLive) {
-        const aTurkish =
-          isTurkishLeague(a);
-
-        const bTurkish =
-          isTurkishLeague(b);
-
-        if (
-          aTurkish &&
-          !bTurkish
-        ) {
-          return -1;
-        }
-
-        if (
-          !aTurkish &&
-          bTurkish
-        ) {
-          return 1;
-        }
-
-        const aMinute =
-          getLiveMinute(a);
-
-        const bMinute =
-          getLiveMinute(b);
-
-        if (
-          aMinute !== null &&
-          bMinute !== null &&
-          aMinute !== bMinute
-        ) {
-          return bMinute - aMinute;
-        }
-
-        if (
-          aMinute !== null &&
-          bMinute === null
-        ) {
-          return -1;
-        }
-
-        if (
-          aMinute === null &&
-          bMinute !== null
-        ) {
-          return 1;
-        }
-
-        return (
-          getMatchTimestamp(a) -
-          getMatchTimestamp(b)
-        );
-      }
+      const aMinute = getLiveMinute(a);
+      const bMinute = getLiveMinute(b);
 
       if (
-        aFinished &&
-        !bFinished
+        aMinute !== null &&
+        bMinute !== null &&
+        aMinute !== bMinute
       ) {
-        return 1;
+        return bMinute - aMinute;
       }
 
       if (
-        !aFinished &&
-        bFinished
+        aMinute !== null &&
+        bMinute === null
       ) {
         return -1;
       }
 
       if (
-        aFinished &&
-        bFinished
+        aMinute === null &&
+        bMinute !== null
       ) {
-        return (
-          getMatchTimestamp(b) -
-          getMatchTimestamp(a)
-        );
+        return 1;
       }
 
       return (
@@ -333,13 +266,30 @@ function sortMatches(matches) {
         getMatchTimestamp(b)
       );
     }
-  );
+
+    if (aFinished && !bFinished) {
+      return 1;
+    }
+
+    if (!aFinished && bFinished) {
+      return -1;
+    }
+
+    if (aFinished && bFinished) {
+      return (
+        getMatchTimestamp(b) -
+        getMatchTimestamp(a)
+      );
+    }
+
+    return (
+      getMatchTimestamp(a) -
+      getMatchTimestamp(b)
+    );
+  });
 }
 
-async function attachSupabaseIds(
-  matches,
-  supabase
-) {
+async function attachSupabaseIds(matches, supabase) {
   if (
     !supabase ||
     !Array.isArray(matches) ||
@@ -348,13 +298,9 @@ async function attachSupabaseIds(
     return matches;
   }
 
-  const externalIds =
-    matches
-      .map(
-        (match) =>
-          match?.external_id
-      )
-      .filter(Boolean);
+  const externalIds = matches
+    .map((match) => match?.external_id)
+    .filter(Boolean);
 
   if (externalIds.length === 0) {
     return matches;
@@ -363,16 +309,10 @@ async function attachSupabaseIds(
   const {
     data: databaseMatches,
     error: databaseError,
-  } =
-    await supabase
-      .from("matches")
-      .select(
-        "id, external_id"
-      )
-      .in(
-        "external_id",
-        externalIds
-      );
+  } = await supabase
+    .from("matches")
+    .select("id, external_id")
+    .in("external_id", externalIds);
 
   if (databaseError) {
     console.error(
@@ -383,88 +323,70 @@ async function attachSupabaseIds(
     return matches;
   }
 
-  const idMap =
-    new Map();
+  const idMap = new Map();
 
-  for (
-    const databaseMatch of
-      databaseMatches || []
-  ) {
+  for (const databaseMatch of databaseMatches || []) {
     if (
       databaseMatch?.external_id &&
       databaseMatch?.id
     ) {
       idMap.set(
-        String(
-          databaseMatch.external_id
-        ),
+        String(databaseMatch.external_id),
         databaseMatch.id
       );
     }
   }
 
-  return matches.map(
-    (match) => {
-      const supabaseId =
-        idMap.get(
-          String(
-            match.external_id
-          )
-        );
+  return matches.map((match) => {
+    const supabaseId = idMap.get(
+      String(match.external_id)
+    );
 
-      if (!supabaseId) {
-        return match;
-      }
-
-      return {
-        ...match,
-        id: supabaseId,
-        external_id:
-          match.external_id,
-      };
+    if (!supabaseId) {
+      return match;
     }
-  );
+
+    return {
+      ...match,
+      id: supabaseId,
+      external_id: match.external_id,
+    };
+  });
 }
 
 export async function GET(request) {
-  const startedAt =
-    Date.now();
+  const startedAt = Date.now();
 
   try {
-    const {
-      searchParams,
-    } = new URL(
-      request.url
-    );
+    const { searchParams } = new URL(request.url);
 
-    const requestedId =
-      searchParams.get("id");
+    const requestedId = searchParams.get("id");
+    const sport = searchParams.get("sport");
+    const status = searchParams.get("status");
+    const search = searchParams.get("search");
 
-    const sport =
-      searchParams.get("sport");
-
-    const status =
-      searchParams.get("status");
-
-    const search =
-      searchParams.get("search");
+    console.log("=================================");
+    console.log("MACKOLIK /api/matches BAŞLADI");
+    console.log("id:", requestedId);
+    console.log("sport:", sport);
+    console.log("status:", status);
+    console.log("search:", search);
+    console.log("=================================");
 
     if (requestedId) {
-      const supabase =
-        getSupabaseAdmin();
+      const supabase = getSupabaseAdmin();
 
       if (supabase) {
         const {
           data: supabaseMatch,
           error: supabaseError,
-        } =
-          await supabase
-            .from("matches")
-            .select("*")
-            .or(
-              `id.eq.${requestedId},external_id.eq.${requestedId}`
-            )
-            .maybeSingle();
+        } = await supabase
+          .from("matches")
+          .select("*")
+          .or(
+            `id.eq.${requestedId},external_id.eq.${requestedId}`
+          )
+          .maybeSingle();
 
         if (supabaseError) {
           console.error(
@@ -474,17 +396,13 @@ export async function GET(request) {
         }
 
         if (supabaseMatch) {
-          let freshMatch =
-            null;
+          let freshMatch = null;
 
-          if (
-            supabaseMatch.external_id
-          ) {
+          if (supabaseMatch.external_id) {
             try {
-              freshMatch =
-                await getMatch(
-                  supabaseMatch.external_id
-                );
+              freshMatch = await getMatch(
+                supabaseMatch.external_id
+              );
             } catch (error) {
               console.error(
                 "Mackolik güncel maç alınamadı:",
@@ -497,12 +415,10 @@ export async function GET(request) {
             return NextResponse.json(
               {
                 success: true,
-                source:
-                  "Mackolik+Supabase",
+                source: "Mackolik+Supabase",
                 match: {
                   ...freshMatch,
-                  id:
-                    supabaseMatch.id,
+                  id: supabaseMatch.id,
                   external_id:
                     supabaseMatch.external_id,
                   created_at:
@@ -511,8 +427,7 @@ export async function GET(request) {
                     supabaseMatch.updated_at,
                 },
                 duration_ms:
-                  Date.now() -
-                  startedAt,
+                  Date.now() - startedAt,
               },
               {
                 headers: {
@@ -528,13 +443,10 @@ export async function GET(request) {
           return NextResponse.json(
             {
               success: true,
-              source:
-                "Supabase",
-              match:
-                supabaseMatch,
+              source: "Supabase",
+              match: supabaseMatch,
               duration_ms:
-                Date.now() -
-                startedAt,
+                Date.now() - startedAt,
             },
             {
               headers: {
@@ -548,22 +460,16 @@ export async function GET(request) {
         }
       }
 
-      const match =
-        await getMatch(
-          requestedId
-        );
+      const match = await getMatch(requestedId);
 
       if (!match) {
         return NextResponse.json(
           {
             success: false,
-            error:
-              "Maç bulunamadı.",
-            source:
-              "Mackolik",
+            error: "Maç bulunamadı.",
+            source: "Mackolik",
             duration_ms:
-              Date.now() -
-              startedAt,
+              Date.now() - startedAt,
           },
           {
             status: 404,
@@ -580,12 +486,10 @@ export async function GET(request) {
       return NextResponse.json(
         {
           success: true,
-          source:
-            "Mackolik",
+          source: "Mackolik",
           match,
           duration_ms:
-            Date.now() -
-            startedAt,
+            Date.now() - startedAt,
         },
         {
           headers: {
@@ -600,168 +504,140 @@ export async function GET(request) {
 
     let allMatches;
 
-    if (
-      search &&
-      search.trim()
-    ) {
-      allMatches =
-        await getSearchMatches();
-    } else {
-      allMatches =
-        await getMatches();
-    }
-
-    if (
-      !Array.isArray(allMatches)
-    ) {
-      allMatches = [];
-    }
-
-    let matches =
-      allMatches;
-
-    const supabase =
-      getSupabaseAdmin();
-
-    matches =
-      await attachSupabaseIds(
-        matches,
-        supabase
+    if (search && search.trim()) {
+      console.log(
+        "Arama modu: sadece bugün"
       );
+
+      allMatches = await getSearchMatches();
+    } else {
+      console.log(
+        "Normal mod: sadece bugün"
+      );
+
+      allMatches = await getMatches();
+    }
+
+    console.log(
+      "Maçkolik maç sayısı:",
+      allMatches.length
+    );
+
+    let matches = allMatches;
+
+    const supabase = getSupabaseAdmin();
+
+    matches = await attachSupabaseIds(
+      matches,
+      supabase
+    );
 
     if (sport) {
       const wantedSport =
-        normalizeText(
-          sport
-        );
+        normalizeText(sport);
 
-      matches =
-        matches.filter(
-          (match) =>
-            normalizeText(
-              match.sport
-            ) === wantedSport
-        );
+      matches = matches.filter(
+        (match) =>
+          normalizeText(match.sport) ===
+          wantedSport
+      );
     }
 
     if (status) {
       const wantedStatus =
-        normalizeText(
-          status
-        );
+        normalizeText(status);
 
-      matches =
-        matches.filter(
-          (match) =>
-            normalizeText(
-              match.status
-            ) === wantedStatus
-        );
-    }
-
-    if (
-      search &&
-      search.trim()
-    ) {
-      const searchText =
-        normalizeText(
-          search
-        );
-
-      matches =
-        matches.filter(
-          (match) => {
-            const homeTeam =
-              normalizeText(
-                match?.home_team
-              );
-
-            const awayTeam =
-              normalizeText(
-                match?.away_team
-              );
-
-            const league =
-              normalizeText(
-                match?.league
-              );
-
-            return (
-              homeTeam.includes(
-                searchText
-              ) ||
-              awayTeam.includes(
-                searchText
-              ) ||
-              league.includes(
-                searchText
-              )
-            );
-          }
-        );
-    }
-
-    matches =
-      sortMatches(
-        matches
+      matches = matches.filter(
+        (match) =>
+          normalizeText(match.status) ===
+          wantedStatus
       );
+    }
+
+    if (search && search.trim()) {
+      const searchText =
+        normalizeText(search);
+
+      matches = matches.filter((match) => {
+        const homeTeam =
+          normalizeText(match?.home_team);
+
+        const awayTeam =
+          normalizeText(match?.away_team);
+
+        const league =
+          normalizeText(match?.league);
+
+        return (
+          homeTeam.includes(searchText) ||
+          awayTeam.includes(searchText) ||
+          league.includes(searchText)
+        );
+      });
+    }
+
+    matches = sortMatches(matches);
+
+    console.log(
+      "Filtre sonrası maç:",
+      matches.length
+    );
 
     return NextResponse.json(
       {
         success: true,
         source:
-          search &&
-          search.trim()
+          search && search.trim()
             ? "Mackolik+Supabase+Search"
             : "Mackolik+Supabase",
-        count:
-          matches.length,
+        count: matches.length,
         matches,
         duration_ms:
-          Date.now() -
-          startedAt,
+          Date.now() - startedAt,
       },
       {
         headers: {
           "Cache-Control":
             "no-store, no-cache, must-revalidate, proxy-revalidate",
-          Pragma:
-            "no-cache",
-          Expires:
-            "0",
+          Pragma: "no-cache",
+          Expires: "0",
         },
       }
     );
   } catch (error) {
     console.error(
-      "MACKOLIK /api/matches HATASI",
-      error
+      "================================="
+    );
+
+    console.error(
+      "MACKOLIK /api/matches HATASI"
+    );
+
+    console.error(error);
+
+    console.error(
+      "================================="
     );
 
     return NextResponse.json(
       {
         success: false,
-        source:
-          "Mackolik",
+        source: "Mackolik",
         error:
           error?.message ||
           "Maç verileri alınamadı.",
         error_name:
-          error?.name ||
-          null,
+          error?.name || null,
         duration_ms:
-          Date.now() -
-          startedAt,
+          Date.now() - startedAt,
       },
       {
         status: 500,
         headers: {
           "Cache-Control":
             "no-store, no-cache, must-revalidate, proxy-revalidate",
-          Pragma:
-            "no-cache",
-          Expires:
-            "0",
+          Pragma: "no-cache",
+          Expires: "0",
         },
       }
     );
