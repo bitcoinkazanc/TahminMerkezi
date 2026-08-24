@@ -4,15 +4,26 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 
 export default function ProfileCard({ user }) {
-  const [followersCount, setFollowersCount] = useState(0);
-  const [followingCount, setFollowingCount] = useState(0);
-  const [isFollowing, setIsFollowing] = useState(false);
-  const [followLoading, setFollowLoading] = useState(false);
+  const [followersCount, setFollowersCount] =
+    useState(0);
 
-  const [followList, setFollowList] = useState(null);
-  const [listLoading, setListLoading] = useState(false);
+  const [followingCount, setFollowingCount] =
+    useState(0);
 
-  const [currentUserId, setCurrentUserId] = useState(null);
+  const [isFollowing, setIsFollowing] =
+    useState(false);
+
+  const [followLoading, setFollowLoading] =
+    useState(false);
+
+  const [followList, setFollowList] =
+    useState(null);
+
+  const [listLoading, setListLoading] =
+    useState(false);
+
+  const [currentUserId, setCurrentUserId] =
+    useState(null);
 
   useEffect(() => {
     if (!user?.id) {
@@ -21,14 +32,10 @@ export default function ProfileCard({ user }) {
 
     async function loadFollowData() {
       try {
-        let savedUser = null;
-
-        if (typeof window !== "undefined") {
-          savedUser =
-            localStorage.getItem("tm_user");
-        }
-
         let loggedUserId = null;
+
+        const savedUser =
+          localStorage.getItem("tm_user");
 
         if (savedUser) {
           try {
@@ -42,9 +49,12 @@ export default function ProfileCard({ user }) {
 
         setCurrentUserId(loggedUserId);
 
+        const followerId =
+          loggedUserId || user.id;
+
         const response = await fetch(
           `/api/follows?follower_id=${encodeURIComponent(
-            loggedUserId || user.id
+            followerId
           )}&following_id=${encodeURIComponent(
             user.id
           )}`,
@@ -131,7 +141,7 @@ export default function ProfileCard({ user }) {
   async function toggleFollow() {
     if (
       followLoading ||
-      !user?.id ||
+      !user.id ||
       !currentUserId ||
       currentUserId === user.id
     ) {
@@ -171,10 +181,7 @@ export default function ProfileCard({ user }) {
 
         setFollowersCount(
           (count) =>
-            Math.max(
-              0,
-              count - 1
-            )
+            Math.max(0, count - 1)
         );
       } else {
         const response =
@@ -211,8 +218,7 @@ export default function ProfileCard({ user }) {
         setIsFollowing(true);
 
         setFollowersCount(
-          (count) =>
-            count + 1
+          (count) => count + 1
         );
       }
     } catch (error) {
@@ -302,6 +308,7 @@ export default function ProfileCard({ user }) {
           overflow: "hidden",
           display: "flex",
           alignItems: "center",
+          gap: "10px",
         }}
       >
         {user.avatar_url ? (
@@ -312,7 +319,6 @@ export default function ProfileCard({ user }) {
                 ? `@${user.username}`
                 : "Telegram Kullanıcısı"
             }
-            className="profile-avatar"
             width={72}
             height={72}
             style={{
@@ -345,83 +351,32 @@ export default function ProfileCard({ user }) {
             flex: "1 1 auto",
             width: 0,
             minWidth: 0,
-            maxWidth: "100%",
             boxSizing: "border-box",
             overflow: "hidden",
-            marginLeft: "10px",
           }}
         >
-          <div
+          <p
             style={{
-              display: "flex",
-              alignItems: "center",
+              margin: 0,
               width: "100%",
-              minWidth: 0,
+              overflow: "hidden",
+              textOverflow:
+                "ellipsis",
+              whiteSpace:
+                "nowrap",
             }}
           >
-            <p
-              style={{
-                flex: "1 1 auto",
-                width: 0,
-                minWidth: 0,
-                margin: 0,
-                overflow: "hidden",
-                textOverflow:
-                  "ellipsis",
-                whiteSpace:
-                  "nowrap",
-              }}
-            >
-              {user.username
-                ? `@${user.username}`
-                : "Telegram kullanıcısı"}
-            </p>
-
-            {currentUserId !==
-              user.id &&
-            user.username ? (
-              <button
-                type="button"
-                onClick={
-                  openTelegram
-                }
-                style={{
-                  flex:
-                    "0 0 auto",
-                  marginLeft:
-                    "8px",
-                  marginRight:
-                    "-2px",
-                  padding:
-                    "6px 10px",
-                  minHeight:
-                    "30px",
-                  border: "none",
-                  borderRadius:
-                    "8px",
-                  background:
-                    "var(--primary)",
-                  color: "#fff",
-                  fontSize:
-                    "10px",
-                  fontWeight: 800,
-                  cursor:
-                    "pointer",
-                  whiteSpace:
-                    "nowrap",
-                }}
-              >
-                💬 Mesaj
-              </button>
-            ) : null}
-          </div>
+            {user.username
+              ? `@${user.username}`
+              : "Telegram kullanıcısı"}
+          </p>
 
           <div
             style={{
               display: "flex",
               alignItems: "center",
-              gap: "12px",
-              marginTop: "10px",
+              gap: "14px",
+              marginTop: "9px",
             }}
           >
             <button
@@ -437,12 +392,10 @@ export default function ProfileCard({ user }) {
                   "transparent",
                 padding: 0,
                 margin: 0,
-                cursor:
-                  "pointer",
+                cursor: "pointer",
                 color:
                   "inherit",
-                textAlign:
-                  "left",
+                textAlign: "left",
               }}
             >
               <strong
@@ -451,6 +404,8 @@ export default function ProfileCard({ user }) {
                     "block",
                   fontSize:
                     "14px",
+                  lineHeight:
+                    "16px",
                 }}
               >
                 {followersCount}
@@ -462,7 +417,10 @@ export default function ProfileCard({ user }) {
                     "block",
                   fontSize:
                     "10px",
-                  opacity: 0.65,
+                  opacity:
+                    0.65,
+                  lineHeight:
+                    "12px",
                 }}
               >
                 Takipçi
@@ -482,12 +440,10 @@ export default function ProfileCard({ user }) {
                   "transparent",
                 padding: 0,
                 margin: 0,
-                cursor:
-                  "pointer",
+                cursor: "pointer",
                 color:
                   "inherit",
-                textAlign:
-                  "left",
+                textAlign: "left",
               }}
             >
               <strong
@@ -496,6 +452,8 @@ export default function ProfileCard({ user }) {
                     "block",
                   fontSize:
                     "14px",
+                  lineHeight:
+                    "16px",
                 }}
               >
                 {followingCount}
@@ -507,62 +465,122 @@ export default function ProfileCard({ user }) {
                     "block",
                   fontSize:
                     "10px",
-                  opacity: 0.65,
+                  opacity:
+                    0.65,
+                  lineHeight:
+                    "12px",
                 }}
               >
                 Takip
               </span>
             </button>
-
-            {currentUserId &&
-            currentUserId !==
-              user.id ? (
-              <button
-                type="button"
-                onClick={
-                  toggleFollow
-                }
-                disabled={
-                  followLoading
-                }
-                style={{
-                  border: "none",
-                  borderRadius:
-                    "8px",
-                  padding:
-                    "7px 12px",
-                  background:
-                    isFollowing
-                      ? "rgba(128,128,128,0.15)"
-                      : "var(--primary)",
-                  color:
-                    isFollowing
-                      ? "inherit"
-                      : "#fff",
-                  fontSize:
-                    "11px",
-                  fontWeight:
-                    800,
-                  cursor:
-                    followLoading
-                      ? "default"
-                      : "pointer",
-                  opacity:
-                    followLoading
-                      ? 0.6
-                      : 1,
-                  whiteSpace:
-                    "nowrap",
-                }}
-              >
-                {followLoading
-                  ? "..."
-                  : isFollowing
-                    ? "Takipten Çık"
-                    : "Takip Et"}
-              </button>
-            ) : null}
           </div>
+        </div>
+
+        <div
+          style={{
+            flex: "0 0 92px",
+            width: "92px",
+            minWidth: "92px",
+            maxWidth: "92px",
+            marginLeft: "auto",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "stretch",
+            justifyContent: "center",
+            gap: "7px",
+            boxSizing: "border-box",
+          }}
+        >
+          {user.username &&
+          currentUserId !== user.id ? (
+            <button
+              type="button"
+              onClick={
+                openTelegram
+              }
+              style={{
+                width: "92px",
+                minWidth: "92px",
+                maxWidth: "92px",
+                height: "30px",
+                padding:
+                  "0 8px",
+                margin: 0,
+                border: "none",
+                borderRadius:
+                  "8px",
+                background:
+                  "var(--primary)",
+                color: "#fff",
+                fontSize:
+                  "10px",
+                fontWeight: 800,
+                cursor:
+                  "pointer",
+                whiteSpace:
+                  "nowrap",
+                boxSizing:
+                  "border-box",
+              }}
+            >
+              💬 Mesaj
+            </button>
+          ) : null}
+
+          {currentUserId &&
+          currentUserId !== user.id ? (
+            <button
+              type="button"
+              onClick={
+                toggleFollow
+              }
+              disabled={
+                followLoading
+              }
+              style={{
+                width: "92px",
+                minWidth: "92px",
+                maxWidth: "92px",
+                height: "30px",
+                padding:
+                  "0 8px",
+                margin: 0,
+                border: "none",
+                borderRadius:
+                  "8px",
+                background:
+                  isFollowing
+                    ? "rgba(128,128,128,0.15)"
+                    : "var(--primary)",
+                color:
+                  isFollowing
+                    ? "inherit"
+                    : "#fff",
+                fontSize:
+                  "10px",
+                fontWeight: 800,
+                cursor:
+                  followLoading
+                    ? "default"
+                    : "pointer",
+                opacity:
+                  followLoading
+                    ? 0.6
+                    : 1,
+                whiteSpace:
+                  "nowrap",
+                boxSizing:
+                  "border-box",
+              }}
+            >
+              {followLoading
+                ? "..."
+                : isFollowing
+                  ? "Takipten Çık"
+                  : "Takip Et"}
+            </button>
+          ) : null}
         </div>
       </section>
 
@@ -733,7 +751,8 @@ export default function ProfileCard({ user }) {
                           gap: "10px",
                           padding:
                             "9px 4px",
-                          width: "100%",
+                          width:
+                            "100%",
                           boxSizing:
                             "border-box",
                           textDecoration:
