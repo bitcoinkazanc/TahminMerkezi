@@ -1,3 +1,5 @@
+"app/api/predictions/route.js"
+
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -33,9 +35,16 @@ function getSupabase() {
  * PredictionBox tarafından gelen match_id
  * Mackolik ID olabilir.
  *
- * Önce matches.external_id kontrol edilir.
- * Bulunan kaydın gerçek Supabase matches.id
- * değeri tahmine yazılır.
+ * Öncelik:
+ *
+ * 1. matches.external_id
+ * 2. matches.id
+ *
+ * ÖNEMLİ:
+ *
+ * matches.iddaa_code KULLANILMIYOR.
+ * Bu kolon Supabase'de olmadığı için sorguya
+ * dahil edilmez.
  */
 
 async function findMatch(
@@ -57,11 +66,9 @@ async function findMatch(
   }
 
   /*
-   * Öncelikli ve asıl eşleşme:
-   *
-   * Mackolik ID
-   *      ↓
-   * matches.external_id
+   * --------------------------------------------------
+   * 1. MACKOLIK ID → external_id
+   * --------------------------------------------------
    */
 
   const {
@@ -102,12 +109,13 @@ async function findMatch(
   }
 
   /*
-   * Bazı ekranlar doğrudan Supabase matches.id
-   * gönderebilir.
+   * --------------------------------------------------
+   * 2. DOĞRUDAN SUPABASE MATCH ID
+   * --------------------------------------------------
    *
-   * UUID değilse Supabase hata verebilir.
-   * Bu nedenle sadece UUID formatındaysa
-   * matches.id sorgulanıyor.
+   * Bazı ekranlar doğrudan matches.id gönderebilir.
+   *
+   * UUID formatındaysa doğrudan id üzerinden arıyoruz.
    */
 
   const uuidRegex =
@@ -589,19 +597,16 @@ export async function POST(request) {
      * MAÇI BUL
      * --------------------------------------------------
      *
-     * Burada kritik düzeltme yapıldı.
+     * PredictionBox'tan gelen match_id
+     * Mackolik ID ise:
      *
-     * Frontend:
-     *
-     * match_id = Mackolik ID
-     *
-     * API:
-     *
-     * matches.external_id = Mackolik ID
-     *
-     * Sonra:
-     *
-     * matches.id = gerçek Supabase ID
+     * match_id
+     *    ↓
+     * matches.external_id
+     *    ↓
+     * matches.id
+     *    ↓
+     * predictions.match_id
      */
 
     const match =
@@ -617,7 +622,7 @@ export async function POST(request) {
           error:
             "Maç bulunamadı. Mackolik ID ile Supabase matches.external_id eşleşmesi yok.",
           received_match_id:
-            String(matchId),
+            String(matchId).trim(),
         },
         {
           status: 404,
@@ -686,9 +691,6 @@ export async function POST(request) {
      * --------------------------------------------------
      * TAHMİNİ KAYDET
      * --------------------------------------------------
-     *
-     * Burada Mackolik ID değil,
-     * gerçek Supabase matches.id yazılır.
      */
 
     const {
@@ -805,8 +807,7 @@ export async function POST(request) {
  *
  * SADECE TAHMİN SAHİBİ SİLEBİLİR.
  *
- * Bu bölüm tahmin silme sisteminin çalışan
- * halini korumak için değiştirilmemiştir.
+ * Bu bölüm çalışan sistem korunarak bırakılmıştır.
  */
 
 export async function DELETE(request) {
@@ -857,12 +858,6 @@ export async function DELETE(request) {
       );
     }
 
-    /*
-     * --------------------------------------------------
-     * MEVCUT TELEGRAM KULLANICISINI BUL
-     * --------------------------------------------------
-     */
-
     const {
       data: currentUser,
       error:
@@ -908,12 +903,6 @@ export async function DELETE(request) {
         }
       );
     }
-
-    /*
-     * --------------------------------------------------
-     * TAHMİNİ BUL
-     * --------------------------------------------------
-     */
 
     const {
       data: prediction,
@@ -961,12 +950,6 @@ export async function DELETE(request) {
       );
     }
 
-    /*
-     * --------------------------------------------------
-     * SAHİPLİK KONTROLÜ
-     * --------------------------------------------------
-     */
-
     if (
       String(
         prediction.user_id
@@ -986,12 +969,6 @@ export async function DELETE(request) {
         }
       );
     }
-
-    /*
-     * --------------------------------------------------
-     * SİL
-     * --------------------------------------------------
-     */
 
     const {
       data:
