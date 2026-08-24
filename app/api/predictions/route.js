@@ -244,28 +244,6 @@ async function findMatch(
    * --------------------------------------------------
    * 3. SUPABASE'DE YOKSA MACKOLIK'TEN BUL
    * --------------------------------------------------
-   *
-   * Buradaki kritik düzeltme budur.
-   *
-   * Daha önce:
-   *
-   * Mackolik ID
-   *      ↓
-   * external_id aranıyor
-   *      ↓
-   * yoksa direkt hata
-   *
-   * Şimdi:
-   *
-   * Mackolik ID
-   *      ↓
-   * external_id aranıyor
-   *      ↓
-   * yoksa Mackolik'ten maç al
-   *      ↓
-   * matches tablosuna kaydet
-   *      ↓
-   * Supabase ID'yi kullan
    */
 
   let mackolikMatch = null;
@@ -286,11 +264,6 @@ async function findMatch(
     return null;
   }
 
-  /*
-   * Mackolik'ten gelen maçın external_id'si
-   * mutlaka mevcut olmalı.
-   */
-
   const externalId =
     mackolikMatch?.external_id
       ? String(
@@ -308,9 +281,9 @@ async function findMatch(
   }
 
   /*
-   * Mackolik'ten gelen ID ile tekrar kontrol.
-   *
-   * Aynı anda başka istek maçı eklemiş olabilir.
+   * --------------------------------------------------
+   * 4. TEKRAR KONTROL
+   * --------------------------------------------------
    */
 
   const {
@@ -355,7 +328,7 @@ async function findMatch(
 
   /*
    * --------------------------------------------------
-   * 4. MAÇI SUPABASE'E EKLE
+   * 5. MAÇI SUPABASE'E EKLE
    * --------------------------------------------------
    */
 
@@ -388,11 +361,6 @@ async function findMatch(
     .single();
 
   if (insertError) {
-    /*
-     * Aynı anda başka bir istek INSERT yaptıysa
-     * tekrar external_id üzerinden bulmayı dene.
-     */
-
     console.error(
       "Match INSERT error:",
       insertError
@@ -893,7 +861,9 @@ export async function POST(
           supabase,
           matchId
         );
-    } catch (matchLookupError) {
+    } catch (
+      matchLookupError
+    ) {
       console.error(
         "Prediction match lookup error:",
         matchLookupError
@@ -1091,260 +1061,6 @@ export async function POST(
         success: false,
         error:
           "Tahmin gönderilirken bir hata oluştu.",
-      },
-      {
-        status: 500,
-      }
-    );
-  }
-}
-
-/*
- * ==================================================
- * DELETE
- * ==================================================
- *
- * SADECE TAHMİN SAHİBİ SİLEBİLİR.
- *
- * Bu bölüm çalışan sistem korunarak bırakılmıştır.
- */
-
-export async function DELETE(
-  request
-) {
-  try {
-    const supabase =
-      getSupabase();
-
-    const {
-      searchParams,
-    } = new URL(
-      request.url
-    );
-
-    const predictionId =
-      searchParams.get(
-        "id"
-      );
-
-    const telegramId =
-      searchParams.get(
-        "telegram_id"
-      ) ||
-      searchParams.get(
-        "user_id"
-      );
-
-    if (!predictionId) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Tahmin ID gerekli.",
-        },
-        {
-          status: 400,
-        }
-      );
-    }
-
-    if (!telegramId) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Kullanıcı bilgisi gerekli.",
-        },
-        {
-          status: 400,
-        }
-      );
-    }
-
-    const {
-      data: currentUser,
-      error:
-        currentUserError,
-    } = await supabase
-      .from("users")
-      .select(
-        "id, telegram_id"
-      )
-      .eq(
-        "telegram_id",
-        telegramId
-      )
-      .maybeSingle();
-
-    if (currentUserError) {
-      console.error(
-        "Delete user lookup error:",
-        currentUserError
-      );
-
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            currentUserError.message,
-        },
-        {
-          status: 500,
-        }
-      );
-    }
-
-    if (!currentUser) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Telegram kullanıcısı bulunamadı.",
-        },
-        {
-          status: 404,
-        }
-      );
-    }
-
-    const {
-      data: prediction,
-      error:
-        predictionError,
-    } = await supabase
-      .from("predictions")
-      .select(
-        "id, user_id"
-      )
-      .eq(
-        "id",
-        predictionId
-      )
-      .maybeSingle();
-
-    if (predictionError) {
-      console.error(
-        "Prediction delete lookup error:",
-        predictionError
-      );
-
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            predictionError.message,
-        },
-        {
-          status: 500,
-        }
-      );
-    }
-
-    if (!prediction) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Tahmin bulunamadı.",
-        },
-        {
-          status: 404,
-        }
-      );
-    }
-
-    /*
-     * SADECE TAHMİN SAHİBİ SİLEBİLİR
-     */
-
-    if (
-      String(
-        prediction.user_id
-      ) !==
-      String(
-        currentUser.id
-      )
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Bu tahmini silme yetkiniz yok.",
-        },
-        {
-          status: 403,
-        }
-      );
-    }
-
-    const {
-      data:
-        deletedPrediction,
-      error:
-        deleteError,
-    } = await supabase
-      .from("predictions")
-      .delete()
-      .eq(
-        "id",
-        predictionId
-      )
-      .eq(
-        "user_id",
-        currentUser.id
-      )
-      .select("id")
-      .maybeSingle();
-
-    if (deleteError) {
-      console.error(
-        "Prediction delete error:",
-        deleteError
-      );
-
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            deleteError.message,
-        },
-        {
-          status: 500,
-        }
-      );
-    }
-
-    if (
-      !deletedPrediction
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Tahmin silinemedi veya bu tahmin size ait değil.",
-        },
-        {
-          status: 403,
-        }
-      );
-    }
-
-    return NextResponse.json({
-      success: true,
-      message:
-        "Tahmin başarıyla silindi.",
-    });
-  } catch (error) {
-    console.error(
-      "Prediction DELETE server error:",
-      error
-    );
-
-    return NextResponse.json(
-      {
-        success: false,
-        error:
-          "Tahmin silinirken bir sunucu hatası oluştu.",
       },
       {
         status: 500,
