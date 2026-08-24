@@ -4,135 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import MatchList from "../../components/MatchList";
 import Loading from "../../components/Loading";
-
-function sortMatches(matches) {
-  return [...matches].sort((a, b) => {
-    const statusA =
-      String(a?.status || "").toLowerCase();
-
-    const statusB =
-      String(b?.status || "").toLowerCase();
-
-    const liveA =
-      statusA === "live";
-
-    const liveB =
-      statusB === "live";
-
-    const finishedA =
-      [
-        "finished",
-        "completed",
-        "ended",
-        "fulltime",
-        "full_time",
-      ].includes(statusA);
-
-    const finishedB =
-      [
-        "finished",
-        "completed",
-        "ended",
-        "fulltime",
-        "full_time",
-      ].includes(statusB);
-
-    /*
-     * 1. CANLI MAÇLAR EN ÜSTTE
-     *
-     * Dakikası büyük olan üstte.
-     * Örn:
-     * 78'
-     * 64'
-     * 32'
-     * 7'
-     */
-    if (liveA && liveB) {
-      const minuteA =
-        Number.isFinite(
-          Number(a?.live_minute)
-        )
-          ? Number(a.live_minute)
-          : -1;
-
-      const minuteB =
-        Number.isFinite(
-          Number(b?.live_minute)
-        )
-          ? Number(b.live_minute)
-          : -1;
-
-      if (minuteA !== minuteB) {
-        return minuteB - minuteA;
-      }
-
-      const dateA =
-        new Date(
-          a?.match_date || 0
-        ).getTime();
-
-      const dateB =
-        new Date(
-          b?.match_date || 0
-        ).getTime();
-
-      return dateA - dateB;
-    }
-
-    if (liveA) {
-      return -1;
-    }
-
-    if (liveB) {
-      return 1;
-    }
-
-    /*
-     * 2. BİTMİŞ MAÇLAR EN ALTA
-     */
-    if (finishedA && finishedB) {
-      const dateA =
-        new Date(
-          a?.match_date || 0
-        ).getTime();
-
-      const dateB =
-        new Date(
-          b?.match_date || 0
-        ).getTime();
-
-      /*
-       * En son biten maç üstte.
-       */
-      return dateB - dateA;
-    }
-
-    if (finishedA) {
-      return 1;
-    }
-
-    if (finishedB) {
-      return -1;
-    }
-
-    /*
-     * 3. BAŞLAMAMIŞ MAÇLAR
-     *
-     * Başlama zamanı en yakın olan üstte.
-     */
-    const dateA =
-      new Date(
-        a?.match_date || 0
-      ).getTime();
-
-    const dateB =
-      new Date(
-        b?.match_date || 0
-      ).getTime();
-
-    return dateA - dateB;
-  });
-}
+import { sortMatches } from "../../lib/match-utils";
 
 export default function MatchesPage() {
   const [matches, setMatches] = useState([]);
@@ -164,6 +36,21 @@ export default function MatchesPage() {
         );
       }
 
+      /*
+       * ÖNEMLİ:
+       *
+       * Burada artık sayfanın kendi
+       * sortMatches() fonksiyonunu
+       * kullanmıyoruz.
+       *
+       * lib/match-utils.js içindeki
+       * ortak sıralama kullanılıyor.
+       *
+       * Böylece MatchCard'da "Bitti"
+       * olarak görünen maç aynı şekilde
+       * sıralamada da BİTMİŞ kabul edilir.
+       */
+
       const sortedMatches =
         sortMatches(
           result.matches || []
@@ -176,7 +63,7 @@ export default function MatchesPage() {
       console.error(err);
 
       setError(
-        err.message ||
+        err?.message ||
           "Maçlar yüklenirken bir hata oluştu."
       );
     } finally {
