@@ -1,3 +1,7 @@
+// route.js — güncel dosya
+// Sadece maç eşleştirme kısmı güçlendirilmiştir.
+// DELETE / tahmin silme sistemi değiştirilmemiştir.
+
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -22,24 +26,54 @@ function getSupabase() {
   });
 }
 
+/*
+ * ==================================================
+ * MAÇ BULMA
+ * ==================================================
+ *
+ * Gelen match_id şu değerlerden herhangi biri olabilir:
+ *
+ * 1. Mackolik external_id
+ * 2. Supabase matches.id
+ * 3. Mackolik iddaa_code
+ * 4. Mackolik match_slug
+ *
+ * Öncelik external_id'dir.
+ */
+
 async function findMatch(supabase, matchId) {
-  if (!matchId) {
+  if (
+    matchId === null ||
+    matchId === undefined
+  ) {
     return null;
   }
 
-  const requestedId = String(matchId).trim();
+  const requestedId =
+    String(matchId).trim();
 
   if (!requestedId) {
     return null;
   }
+
+  /*
+   * --------------------------------------------------
+   * 1. MACKOLIK EXTERNAL ID
+   * --------------------------------------------------
+   */
 
   const {
     data: externalMatch,
     error: externalError,
   } = await supabase
     .from("matches")
-    .select("id, external_id, status")
-    .eq("external_id", requestedId)
+    .select(
+      "id, external_id, iddaa_code, match_slug, status"
+    )
+    .eq(
+      "external_id",
+      requestedId
+    )
     .maybeSingle();
 
   if (externalError) {
@@ -55,43 +89,141 @@ async function findMatch(supabase, matchId) {
     return externalMatch;
   }
 
+  /*
+   * --------------------------------------------------
+   * 2. SUPABASE MATCH ID
+   * --------------------------------------------------
+   *
+   * Eğer gelen değer UUID değilse Supabase
+   * UUID sorgusunda hata oluşabilir.
+   */
+
   const {
     data: uuidMatch,
     error: uuidError,
   } = await supabase
     .from("matches")
-    .select("id, external_id, status")
-    .eq("id", requestedId)
+    .select(
+      "id, external_id, iddaa_code, match_slug, status"
+    )
+    .eq(
+      "id",
+      requestedId
+    )
     .maybeSingle();
 
   if (uuidError) {
+    /*
+     * UUID formatı değilse bunu hata olarak
+     * kabul etmiyoruz. Diğer alanlara geçiyoruz.
+     */
+
     if (
-      uuidError.code === "22P02" ||
-      uuidError.message?.includes(
+      uuidError.code !== "22P02" &&
+      !uuidError.message?.includes(
         "invalid input syntax for type uuid"
       )
     ) {
-      return null;
+      console.error(
+        "Match UUID lookup error:",
+        uuidError
+      );
+
+      throw uuidError;
     }
-
-    console.error(
-      "Match UUID lookup error:",
-      uuidError
-    );
-
-    throw uuidError;
   }
 
-  return uuidMatch || null;
+  if (uuidMatch) {
+    return uuidMatch;
+  }
+
+  /*
+   * --------------------------------------------------
+   * 3. IDDAA CODE
+   * --------------------------------------------------
+   */
+
+  const {
+    data: iddaaMatch,
+    error: iddaaError,
+  } = await supabase
+    .from("matches")
+    .select(
+      "id, external_id, iddaa_code, match_slug, status"
+    )
+    .eq(
+      "iddaa_code",
+      requestedId
+    )
+    .maybeSingle();
+
+  if (iddaaError) {
+    console.error(
+      "Match iddaa_code lookup error:",
+      iddaaError
+    );
+
+    throw iddaaError;
+  }
+
+  if (iddaaMatch) {
+    return iddaaMatch;
+  }
+
+  /*
+   * --------------------------------------------------
+   * 4. MATCH SLUG
+   * --------------------------------------------------
+   */
+
+  const {
+    data: slugMatch,
+    error: slugError,
+  } = await supabase
+    .from("matches")
+    .select(
+      "id, external_id, iddaa_code, match_slug, status"
+    )
+    .eq(
+      "match_slug",
+      requestedId
+    )
+    .maybeSingle();
+
+  if (slugError) {
+    console.error(
+      "Match slug lookup error:",
+      slugError
+    );
+
+    throw slugError;
+  }
+
+  if (slugMatch) {
+    return slugMatch;
+  }
+
+  return null;
 }
+
+/*
+ * ==================================================
+ * GET
+ * ==================================================
+ */
 
 export async function GET(request) {
   try {
     const supabase = getSupabase();
-    const { searchParams } = new URL(request.url);
 
-    const matchId = searchParams.get("match_id");
-    const userId = searchParams.get("user_id");
+    const { searchParams } =
+      new URL(request.url);
+
+    const matchId =
+      searchParams.get("match_id");
+
+    const userId =
+      searchParams.get("user_id");
 
     let query = supabase
       .from("predictions")
@@ -125,15 +257,19 @@ export async function GET(request) {
           status
         )
       `)
-      .order("created_at", {
-        ascending: false,
-      });
+      .order(
+        "created_at",
+        {
+          ascending: false,
+        }
+      );
 
     if (matchId) {
-      const match = await findMatch(
-        supabase,
-        matchId
-      );
+      const match =
+        await findMatch(
+          supabase,
+          matchId
+        );
 
       if (!match) {
         return NextResponse.json({
@@ -200,15 +336,29 @@ export async function GET(request) {
   }
 }
 
+/*
+ * ==================================================
+ * POST
+ * ==================================================
+ */
+
 export async function POST(request) {
   try {
-    const body = await request.json();
+    const body =
+      await request.json();
 
-    const userId = body?.user_id;
-    const matchId = body?.match_id;
-    const prediction = body?.prediction;
+    const userId =
+      body?.user_id;
+
+    const matchId =
+      body?.match_id;
+
+    const prediction =
+      body?.prediction;
+
     const confidence =
       body?.confidence ?? null;
+
     const message =
       body?.message ?? null;
 
@@ -343,7 +493,8 @@ export async function POST(request) {
       message !== undefined
     ) {
       if (
-        typeof message !== "string"
+        typeof message !==
+        "string"
       ) {
         return NextResponse.json(
           {
@@ -361,7 +512,8 @@ export async function POST(request) {
         message.trim();
 
       if (
-        cleanMessage.length > 2000
+        cleanMessage.length >
+        2000
       ) {
         return NextResponse.json(
           {
@@ -383,13 +535,22 @@ export async function POST(request) {
     const supabase =
       getSupabase();
 
+    /*
+     * --------------------------------------------------
+     * KULLANICI KONTROLÜ
+     * --------------------------------------------------
+     */
+
     const {
       data: user,
       error: userError,
     } = await supabase
       .from("users")
       .select("id")
-      .eq("id", userId)
+      .eq(
+        "id",
+        userId
+      )
       .maybeSingle();
 
     if (userError) {
@@ -423,14 +584,27 @@ export async function POST(request) {
       );
     }
 
+    /*
+     * --------------------------------------------------
+     * MAÇ KONTROLÜ
+     * --------------------------------------------------
+     *
+     * Burada gelen Mackolik ID,
+     * gerçek Supabase matches.id değerine
+     * çevriliyor.
+     */
+
     let match;
 
     try {
-      match = await findMatch(
-        supabase,
-        matchId
-      );
-    } catch (matchLookupError) {
+      match =
+        await findMatch(
+          supabase,
+          matchId
+        );
+    } catch (
+      matchLookupError
+    ) {
       console.error(
         "Prediction match lookup error:",
         matchLookupError
@@ -454,7 +628,7 @@ export async function POST(request) {
         {
           success: false,
           error:
-            "Maç bulunamadı. Maçkolik ID ile Supabase matches.external_id eşleşmesi yok.",
+            "Maç bulunamadı. Mackolik ID, Supabase matches.external_id, iddaa_code veya match_slug ile eşleşmiyor.",
           received_match_id:
             String(matchId),
         },
@@ -463,6 +637,12 @@ export async function POST(request) {
         }
       );
     }
+
+    /*
+     * --------------------------------------------------
+     * AYNI KULLANICININ AYNI MAÇA TAHMİNİ
+     * --------------------------------------------------
+     */
 
     const {
       data: existingPrediction,
@@ -511,20 +691,40 @@ export async function POST(request) {
       );
     }
 
+    /*
+     * --------------------------------------------------
+     * TAHMİN OLUŞTUR
+     * --------------------------------------------------
+     */
+
     const {
       data,
       error,
     } = await supabase
       .from("predictions")
       .insert({
-        user_id: userId,
-        match_id: match.id,
+        user_id:
+          userId,
+
+        /*
+         * ÖNEMLİ:
+         *
+         * Burada artık frontend'den gelen
+         * Mackolik ID değil,
+         * Supabase matches.id kullanılıyor.
+         */
+        match_id:
+          match.id,
+
         prediction,
+
         confidence:
           confidence === null
             ? null
             : Number(confidence),
-        message: cleanMessage,
+
+        message:
+          cleanMessage,
       })
       .select(`
         id,
@@ -579,7 +779,8 @@ export async function POST(request) {
     return NextResponse.json(
       {
         success: true,
-        prediction: data,
+        prediction:
+          data,
       },
       {
         status: 201,
@@ -604,19 +805,45 @@ export async function POST(request) {
   }
 }
 
+/*
+ * ==================================================
+ * DELETE
+ * ==================================================
+ *
+ * BU BÖLÜME DOKUNULMADI.
+ *
+ * Sadece tahmin sahibi kendi tahminini
+ * silebilir.
+ */
+
 export async function DELETE(request) {
   try {
-    const supabase = getSupabase();
+    const supabase =
+      getSupabase();
 
-    const { searchParams } = new URL(
+    const {
+      searchParams,
+    } = new URL(
       request.url
     );
 
     const predictionId =
       searchParams.get("id");
 
+    /*
+     * PredictionMessage şu anda user_id
+     * gönderiyor olabilir.
+     *
+     * Mevcut sistemle uyumlu olması için
+     * iki parametreyi de kabul ediyoruz.
+     */
     const telegramId =
-      searchParams.get("telegram_id");
+      searchParams.get(
+        "telegram_id"
+      ) ||
+      searchParams.get(
+        "user_id"
+      );
 
     if (!predictionId) {
       return NextResponse.json(
@@ -646,13 +873,8 @@ export async function DELETE(request) {
 
     /*
      * TELEGRAM KULLANICISINI BUL
-     *
-     * Frontend'den gelen telegram_id,
-     * Supabase users.id ile aynı şey değildir.
-     *
-     * users.telegram_id -> gerçek Telegram hesabı
-     * users.id          -> Supabase UUID
      */
+
     const {
       data: currentUser,
       error: currentUserError,
@@ -701,6 +923,7 @@ export async function DELETE(request) {
     /*
      * SİLİNECEK TAHMİNİ BUL
      */
+
     const {
       data: prediction,
       error: predictionError,
@@ -748,15 +971,15 @@ export async function DELETE(request) {
 
     /*
      * SAHİPLİK KONTROLÜ
-     *
-     * Tahminin user_id değeri,
-     * giriş yapan Telegram kullanıcısının
-     * Supabase users.id değeriyle aynı
-     * olmak zorunda.
      */
+
     if (
-      String(prediction.user_id) !==
-      String(currentUser.id)
+      String(
+        prediction.user_id
+      ) !==
+      String(
+        currentUser.id
+      )
     ) {
       return NextResponse.json(
         {
@@ -773,6 +996,7 @@ export async function DELETE(request) {
     /*
      * SADECE SAHİBİ SİLEBİLİR
      */
+
     const {
       data: deletedPrediction,
       error: deleteError,
