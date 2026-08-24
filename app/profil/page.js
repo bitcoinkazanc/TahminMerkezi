@@ -10,38 +10,17 @@ export default function ProfilePage() {
   const searchParams = useSearchParams();
 
   const [user, setUser] = useState(null);
-  const [currentUser, setCurrentUser] =
-    useState(null);
-
-  const [predictions, setPredictions] =
-    useState([]);
-
-  const [loading, setLoading] =
-    useState(true);
-
-  const [followLoading, setFollowLoading] =
-    useState(false);
-
-  const [isFollowing, setIsFollowing] =
-    useState(false);
-
-  const [followersCount, setFollowersCount] =
-    useState(0);
-
-  const [followingCount, setFollowingCount] =
-    useState(0);
-
-  const [error, setError] =
-    useState("");
+  const [currentUser, setCurrentUser] = useState(null);
+  const [predictions, setPredictions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [followLoading, setFollowLoading] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followersCount, setFollowersCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
+  const [error, setError] = useState("");
 
   const profileUserId =
     searchParams.get("user_id");
-
-  /*
-   * ==================================================
-   * PROFİLİ YÜKLE
-   * ==================================================
-   */
 
   useEffect(() => {
     async function loadProfile() {
@@ -50,66 +29,54 @@ export default function ProfilePage() {
         setError("");
         setUser(null);
         setPredictions([]);
+        setIsFollowing(false);
+        setFollowersCount(0);
+        setFollowingCount(0);
+
+        let profileUser = null;
+        let loggedUser = null;
 
         /*
-         * --------------------------------------------------
+         * ==================================================
          * GİRİŞ YAPMIŞ KULLANICI
-         * --------------------------------------------------
+         * ==================================================
          */
 
-        let savedCurrentUser = null;
+        const savedUser =
+          localStorage.getItem("tm_user");
 
-        try {
-          const savedUser =
-            localStorage.getItem(
-              "tm_user"
-            );
-
-          if (savedUser) {
+        if (savedUser) {
+          try {
             const parsedUser =
-              JSON.parse(
-                savedUser
-              );
+              JSON.parse(savedUser);
 
-            if (
-              parsedUser?.id
-            ) {
-              savedCurrentUser =
-                parsedUser;
-
-              setCurrentUser(
-                parsedUser
-              );
+            if (parsedUser?.id) {
+              loggedUser = parsedUser;
+              setCurrentUser(parsedUser);
             }
+          } catch (error) {
+            console.error(
+              "Saved user parse error:",
+              error
+            );
           }
-        } catch (
-          localStorageError
-        ) {
-          console.error(
-            "Current user parse error:",
-            localStorageError
-          );
         }
 
         /*
-         * --------------------------------------------------
-         * GÖSTERİLECEK PROFİL
-         * --------------------------------------------------
+         * ==================================================
+         * PROFİL KULLANICISI
+         * ==================================================
          */
 
-        let profileUser = null;
-
         if (profileUserId) {
-          const response =
-            await fetch(
-              `/api/users/${encodeURIComponent(
-                profileUserId
-              )}`,
-              {
-                cache:
-                  "no-store",
-              }
-            );
+          const response = await fetch(
+            `/api/users/${encodeURIComponent(
+              profileUserId
+            )}`,
+            {
+              cache: "no-store",
+            }
+          );
 
           const result =
             await response.json();
@@ -127,143 +94,60 @@ export default function ProfilePage() {
           profileUser =
             result.user;
         } else {
-          if (
-            !savedCurrentUser
-          ) {
+          if (!loggedUser) {
             setLoading(false);
             return;
           }
 
           profileUser =
-            savedCurrentUser;
+            loggedUser;
         }
 
-        setUser(
-          profileUser
-        );
-
-        /*
-         * --------------------------------------------------
-         * TAHMİNLER
-         * --------------------------------------------------
-         */
-
-        const predictionResponse =
-          await fetch(
-            `/api/predictions?user_id=${encodeURIComponent(
-              profileUser.id
-            )}`,
-            {
-              cache:
-                "no-store",
-            }
-          );
-
-        const predictionResult =
-          await predictionResponse.json();
-
-        if (
-          predictionResponse.ok &&
-          predictionResult.success
-        ) {
-          setPredictions(
-            predictionResult.predictions ||
-              []
+        if (!profileUser?.id) {
+          throw new Error(
+            "Profil kullanıcı bilgisi bulunamadı."
           );
         }
 
+        setUser(profileUser);
+
         /*
-         * --------------------------------------------------
-         * TAKİP DURUMU
-         * --------------------------------------------------
+         * ==================================================
+         * TAKİP DURUMUNU GETİR
+         * ==================================================
          *
-         * Sadece başka bir kullanıcının
-         * profilindeysek kontrol edilir.
+         * Sadece başka bir kullanıcının profiline
+         * bakılıyorsa kontrol edilir.
          */
 
         if (
-          savedCurrentUser?.id &&
-          profileUser?.id &&
-          savedCurrentUser.id !==
-            profileUser.id
+          loggedUser?.id &&
+          profileUser.id
         ) {
-          const followResponse =
-            await fetch(
-              `/api/follows?follower_id=${encodeURIComponent(
-                savedCurrentUser.id
-              )}&following_id=${encodeURIComponent(
-                profileUser.id
-              )}`,
-              {
-                cache:
-                  "no-store",
-              }
-            );
+          try {
+            const followResponse =
+              await fetch(
+                `/api/follows?follower_id=${encodeURIComponent(
+                  loggedUser.id
+                )}&following_id=${encodeURIComponent(
+                  profileUser.id
+                )}`,
+                {
+                  cache: "no-store",
+                }
+              );
 
-          const followResult =
-            await followResponse.json();
-
-          if (
-            followResponse.ok &&
-            followResult.success
-          ) {
-            setIsFollowing(
-              !!followResult.is_following
-            );
-
-            setFollowersCount(
-              Number(
-                followResult.followers_count
-              ) || 0
-            );
-
-            setFollowingCount(
-              Number(
-                followResult.following_count
-              ) || 0
-            );
-          }
-        } else if (
-          profileUser?.id
-        ) {
-          /*
-           * Kendi profilimizdeysek
-           * sadece sayıları göstermek için
-           * aynı kullanıcının takip bilgilerini al.
-           */
-
-          const followResponse =
-            await fetch(
-              `/api/follows?follower_id=${encodeURIComponent(
-                profileUser.id
-              )}&following_id=${encodeURIComponent(
-                profileUser.id
-              )}`,
-              {
-                cache:
-                  "no-store",
-              }
-            );
-
-          /*
-           * Kendi kendini takip etmeyeceğimiz için
-           * bu istek normalde 400 dönebilir.
-           *
-           * Bu nedenle burada takip sayılarını
-           * başka bir endpoint olmadan alamıyoruz.
-           *
-           * Hata olması durumunda sessizce devam ediyoruz.
-           */
-
-          if (
-            followResponse.ok
-          ) {
             const followResult =
               await followResponse.json();
 
             if (
+              followResponse.ok &&
               followResult.success
             ) {
+              setIsFollowing(
+                !!followResult.is_following
+              );
+
               setFollowersCount(
                 Number(
                   followResult.followers_count
@@ -276,7 +160,40 @@ export default function ProfilePage() {
                 ) || 0
               );
             }
+          } catch (error) {
+            console.error(
+              "Follow status loading error:",
+              error
+            );
           }
+        }
+
+        /*
+         * ==================================================
+         * TAHMİNLER
+         * ==================================================
+         */
+
+        const response =
+          await fetch(
+            `/api/predictions?user_id=${encodeURIComponent(
+              profileUser.id
+            )}`,
+            {
+              cache: "no-store",
+            }
+          );
+
+        const result =
+          await response.json();
+
+        if (
+          response.ok &&
+          result.success
+        ) {
+          setPredictions(
+            result.predictions || []
+          );
         }
       } catch (error) {
         console.error(
@@ -302,9 +219,8 @@ export default function ProfilePage() {
    * ==================================================
    */
 
-  async function handleFollowToggle() {
+  async function handleFollow() {
     if (
-      followLoading ||
       !currentUser?.id ||
       !user?.id
     ) {
@@ -312,26 +228,21 @@ export default function ProfilePage() {
     }
 
     if (
-      currentUser.id ===
-      user.id
+      currentUser.id === user.id
     ) {
       return;
     }
 
     try {
-      setFollowLoading(
-        true
-      );
+      setFollowLoading(true);
 
-      if (
-        isFollowing
-      ) {
-        /*
-         * --------------------------------------------------
-         * TAKİBİ BIRAK
-         * --------------------------------------------------
-         */
+      /*
+       * --------------------------------------------------
+       * TAKİBİ BIRAK
+       * --------------------------------------------------
+       */
 
+      if (isFollowing) {
         const response =
           await fetch(
             `/api/follows?follower_id=${encodeURIComponent(
@@ -340,8 +251,7 @@ export default function ProfilePage() {
               user.id
             )}`,
             {
-              method:
-                "DELETE",
+              method: "DELETE",
             }
           );
 
@@ -358,69 +268,63 @@ export default function ProfilePage() {
           );
         }
 
-        setIsFollowing(
-          false
-        );
+        setIsFollowing(false);
 
         setFollowersCount(
-          (value) =>
-            Math.max(
-              0,
-              value - 1
-            )
-        );
-      } else {
-        /*
-         * --------------------------------------------------
-         * TAKİP ET
-         * --------------------------------------------------
-         */
-
-        const response =
-          await fetch(
-            "/api/follows",
-            {
-              method:
-                "POST",
-              headers: {
-                "Content-Type":
-                  "application/json",
-              },
-              body: JSON.stringify({
-                follower_id:
-                  currentUser.id,
-
-                following_id:
-                  user.id,
-              }),
-            }
-          );
-
-        const result =
-          await response.json();
-
-        if (
-          !response.ok ||
-          !result.success
-        ) {
-          throw new Error(
-            result.error ||
-              "Takip işlemi başarısız."
-          );
-        }
-
-        setIsFollowing(
-          true
+          (count) =>
+            Math.max(0, count - 1)
         );
 
-        setFollowersCount(
-          (value) =>
-            value + 1
+        return;
+      }
+
+      /*
+       * --------------------------------------------------
+       * TAKİP ET
+       * --------------------------------------------------
+       */
+
+      const response =
+        await fetch(
+          "/api/follows",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body: JSON.stringify({
+              follower_id:
+                currentUser.id,
+
+              following_id:
+                user.id,
+            }),
+          }
+        );
+
+      const result =
+        await response.json();
+
+      if (
+        !response.ok ||
+        !result.success
+      ) {
+        throw new Error(
+          result.error ||
+            "Takip işlemi başarısız."
         );
       }
+
+      setIsFollowing(true);
+
+      setFollowersCount(
+        (count) =>
+          count + 1
+      );
     } catch (error) {
       console.error(
-        "Follow toggle error:",
+        "Follow action error:",
         error
       );
 
@@ -429,27 +333,13 @@ export default function ProfilePage() {
           "Takip işlemi sırasında bir hata oluştu."
       );
     } finally {
-      setFollowLoading(
-        false
-      );
+      setFollowLoading(false);
     }
   }
-
-  /*
-   * ==================================================
-   * LOADING
-   * ==================================================
-   */
 
   if (loading) {
     return <Loading />;
   }
-
-  /*
-   * ==================================================
-   * ERROR
-   * ==================================================
-   */
 
   if (error) {
     return (
@@ -459,12 +349,9 @@ export default function ProfilePage() {
           width: "100%",
           maxWidth: "100%",
           minWidth: 0,
-          overflowX:
-            "hidden",
-          boxSizing:
-            "border-box",
-          paddingBottom:
-            "100px",
+          overflowX: "hidden",
+          boxSizing: "border-box",
+          paddingBottom: "100px",
         }}
       >
         <div
@@ -473,8 +360,7 @@ export default function ProfilePage() {
             width: "100%",
             maxWidth: "100%",
             minWidth: 0,
-            boxSizing:
-              "border-box",
+            boxSizing: "border-box",
           }}
         >
           <div className="error-box">
@@ -482,9 +368,7 @@ export default function ProfilePage() {
               Bir sorun oluştu
             </h2>
 
-            <p>
-              {error}
-            </p>
+            <p>{error}</p>
 
             <Link
               href="/"
@@ -498,12 +382,6 @@ export default function ProfilePage() {
     );
   }
 
-  /*
-   * ==================================================
-   * KULLANICI YOK
-   * ==================================================
-   */
-
   if (!user) {
     return (
       <main
@@ -512,12 +390,9 @@ export default function ProfilePage() {
           width: "100%",
           maxWidth: "100%",
           minWidth: 0,
-          overflowX:
-            "hidden",
-          boxSizing:
-            "border-box",
-          paddingBottom:
-            "100px",
+          overflowX: "hidden",
+          boxSizing: "border-box",
+          paddingBottom: "100px",
         }}
       >
         <div
@@ -526,8 +401,7 @@ export default function ProfilePage() {
             width: "100%",
             maxWidth: "100%",
             minWidth: 0,
-            boxSizing:
-              "border-box",
+            boxSizing: "border-box",
           }}
         >
           <div className="empty-state profile-empty">
@@ -535,9 +409,7 @@ export default function ProfilePage() {
               👤
             </div>
 
-            <h1>
-              Profil
-            </h1>
+            <h1>Profil</h1>
 
             <p>
               Profil bilgilerini görmek için
@@ -557,11 +429,8 @@ export default function ProfilePage() {
     );
   }
 
-  /*
-   * ==================================================
-   * PROFİL İSTATİSTİKLERİ
-   * ==================================================
-   */
+  const isOwnProfile =
+    currentUser?.id === user.id;
 
   const totalPredictions =
     predictions.length;
@@ -585,8 +454,7 @@ export default function ProfilePage() {
     wrongPredictions;
 
   const successRate =
-    completedPredictions >
-    0
+    completedPredictions > 0
       ? Math.round(
           (correctPredictions /
             completedPredictions) *
@@ -596,26 +464,11 @@ export default function ProfilePage() {
 
   const totalPoints =
     predictions.reduce(
-      (
-        total,
-        item
-      ) =>
+      (total, item) =>
         total +
-        (Number(
-          item.points
-        ) || 0),
+        (Number(item.points) || 0),
       0
     );
-
-  const isOwnProfile =
-    currentUser?.id ===
-    user?.id;
-
-  /*
-   * ==================================================
-   * RENDER
-   * ==================================================
-   */
 
   return (
     <main
@@ -624,12 +477,9 @@ export default function ProfilePage() {
         width: "100%",
         maxWidth: "100%",
         minWidth: 0,
-        overflowX:
-          "hidden",
-        boxSizing:
-          "border-box",
-        paddingBottom:
-          "100px",
+        overflowX: "hidden",
+        boxSizing: "border-box",
+        paddingBottom: "100px",
       }}
     >
       <div
@@ -638,21 +488,15 @@ export default function ProfilePage() {
           width: "100%",
           maxWidth: "100%",
           minWidth: 0,
-          boxSizing:
-            "border-box",
-          overflowX:
-            "hidden",
+          boxSizing: "border-box",
+          overflowX: "hidden",
         }}
       >
-        <ProfileCard
-          user={user}
-        />
+        <ProfileCard user={user} />
 
-        {/*
-         * ==================================================
-         * TAKİP ALANI
-         * ==================================================
-         */}
+        {/* ==================================================
+            TAKİP ALANI
+            ================================================== */}
 
         <section
           className="section-card"
@@ -660,94 +504,58 @@ export default function ProfilePage() {
             width: "100%",
             maxWidth: "100%",
             minWidth: 0,
-            boxSizing:
-              "border-box",
-            overflow:
-              "hidden",
-            marginTop:
-              "12px",
+            boxSizing: "border-box",
+            overflow: "hidden",
+            marginTop: "12px",
           }}
         >
           <div
             style={{
-              display:
-                "flex",
-              alignItems:
-                "center",
-              justifyContent:
-                "space-between",
-              gap:
-                "12px",
-              width:
-                "100%",
-              minWidth:
-                0,
-              boxSizing:
-                "border-box",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "12px",
+              width: "100%",
+              minWidth: 0,
             }}
           >
             <div
               style={{
-                display:
-                  "flex",
-                gap:
-                  "18px",
-                minWidth:
-                  0,
-                flex:
-                  "1 1 auto",
+                display: "flex",
+                gap: "18px",
+                minWidth: 0,
               }}
             >
               <div
                 style={{
-                  display:
-                    "flex",
-                  flexDirection:
-                    "column",
-                  minWidth:
-                    0,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
                 }}
               >
                 <strong>
                   {followersCount}
                 </strong>
 
-                <span
-                  style={{
-                    fontSize:
-                      "12px",
-                    opacity:
-                      0.7,
-                  }}
-                >
+                <small>
                   Takipçi
-                </span>
+                </small>
               </div>
 
               <div
                 style={{
-                  display:
-                    "flex",
-                  flexDirection:
-                    "column",
-                  minWidth:
-                    0,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
                 }}
               >
                 <strong>
                   {followingCount}
                 </strong>
 
-                <span
-                  style={{
-                    fontSize:
-                      "12px",
-                    opacity:
-                      0.7,
-                  }}
-                >
+                <small>
                   Takip
-                </span>
+                </small>
               </div>
             </div>
 
@@ -756,44 +564,36 @@ export default function ProfilePage() {
                 <button
                   type="button"
                   onClick={
-                    handleFollowToggle
+                    handleFollow
                   }
                   disabled={
                     followLoading
                   }
-                  className={
-                    isFollowing
-                      ? "secondary-button"
-                      : "primary-button"
-                  }
+                  className="primary-button"
                   style={{
                     flex:
                       "0 0 auto",
                     minWidth:
-                      "110px",
-                    whiteSpace:
-                      "nowrap",
+                      "120px",
                     opacity:
                       followLoading
-                        ? 0.7
+                        ? 0.6
                         : 1,
                   }}
                 >
                   {followLoading
-                    ? "İşleniyor..."
+                    ? "Bekleyin..."
                     : isFollowing
-                    ? "Takibi Bırak"
-                    : "Takip Et"}
+                      ? "Takibi Bırak"
+                      : "Takip Et"}
                 </button>
               )}
           </div>
         </section>
 
-        {/*
-         * ==================================================
-         * PROFİL İSTATİSTİKLERİ
-         * ==================================================
-         */}
+        {/* ==================================================
+            PROFİL İSTATİSTİKLERİ
+            ================================================== */}
 
         <section className="profile-stats">
           <div className="stat-card">
@@ -827,11 +627,9 @@ export default function ProfilePage() {
           </div>
         </section>
 
-        {/*
-         * ==================================================
-         * TAHMİNLER
-         * ==================================================
-         */}
+        {/* ==================================================
+            TAHMİNLER
+            ================================================== */}
 
         <section
           className="section-card"
@@ -839,10 +637,8 @@ export default function ProfilePage() {
             width: "100%",
             maxWidth: "100%",
             minWidth: 0,
-            boxSizing:
-              "border-box",
-            overflow:
-              "hidden",
+            boxSizing: "border-box",
+            overflow: "hidden",
           }}
         >
           <div className="section-title">
@@ -855,8 +651,7 @@ export default function ProfilePage() {
             </p>
           </div>
 
-          {predictions.length ===
-          0 ? (
+          {predictions.length === 0 ? (
             <div className="empty-state small">
               <div className="empty-icon">
                 🎯
@@ -878,10 +673,8 @@ export default function ProfilePage() {
                 width: "100%",
                 maxWidth: "100%",
                 minWidth: 0,
-                boxSizing:
-                  "border-box",
-                overflow:
-                  "hidden",
+                boxSizing: "border-box",
+                overflow: "hidden",
               }}
             >
               {predictions.map(
@@ -900,11 +693,11 @@ export default function ProfilePage() {
                       ? "MS 1"
                       : item.prediction ===
                         "MSX"
-                      ? "MS X"
-                      : item.prediction ===
-                        "MS2"
-                      ? "MS 2"
-                      : item.prediction;
+                        ? "MS X"
+                        : item.prediction ===
+                          "MS2"
+                          ? "MS 2"
+                          : item.prediction;
 
                   const date =
                     item.created_at
@@ -921,8 +714,8 @@ export default function ProfilePage() {
                       ? "✓ Doğru"
                       : item.result ===
                         "wrong"
-                      ? "✕ Yanlış"
-                      : "⏳ Bekliyor";
+                        ? "✕ Yanlış"
+                        : "⏳ Bekliyor";
 
                   const points =
                     Number(
@@ -933,50 +726,33 @@ export default function ProfilePage() {
                     <div
                       className="my-prediction-item"
                       style={{
-                        display:
-                          "flex",
-                        alignItems:
-                          "center",
-                        width:
-                          "100%",
-                        maxWidth:
-                          "100%",
-                        minWidth:
-                          0,
-                        boxSizing:
-                          "border-box",
-                        overflow:
-                          "hidden",
+                        display: "flex",
+                        alignItems: "center",
+                        width: "100%",
+                        maxWidth: "100%",
+                        minWidth: 0,
+                        boxSizing: "border-box",
+                        overflow: "hidden",
                       }}
                     >
                       <div
                         className="my-prediction-info"
                         style={{
-                          flex:
-                            "1 1 auto",
+                          flex: "1 1 auto",
                           width: 0,
-                          minWidth:
-                            0,
-                          maxWidth:
-                            "100%",
-                          boxSizing:
-                            "border-box",
-                          overflow:
-                            "hidden",
+                          minWidth: 0,
+                          maxWidth: "100%",
+                          boxSizing: "border-box",
+                          overflow: "hidden",
                         }}
                       >
                         <strong
                           style={{
-                            display:
-                              "block",
-                            width:
-                              "100%",
-                            maxWidth:
-                              "100%",
-                            minWidth:
-                              0,
-                            overflow:
-                              "hidden",
+                            display: "block",
+                            width: "100%",
+                            maxWidth: "100%",
+                            minWidth: 0,
+                            overflow: "hidden",
                             textOverflow:
                               "ellipsis",
                             whiteSpace:
@@ -990,16 +766,11 @@ export default function ProfilePage() {
 
                         <span
                           style={{
-                            display:
-                              "block",
-                            width:
-                              "100%",
-                            maxWidth:
-                              "100%",
-                            minWidth:
-                              0,
-                            overflow:
-                              "hidden",
+                            display: "block",
+                            width: "100%",
+                            maxWidth: "100%",
+                            minWidth: 0,
+                            overflow: "hidden",
                             textOverflow:
                               "ellipsis",
                             whiteSpace:
@@ -1020,20 +791,16 @@ export default function ProfilePage() {
                         style={{
                           flex:
                             "0 0 auto",
-                          width:
-                            "78px",
-                          minWidth:
-                            "78px",
-                          maxWidth:
-                            "78px",
+                          width: "78px",
+                          minWidth: "78px",
+                          maxWidth: "78px",
                           boxSizing:
                             "border-box",
                           overflow:
                             "hidden",
                           textAlign:
                             "center",
-                          display:
-                            "flex",
+                          display: "flex",
                           flexDirection:
                             "column",
                           alignItems:
@@ -1098,24 +865,16 @@ export default function ProfilePage() {
                     </div>
                   );
 
-                  if (
-                    match?.id
-                  ) {
+                  if (match?.id) {
                     return (
                       <Link
-                        key={
-                          item.id
-                        }
+                        key={item.id}
                         href={`/mac/${match.id}`}
                         style={{
-                          display:
-                            "block",
-                          width:
-                            "100%",
-                          maxWidth:
-                            "100%",
-                          minWidth:
-                            0,
+                          display: "block",
+                          width: "100%",
+                          maxWidth: "100%",
+                          minWidth: 0,
                           boxSizing:
                             "border-box",
                           overflow:
@@ -1131,16 +890,11 @@ export default function ProfilePage() {
 
                   return (
                     <div
-                      key={
-                        item.id
-                      }
+                      key={item.id}
                       style={{
-                        width:
-                          "100%",
-                        maxWidth:
-                          "100%",
-                        minWidth:
-                          0,
+                        width: "100%",
+                        maxWidth: "100%",
+                        minWidth: 0,
                         boxSizing:
                           "border-box",
                         overflow:
