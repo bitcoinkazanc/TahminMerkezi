@@ -79,18 +79,45 @@ async function userExists(
 
 /*
  * ==================================================
+ * KULLANICI ALANLARI
+ * ==================================================
+ */
+
+const userSelect = `
+  id,
+  telegram_id,
+  username,
+  first_name,
+  last_name,
+  avatar_url
+`;
+
+/*
+ * ==================================================
  * GET
  * ==================================================
  *
- * 1. TAKİP DURUMU
+ * Takip durumu
+ * Takipçi sayısı
+ * Takip edilen sayısı
+ * Takipçi listesi
+ * Takip edilen kullanıcı listesi
+ *
+ * --------------------------------------------------
+ *
+ * Normal kullanım:
  *
  * /api/follows?follower_id=UUID&following_id=UUID
  *
- * 2. TAKİPÇİ LİSTESİ
+ * --------------------------------------------------
+ *
+ * Takipçi listesi:
  *
  * /api/follows?user_id=UUID&type=followers
  *
- * 3. TAKİP EDİLENLER LİSTESİ
+ * --------------------------------------------------
+ *
+ * Takip edilenler:
  *
  * /api/follows?user_id=UUID&type=following
  *
@@ -131,14 +158,11 @@ export async function GET(
 
     /*
      * ==================================================
-     * TAKİPÇİ / TAKİP EDİLEN LİSTESİ
+     * LİSTE İSTEĞİ
      * ==================================================
      */
 
-    if (
-      userId &&
-      type
-    ) {
+    if (userId && type) {
       /*
        * --------------------------------------------------
        * USER ID KONTROLÜ
@@ -188,7 +212,7 @@ export async function GET(
 
       /*
        * --------------------------------------------------
-       * KULLANICI KONTROLÜ
+       * KULLANICI VAR MI?
        * --------------------------------------------------
        */
 
@@ -212,12 +236,15 @@ export async function GET(
       }
 
       /*
-       * --------------------------------------------------
+       * ==================================================
        * TAKİPÇİLER
+       * ==================================================
        *
        * following_id = userId
-       * follower_id  = listed user
-       * --------------------------------------------------
+       *
+       * Yani:
+       *
+       * Bu kullanıcıyı kimler takip ediyor?
        */
 
       if (
@@ -235,13 +262,9 @@ export async function GET(
               follower_id,
               following_id,
               created_at,
-              user:follower_id (
-                id,
-                telegram_id,
-                username,
-                first_name,
-                last_name,
-                avatar_url
+
+              follower:follower_id (
+                ${userSelect}
               )
             `
           )
@@ -274,108 +297,114 @@ export async function GET(
           );
         }
 
+        const followers =
+          (data || [])
+            .map(
+              (item) =>
+                item.follower
+            )
+            .filter(
+              Boolean
+            );
+
         return NextResponse.json({
           success: true,
           type:
             "followers",
           users:
-            (data || []).map(
-              (item) => ({
-                ...item.user,
-                follow_id:
-                  item.id,
-                followed_at:
-                  item.created_at,
-              })
-            ),
+            followers,
           count:
-            data?.length ||
-            0,
+            followers.length,
         });
       }
 
       /*
-       * --------------------------------------------------
+       * ==================================================
        * TAKİP EDİLENLER
+       * ==================================================
        *
-       * follower_id  = userId
-       * following_id = listed user
-       * --------------------------------------------------
+       * follower_id = userId
+       *
+       * Yani:
+       *
+       * Bu kullanıcı kimi takip ediyor?
        */
 
-      const {
-        data,
-        error,
-      } = await supabase
-        .from("follows")
-        .select(
-          `
-            id,
-            follower_id,
-            following_id,
-            created_at,
-            user:following_id (
+      if (
+        type ===
+        "following"
+      ) {
+        const {
+          data,
+          error,
+        } = await supabase
+          .from("follows")
+          .select(
+            `
               id,
-              telegram_id,
-              username,
-              first_name,
-              last_name,
-              avatar_url
+              follower_id,
+              following_id,
+              created_at,
+
+              following:following_id (
+                ${userSelect}
+              )
+            `
+          )
+          .eq(
+            "follower_id",
+            userId
+          )
+          .order(
+            "created_at",
+            {
+              ascending: false,
+            }
+          );
+
+        if (error) {
+          console.error(
+            "Following list error:",
+            error
+          );
+
+          return NextResponse.json(
+            {
+              success: false,
+              error:
+                error.message,
+            },
+            {
+              status: 500,
+            }
+          );
+        }
+
+        const following =
+          (data || [])
+            .map(
+              (item) =>
+                item.following
             )
-          `
-        )
-        .eq(
-          "follower_id",
-          userId
-        )
-        .order(
-          "created_at",
-          {
-            ascending: false,
-          }
-        );
+            .filter(
+              Boolean
+            );
 
-      if (error) {
-        console.error(
-          "Following list error:",
-          error
-        );
-
-        return NextResponse.json(
-          {
-            success: false,
-            error:
-              error.message,
-          },
-          {
-            status: 500,
-          }
-        );
+        return NextResponse.json({
+          success: true,
+          type:
+            "following",
+          users:
+            following,
+          count:
+            following.length,
+        });
       }
-
-      return NextResponse.json({
-        success: true,
-        type:
-          "following",
-        users:
-          (data || []).map(
-            (item) => ({
-              ...item.user,
-              follow_id:
-                item.id,
-              followed_at:
-                item.created_at,
-            })
-          ),
-        count:
-          data?.length ||
-          0,
-      });
     }
 
     /*
      * ==================================================
-     * TAKİP DURUMU
+     * TAKİP DURUMU + SAYILAR
      * ==================================================
      */
 
@@ -459,7 +488,7 @@ export async function GET(
      * --------------------------------------------------
      * TAKİP DURUMU
      * --------------------------------------------------
- */
+     */
 
     const {
       data: follow,
@@ -511,8 +540,7 @@ export async function GET(
       .select(
         "id",
         {
-          count:
-            "exact",
+          count: "exact",
           head: true,
         }
       )
@@ -543,7 +571,7 @@ export async function GET(
      * --------------------------------------------------
      * TAKİP EDİLEN SAYISI
      * --------------------------------------------------
- */
+     */
 
     const {
       count:
@@ -555,8 +583,7 @@ export async function GET(
       .select(
         "id",
         {
-          count:
-            "exact",
+          count: "exact",
           head: true,
         }
       )
@@ -644,12 +671,6 @@ export async function POST(
     const followingId =
       body?.following_id;
 
-    /*
-     * --------------------------------------------------
-     * PARAMETRE KONTROLÜ
-     * --------------------------------------------------
-     */
-
     if (
       !followerId ||
       !followingId
@@ -686,12 +707,6 @@ export async function POST(
       );
     }
 
-    /*
-     * --------------------------------------------------
-     * KENDİNİ TAKİP ETME
-     * --------------------------------------------------
-     */
-
     if (
       followerId ===
       followingId
@@ -710,12 +725,6 @@ export async function POST(
 
     const supabase =
       getSupabase();
-
-    /*
-     * --------------------------------------------------
-     * KULLANICI KONTROLÜ
-     * --------------------------------------------------
-     */
 
     const followerExists =
       await userExists(
@@ -759,15 +768,8 @@ export async function POST(
       );
     }
 
-    /*
-     * --------------------------------------------------
-     * ZATEN TAKİP EDİLİYOR MU?
-     * --------------------------------------------------
- */
-
     const {
-      data:
-        existingFollow,
+      data: existingFollow,
       error:
         existingFollowError,
     } = await supabase
@@ -819,12 +821,6 @@ export async function POST(
         }
       );
     }
-
-    /*
-     * --------------------------------------------------
-     * TAKİP KAYDI OLUŞTUR
-     * --------------------------------------------------
- */
 
     const {
       data,
@@ -944,12 +940,6 @@ export async function DELETE(
         "following_id"
       );
 
-    /*
-     * --------------------------------------------------
-     * PARAMETRE KONTROLÜ
-     * --------------------------------------------------
-     */
-
     if (
       !followerId ||
       !followingId
@@ -985,12 +975,6 @@ export async function DELETE(
         }
       );
     }
-
-    /*
-     * --------------------------------------------------
-     * TAKİP KAYDINI SİL
-     * --------------------------------------------------
- */
 
     const {
       data,
