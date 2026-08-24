@@ -338,7 +338,20 @@ export default function PredictionBox({
       return;
     }
 
-    if (!match?.id) {
+    /*
+     * Maç için hem Supabase UUID
+     * hem de Maçkolik external_id
+     * desteklenir.
+     *
+     * Öncelik:
+     * 1. match.external_id
+     * 2. match.id
+     */
+    const requestMatchId =
+      match?.external_id ||
+      match?.id;
+
+    if (!requestMatchId) {
       setError("Maç bilgisi bulunamadı.");
       return;
     }
@@ -357,7 +370,16 @@ export default function PredictionBox({
         return;
       }
 
-      const user = JSON.parse(savedUser);
+      let user;
+
+      try {
+        user = JSON.parse(savedUser);
+      } catch {
+        setError(
+          "Kullanıcı bilgileri okunamadı. Lütfen tekrar giriş yap."
+        );
+        return;
+      }
 
       if (!user?.id) {
         setError(
@@ -376,9 +398,20 @@ export default function PredictionBox({
           },
           body: JSON.stringify({
             user_id: user.id,
-            match_id: match.id,
+
+            /*
+             * ÖNEMLİ:
+             * Önce Maçkolik external_id gönderilir.
+             * route.js bunu Supabase matches.id
+             * UUID'sine dönüştürür.
+             */
+            match_id: requestMatchId,
+
             prediction,
-            confidence: Number(confidence),
+
+            confidence:
+              Number(confidence),
+
             message:
               message.trim() || null,
           }),
@@ -401,6 +434,7 @@ export default function PredictionBox({
       setPrediction("");
       setConfidence(50);
       setMessage("");
+      setError("");
 
       if (onPredictionCreated) {
         onPredictionCreated(
@@ -414,7 +448,7 @@ export default function PredictionBox({
       );
 
       setError(
-        err.message ||
+        err?.message ||
           "Tahmin gönderilirken bir hata oluştu."
       );
     } finally {
