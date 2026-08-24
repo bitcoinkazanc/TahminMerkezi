@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+
 import ProfileCard from "../../components/ProfileCard";
 import ProfileFollowList from "../../components/ProfileFollowList";
 import Loading from "../../components/Loading";
@@ -113,7 +114,7 @@ export default function ProfilePage() {
          */
 
         try {
-          const followResponse =
+          const followersResponse =
             await fetch(
               `/api/follows?user_id=${encodeURIComponent(
                 profileUser.id
@@ -123,27 +124,29 @@ export default function ProfilePage() {
               }
             );
 
-          const followResult =
-            await followResponse.json();
+          const followersResult =
+            await followersResponse.json();
 
           if (
-            followResponse.ok &&
-            followResult.success
+            followersResponse.ok &&
+            followersResult.success
           ) {
             setFollowersCount(
               Array.isArray(
-                followResult.users
+                followersResult.users
               )
-                ? followResult.users.length
-                : 0
+                ? followersResult.users.length
+                : Number(
+                    followersResult.followers_count
+                  ) || 0
             );
           }
         } catch (
-          followError
+          followersError
         ) {
           console.error(
             "Followers count error:",
-            followError
+            followersError
           );
         }
 
@@ -170,7 +173,9 @@ export default function ProfilePage() {
                 followingResult.users
               )
                 ? followingResult.users.length
-                : 0
+                : Number(
+                    followingResult.following_count
+                  ) || 0
             );
           }
         } catch (
@@ -184,11 +189,11 @@ export default function ProfilePage() {
 
         /*
          * ==================================================
-         * TAHMİNLER
+         * TAHMİNLERİ GETİR
          * ==================================================
          */
 
-        const response =
+        const predictionsResponse =
           await fetch(
             `/api/predictions?user_id=${encodeURIComponent(
               profileUser.id
@@ -198,15 +203,15 @@ export default function ProfilePage() {
             }
           );
 
-        const result =
-          await response.json();
+        const predictionsResult =
+          await predictionsResponse.json();
 
         if (
-          response.ok &&
-          result.success
+          predictionsResponse.ok &&
+          predictionsResult.success
         ) {
           setPredictions(
-            result.predictions ||
+            predictionsResult.predictions ||
               []
           );
         }
@@ -271,7 +276,9 @@ export default function ProfilePage() {
               Bir sorun oluştu
             </h2>
 
-            <p>{error}</p>
+            <p>
+              {error}
+            </p>
 
             <Link
               href="/"
@@ -318,7 +325,9 @@ export default function ProfilePage() {
               👤
             </div>
 
-            <h1>Profil</h1>
+            <h1>
+              Profil
+            </h1>
 
             <p>
               Profil bilgilerini görmek
@@ -337,51 +346,6 @@ export default function ProfilePage() {
       </main>
     );
   }
-
-  /*
-   * ==================================================
-   * TAHMİN İSTATİSTİKLERİ
-   * ==================================================
-   */
-
-  const totalPredictions =
-    predictions.length;
-
-  const correctPredictions =
-    predictions.filter(
-      (item) =>
-        item.result ===
-        "correct"
-    ).length;
-
-  const wrongPredictions =
-    predictions.filter(
-      (item) =>
-        item.result ===
-        "wrong"
-    ).length;
-
-  const completedPredictions =
-    correctPredictions +
-    wrongPredictions;
-
-  const successRate =
-    completedPredictions > 0
-      ? Math.round(
-          (correctPredictions /
-            completedPredictions) *
-            100
-        )
-      : 0;
-
-  const totalPoints =
-    predictions.reduce(
-      (total, item) =>
-        total +
-        (Number(item.points) ||
-          0),
-      0
-    );
 
   return (
     <>
@@ -412,7 +376,15 @@ export default function ProfilePage() {
 
           {/*
            * ==================================================
-           * TAKİP İSTATİSTİKLERİ
+           * TEK İSTATİSTİK SATIRI
+           * ==================================================
+           *
+           * Sadece:
+           *
+           * Toplam Tahmin
+           * Takipçi
+           * Takip
+           *
            * ==================================================
            */}
 
@@ -423,14 +395,40 @@ export default function ProfilePage() {
               maxWidth: "100%",
               minWidth: 0,
               boxSizing: "border-box",
+              display: "grid",
+              gridTemplateColumns:
+                "repeat(3, 1fr)",
+              gap: "7px",
+              marginTop: "10px",
             }}
           >
-            <div className="stat-card">
-              <strong>
-                {totalPredictions}
+            <div
+              className="stat-card"
+              style={{
+                minWidth: 0,
+                padding:
+                  "8px 5px",
+                borderRadius:
+                  "10px",
+              }}
+            >
+              <strong
+                style={{
+                  fontSize:
+                    "16px",
+                  lineHeight: 1.1,
+                }}
+              >
+                {predictions.length}
               </strong>
 
-              <span>
+              <span
+                style={{
+                  fontSize:
+                    "10px",
+                  lineHeight: 1.2,
+                }}
+              >
                 Toplam Tahmin
               </span>
             </div>
@@ -444,18 +442,39 @@ export default function ProfilePage() {
                 )
               }
               style={{
+                minWidth: 0,
+                padding:
+                  "8px 5px",
+                borderRadius:
+                  "10px",
                 border: "none",
                 font: "inherit",
                 color: "inherit",
-                cursor: "pointer",
-                textAlign: "center",
+                cursor:
+                  "pointer",
+                textAlign:
+                  "center",
+                background:
+                  "var(--card-bg, #fff)",
               }}
             >
-              <strong>
+              <strong
+                style={{
+                  fontSize:
+                    "16px",
+                  lineHeight: 1.1,
+                }}
+              >
                 {followersCount}
               </strong>
 
-              <span>
+              <span
+                style={{
+                  fontSize:
+                    "10px",
+                  lineHeight: 1.2,
+                }}
+              >
                 Takipçi
               </span>
             </button>
@@ -469,67 +488,42 @@ export default function ProfilePage() {
                 )
               }
               style={{
+                minWidth: 0,
+                padding:
+                  "8px 5px",
+                borderRadius:
+                  "10px",
                 border: "none",
                 font: "inherit",
                 color: "inherit",
-                cursor: "pointer",
-                textAlign: "center",
+                cursor:
+                  "pointer",
+                textAlign:
+                  "center",
+                background:
+                  "var(--card-bg, #fff)",
               }}
             >
-              <strong>
+              <strong
+                style={{
+                  fontSize:
+                    "16px",
+                  lineHeight: 1.1,
+                }}
+              >
                 {followingCount}
               </strong>
 
-              <span>
+              <span
+                style={{
+                  fontSize:
+                    "10px",
+                  lineHeight: 1.2,
+                }}
+              >
                 Takip
               </span>
             </button>
-          </section>
-
-          {/*
-           * ==================================================
-           * DİĞER İSTATİSTİKLER
-           * ==================================================
-           */}
-
-          <section
-            className="profile-stats"
-            style={{
-              width: "100%",
-              maxWidth: "100%",
-              minWidth: 0,
-              boxSizing: "border-box",
-            }}
-          >
-            <div className="stat-card">
-              <strong>
-                {successRate}%
-              </strong>
-
-              <span>
-                Başarı Oranı
-              </span>
-            </div>
-
-            <div className="stat-card">
-              <strong>
-                {totalPoints}
-              </strong>
-
-              <span>
-                Puan
-              </span>
-            </div>
-
-            <div className="stat-card">
-              <strong>
-                {correctPredictions}
-              </strong>
-
-              <span>
-                Doğru
-              </span>
-            </div>
           </section>
 
           {/*
@@ -546,6 +540,7 @@ export default function ProfilePage() {
               minWidth: 0,
               boxSizing: "border-box",
               overflow: "hidden",
+              marginTop: "10px",
             }}
           >
             <div className="section-title">
