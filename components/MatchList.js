@@ -185,26 +185,264 @@ export default function MatchList({
   }
 
   if (
-    !enableFilters &&
-    (!Array.isArray(matches) ||
-      matches.length === 0)
+    !Array.isArray(matches) ||
+    matches.length === 0
   ) {
-    return (
-      <div className="empty-state small">
-        <div className="empty-icon">
-          ⚽
-        </div>
+    if (
+      enableFilters &&
+      search.trim()
+    ) {
+      // Arama devam eder.
+    } else if (
+      enableFilters
+    ) {
+      return (
+        <>
+          <div
+            style={{
+              border:
+                "1px solid var(--border)",
+              borderRadius:
+                "12px",
+              padding:
+                "10px",
+              marginBottom:
+                "12px",
+              background:
+                "var(--surface-soft)",
+            }}
+          >
+            <div
+              style={{
+                display:
+                  "flex",
+                gap:
+                  "6px",
+                overflowX:
+                  "auto",
+                paddingBottom:
+                  "8px",
+                marginBottom:
+                  "9px",
+                scrollbarWidth:
+                  "thin",
+              }}
+            >
+              {filterCategories.map(
+                (category) => {
+                  const active =
+                    statusFilter ===
+                    category.id;
 
-        <h3>
-          Maç bulunamadı
-        </h3>
+                  return (
+                    <button
+                      key={
+                        category.id
+                      }
+                      type="button"
+                      onClick={() =>
+                        setStatusFilter(
+                          category.id
+                        )
+                      }
+                      style={{
+                        flexShrink:
+                          0,
+                        border:
+                          active
+                            ? "1px solid var(--primary)"
+                            : "1px solid var(--border)",
+                        borderRadius:
+                          "8px",
+                        background:
+                          active
+                            ? "var(--primary)"
+                            : "var(--surface)",
+                        color:
+                          active
+                            ? "#fff"
+                            : "var(--text)",
+                        padding:
+                          "7px 10px",
+                        fontSize:
+                          "10px",
+                        fontWeight:
+                          800,
+                        cursor:
+                          "pointer",
+                        boxShadow:
+                          active
+                            ? "0 2px 7px rgba(0,0,0,0.12)"
+                            : "none",
+                      }}
+                    >
+                      {
+                        category.label
+                      }
+                    </button>
+                  );
+                }
+              )}
+            </div>
 
-        <p>
-          Şu anda gösterilecek bir maç
-          bulunmuyor.
-        </p>
-      </div>
-    );
+            <div
+              style={{
+                position:
+                  "relative",
+                display:
+                  "flex",
+                alignItems:
+                  "center",
+                gap:
+                  "6px",
+              }}
+            >
+              <div
+                style={{
+                  position:
+                    "relative",
+                  flex:
+                    1,
+                  minWidth:
+                    0,
+                }}
+              >
+                <span
+                  style={{
+                    position:
+                      "absolute",
+                    left:
+                      "10px",
+                    top:
+                      "50%",
+                    transform:
+                      "translateY(-50%)",
+                    fontSize:
+                      "12px",
+                    pointerEvents:
+                      "none",
+                    opacity:
+                      0.7,
+                  }}
+                >
+                  🔎
+                </span>
+
+                <input
+                  type="text"
+                  value={
+                    search
+                  }
+                  onChange={(
+                    event
+                  ) =>
+                    setSearch(
+                      event
+                        .target
+                        .value
+                    )
+                  }
+                  placeholder="Takım veya lig ara..."
+                  style={{
+                    width:
+                      "100%",
+                    minWidth:
+                      0,
+                    height:
+                      "36px",
+                    boxSizing:
+                      "border-box",
+                    padding:
+                      "7px 30px 7px 29px",
+                    border:
+                      "1px solid var(--border)",
+                    borderRadius:
+                      "9px",
+                    background:
+                      "var(--surface)",
+                    color:
+                      "var(--text)",
+                    outline:
+                      "none",
+                    fontSize:
+                      "11px",
+                    fontWeight:
+                      600,
+                  }}
+                />
+
+                {searchLoading ? (
+                  <span
+                    style={{
+                      position:
+                        "absolute",
+                      right:
+                        "10px",
+                      top:
+                        "50%",
+                      transform:
+                        "translateY(-50%)",
+                      fontSize:
+                        "10px",
+                      opacity:
+                        0.65,
+                    }}
+                  >
+                    ⏳
+                  </span>
+                ) : null}
+              </div>
+
+              <button
+                type="button"
+                onClick={
+                  clearFilters
+                }
+                style={{
+                  flexShrink:
+                    0,
+                  height:
+                    "36px",
+                  padding:
+                    "0 10px",
+                  border:
+                    "1px solid var(--border)",
+                  borderRadius:
+                    "9px",
+                  background:
+                    "var(--surface)",
+                  color:
+                    "var(--text)",
+                  fontSize:
+                    "10px",
+                  fontWeight:
+                    800,
+                  cursor:
+                    "pointer",
+                }}
+              >
+                Temizle
+              </button>
+            </div>
+          </div>
+
+          <div className="empty-state small">
+            <div className="empty-icon">
+              ⚽
+            </div>
+
+            <h3>
+              Maç bulunamadı
+            </h3>
+
+            <p>
+              Şu anda gösterilecek
+              bir maç bulunmuyor.
+            </p>
+          </div>
+        </>
+      );
+    }
   }
 
   return (
@@ -464,7 +702,7 @@ export default function MatchList({
               }}
             >
               {searchLoading
-                ? "Geçmiş maçlar aranıyor..."
+                ? "Bugünkü maçlar aranıyor..."
                 : `${searchResults.length} arama sonucu bulundu.`}
             </div>
           ) : null}
@@ -515,21 +753,19 @@ export default function MatchList({
 
           <p>
             {search.trim()
-              ? "Takım veya lig adına uygun maç bulunmuyor."
+              ? "Bugünkü maçlar içinde takım veya lig adına uygun maç bulunmuyor."
               : "Seçtiğin filtrelere uygun maç bulunmuyor."}
           </p>
 
-          {enableFilters ? (
-            <button
-              type="button"
-              className="primary-button"
-              onClick={
-                clearFilters
-              }
-            >
-              Filtreleri Temizle
-            </button>
-          ) : null}
+          <button
+            type="button"
+            className="primary-button"
+            onClick={
+              clearFilters
+            }
+          >
+            Filtreleri Temizle
+          </button>
         </div>
       ) : (
         <div className="match-list">
