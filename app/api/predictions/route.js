@@ -1,7 +1,9 @@
-"app/api/predictions/route.js"
-
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+
+import {
+  getMatch,
+} from "../../../lib/football-api";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,22 +31,100 @@ function getSupabase() {
 
 /*
  * ==================================================
+ * MAÇ VERİSİNİ SUPABASE FORMATINA ÇEVİR
+ * ==================================================
+ */
+
+function buildDatabaseMatch(
+  match
+) {
+  return {
+    external_id:
+      match?.external_id
+        ? String(
+            match.external_id
+          )
+        : null,
+
+    league:
+      match?.league ||
+      "Mackolik",
+
+    league_logo:
+      match?.league_logo ||
+      null,
+
+    home_team:
+      match?.home_team ||
+      "",
+
+    away_team:
+      match?.away_team ||
+      "",
+
+    home_logo:
+      match?.home_logo ||
+      null,
+
+    away_logo:
+      match?.away_logo ||
+      null,
+
+    match_date:
+      match?.match_date ||
+      null,
+
+    status:
+      match?.status ||
+      "scheduled",
+
+    home_score:
+      match?.home_score ??
+      null,
+
+    away_score:
+      match?.away_score ??
+      null,
+
+    home_team_id:
+      match?.home_team_id
+        ? String(
+            match.home_team_id
+          )
+        : null,
+
+    away_team_id:
+      match?.away_team_id
+        ? String(
+            match.away_team_id
+          )
+        : null,
+  };
+}
+
+/*
+ * ==================================================
  * MAÇ BULMA
  * ==================================================
  *
- * PredictionBox tarafından gelen match_id
- * Mackolik ID olabilir.
+ * Gelen match_id:
+ *
+ * 1. Mackolik ID olabilir
+ * 2. Supabase matches.id olabilir
  *
  * Öncelik:
  *
- * 1. matches.external_id
- * 2. matches.id
+ * matches.external_id
+ *        ↓
+ * matches.id
+ *        ↓
+ * Mackolik'ten bul
+ *        ↓
+ * Supabase'e kaydet
+ *        ↓
+ * gerçek Supabase matches.id döndür
  *
- * ÖNEMLİ:
- *
- * matches.iddaa_code KULLANILMIYOR.
- * Bu kolon Supabase'de olmadığı için sorguya
- * dahil edilmez.
+ * iddaa_code KULLANILMAZ.
  */
 
 async function findMatch(
@@ -112,17 +192,15 @@ async function findMatch(
    * --------------------------------------------------
    * 2. DOĞRUDAN SUPABASE MATCH ID
    * --------------------------------------------------
-   *
-   * Bazı ekranlar doğrudan matches.id gönderebilir.
-   *
-   * UUID formatındaysa doğrudan id üzerinden arıyoruz.
    */
 
   const uuidRegex =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
   if (
-    uuidRegex.test(requestedId)
+    uuidRegex.test(
+      requestedId
+    )
   ) {
     const {
       data: uuidMatch,
@@ -162,7 +240,208 @@ async function findMatch(
     }
   }
 
-  return null;
+  /*
+   * --------------------------------------------------
+   * 3. SUPABASE'DE YOKSA MACKOLIK'TEN BUL
+   * --------------------------------------------------
+   *
+   * Buradaki kritik düzeltme budur.
+   *
+   * Daha önce:
+   *
+   * Mackolik ID
+   *      ↓
+   * external_id aranıyor
+   *      ↓
+   * yoksa direkt hata
+   *
+   * Şimdi:
+   *
+   * Mackolik ID
+   *      ↓
+   * external_id aranıyor
+   *      ↓
+   * yoksa Mackolik'ten maç al
+   *      ↓
+   * matches tablosuna kaydet
+   *      ↓
+   * Supabase ID'yi kullan
+   */
+
+  let mackolikMatch = null;
+
+  try {
+    mackolikMatch =
+      await getMatch(
+        requestedId
+      );
+  } catch (error) {
+    console.error(
+      "Mackolik match lookup error:",
+      error
+    );
+  }
+
+  if (!mackolikMatch) {
+    return null;
+  }
+
+  /*
+   * Mackolik'ten gelen maçın external_id'si
+   * mutlaka mevcut olmalı.
+   */
+
+  const externalId =
+    mackolikMatch?.external_id
+      ? String(
+          mackolikMatch.external_id
+        ).trim()
+      : null;
+
+  if (!externalId) {
+    console.error(
+      "Mackolik match has no external_id:",
+      mackolikMatch
+    );
+
+    return null;
+  }
+
+  /*
+   * Mackolik'ten gelen ID ile tekrar kontrol.
+   *
+   * Aynı anda başka istek maçı eklemiş olabilir.
+   */
+
+  const {
+    data: existingAfterFetch,
+    error:
+      existingAfterFetchError,
+  } = await supabase
+    .from("matches")
+    .select(
+      `
+        id,
+        external_id,
+        league,
+        home_team,
+        away_team,
+        home_logo,
+        away_logo,
+        match_date,
+        status
+      `
+    )
+    .eq(
+      "external_id",
+      externalId
+    )
+    .maybeSingle();
+
+  if (
+    existingAfterFetchError
+  ) {
+    console.error(
+      "Match second external_id lookup error:",
+      existingAfterFetchError
+    );
+
+    throw existingAfterFetchError;
+  }
+
+  if (existingAfterFetch) {
+    return existingAfterFetch;
+  }
+
+  /*
+   * --------------------------------------------------
+   * 4. MAÇI SUPABASE'E EKLE
+   * --------------------------------------------------
+   */
+
+  const databaseMatch =
+    buildDatabaseMatch(
+      mackolikMatch
+    );
+
+  const {
+    data: insertedMatch,
+    error: insertError,
+  } = await supabase
+    .from("matches")
+    .insert(
+      databaseMatch
+    )
+    .select(
+      `
+        id,
+        external_id,
+        league,
+        home_team,
+        away_team,
+        home_logo,
+        away_logo,
+        match_date,
+        status
+      `
+    )
+    .single();
+
+  if (insertError) {
+    /*
+     * Aynı anda başka bir istek INSERT yaptıysa
+     * tekrar external_id üzerinden bulmayı dene.
+     */
+
+    console.error(
+      "Match INSERT error:",
+      insertError
+    );
+
+    const {
+      data: retryMatch,
+      error:
+        retryError,
+    } = await supabase
+      .from("matches")
+      .select(
+        `
+          id,
+          external_id,
+          league,
+          home_team,
+          away_team,
+          home_logo,
+          away_logo,
+          match_date,
+          status
+        `
+      )
+      .eq(
+        "external_id",
+        externalId
+      )
+      .maybeSingle();
+
+    if (
+      retryError
+    ) {
+      console.error(
+        "Match retry lookup error:",
+        retryError
+      );
+
+      throw insertError;
+    }
+
+    if (retryMatch) {
+      return retryMatch;
+    }
+
+    throw insertError;
+  }
+
+  return insertedMatch;
 }
 
 /*
@@ -171,14 +450,18 @@ async function findMatch(
  * ==================================================
  */
 
-export async function GET(request) {
+export async function GET(
+  request
+) {
   try {
     const supabase =
       getSupabase();
 
     const {
       searchParams,
-    } = new URL(request.url);
+    } = new URL(
+      request.url
+    );
 
     const matchId =
       searchParams.get(
@@ -316,7 +599,9 @@ export async function GET(request) {
  * ==================================================
  */
 
-export async function POST(request) {
+export async function POST(
+  request
+) {
   try {
     const body =
       await request.json();
@@ -331,10 +616,12 @@ export async function POST(request) {
       body?.prediction;
 
     const confidence =
-      body?.confidence ?? null;
+      body?.confidence ??
+      null;
 
     const message =
-      body?.message ?? null;
+      body?.message ??
+      null;
 
     /*
      * --------------------------------------------------
@@ -594,35 +881,47 @@ export async function POST(request) {
 
     /*
      * --------------------------------------------------
-     * MAÇI BUL
+     * MAÇI BUL / GEREKİRSE SUPABASE'E EKLE
      * --------------------------------------------------
-     *
-     * PredictionBox'tan gelen match_id
-     * Mackolik ID ise:
-     *
-     * match_id
-     *    ↓
-     * matches.external_id
-     *    ↓
-     * matches.id
-     *    ↓
-     * predictions.match_id
      */
 
-    const match =
-      await findMatch(
-        supabase,
-        matchId
+    let match;
+
+    try {
+      match =
+        await findMatch(
+          supabase,
+          matchId
+        );
+    } catch (matchLookupError) {
+      console.error(
+        "Prediction match lookup error:",
+        matchLookupError
       );
+
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            matchLookupError?.message ||
+            "Maç kontrol edilemedi.",
+        },
+        {
+          status: 500,
+        }
+      );
+    }
 
     if (!match) {
       return NextResponse.json(
         {
           success: false,
           error:
-            "Maç bulunamadı. Mackolik ID ile Supabase matches.external_id eşleşmesi yok.",
+            "Maç bulunamadı. Mackolik ID ile maç verisi alınamadı.",
           received_match_id:
-            String(matchId).trim(),
+            String(
+              matchId
+            ).trim(),
         },
         {
           status: 404,
@@ -791,7 +1090,7 @@ export async function POST(request) {
       {
         success: false,
         error:
-          "Tahmin gönderilirken bir sunucu hatası oluştu.",
+          "Tahmin gönderilirken bir hata oluştu.",
       },
       {
         status: 500,
@@ -810,7 +1109,9 @@ export async function POST(request) {
  * Bu bölüm çalışan sistem korunarak bırakılmıştır.
  */
 
-export async function DELETE(request) {
+export async function DELETE(
+  request
+) {
   try {
     const supabase =
       getSupabase();
@@ -822,7 +1123,9 @@ export async function DELETE(request) {
     );
 
     const predictionId =
-      searchParams.get("id");
+      searchParams.get(
+        "id"
+      );
 
     const telegramId =
       searchParams.get(
@@ -949,6 +1252,10 @@ export async function DELETE(request) {
         }
       );
     }
+
+    /*
+     * SADECE TAHMİN SAHİBİ SİLEBİLİR
+     */
 
     if (
       String(
