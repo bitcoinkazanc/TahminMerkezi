@@ -1,11 +1,15 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 
 export default function PredictionMessage({
   prediction,
 }) {
-  if (!prediction) {
+  const [deleting, setDeleting] = useState(false);
+  const [deleted, setDeleted] = useState(false);
+
+  if (!prediction || deleted) {
     return null;
   }
 
@@ -57,6 +61,56 @@ export default function PredictionMessage({
   const matchName = match
     ? `${match.home_team} - ${match.away_team}`
     : "Maç bilgisi yok";
+
+  async function handleDelete() {
+    if (deleting) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Bu tahmini silmek istediğinizden emin misiniz?"
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setDeleting(true);
+
+      const response = await fetch(
+        `/api/predictions?id=${encodeURIComponent(
+          prediction.id
+        )}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data?.error ||
+            "Tahmin silinemedi."
+        );
+      }
+
+      setDeleted(true);
+    } catch (error) {
+      console.error(
+        "Prediction delete error:",
+        error
+      );
+
+      alert(
+        error?.message ||
+          "Tahmin silinemedi."
+      );
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   return (
     <article
@@ -348,6 +402,39 @@ export default function PredictionMessage({
           >
             ⚽ Maça Git
           </Link>
+
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={deleting}
+            style={{
+              flex: "1 1 0",
+              minWidth: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              minHeight: "34px",
+              padding: "7px 8px",
+              border: "1px solid #dc2626",
+              borderRadius: "9px",
+              background: "#dc2626",
+              color: "#fff",
+              fontSize: "11px",
+              fontWeight: 800,
+              boxSizing: "border-box",
+              overflow: "hidden",
+              whiteSpace: "nowrap",
+              textOverflow: "ellipsis",
+              cursor: deleting
+                ? "not-allowed"
+                : "pointer",
+              opacity: deleting ? 0.6 : 1,
+            }}
+          >
+            {deleting
+              ? "Siliniyor..."
+              : "🗑 Tahmin Sil"}
+          </button>
         </div>
       ) : null}
     </article>
