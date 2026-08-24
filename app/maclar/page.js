@@ -68,21 +68,37 @@ export default function MatchesPage() {
     <main className="page">
       <div className="page-container">
 
-        {/* ANA SAYFADAKİ HERO YAPISI */}
-        <section className="home-hero">
-          <div
-            className="home-hero-title"
+        {/* MAÇLAR SAYFASI ÜST KUTUSU */}
+        <section
+          className="home-hero"
+          style={{
+            position: "relative",
+          }}
+        >
+          {/* YENİLEME BUTONU */}
+          <button
+            type="button"
+            className="refresh-button"
+            onClick={loadMatches}
+            disabled={loading}
+            aria-label="Maçları yenile"
             style={{
-              position: "relative",
+              position: "absolute",
+              top: "16px",
+              right: "16px",
             }}
           >
+            ↻
+          </button>
+
+          {/* BAŞLIK */}
+          <div className="home-hero-title">
             <span className="home-hero-decoration">
               ✦
             </span>
 
             <h1>
-              Başarı oranın ne kadar yüksekse,
-              sesin o kadar gür çıkar
+              Günün maçları seni bekliyor
             </h1>
 
             <span className="home-hero-decoration">
@@ -90,48 +106,32 @@ export default function MatchesPage() {
             </span>
           </div>
 
-          <p className="home-hero-text">
-            Unutma, en büyük analizciler de tek bir
-            doğru tahminle başladı. Sahadaki heyecana
-            ortak ol, bilgini konuştur ve liderlik
-            kürsüsüne doğru ilk adımını at. 🏆
+          {/* SLOGAN */}
+          <p
+            className="home-hero-text"
+            style={{
+              marginBottom: "10px",
+            }}
+          >
+            Başarı oranın ne kadar yüksekse,
+            sesin o kadar gür çıkar
+          </p>
+
+          {/* TAHMİN TEŞVİK METNİ */}
+          <p
+            className="home-hero-text"
+            style={{
+              marginTop: "0",
+            }}
+          >
+            Maçı seç, analizini yap ve tahminini
+            paylaş. Doğru tahminlerinle puanını
+            yükselt, liderlik kürsüsüne yaklaş! 🏆
           </p>
         </section>
 
-        {/* MAÇLAR KUTUSU */}
+        {/* MAÇLAR */}
         <section className="section-card">
-
-          <div
-            className="section-title home-matches-title"
-            style={{
-              position: "relative",
-              justifyContent: "center",
-              textAlign: "center",
-              paddingRight: "52px",
-            }}
-          >
-            <h2>
-              Günün maçları seni bekliyor
-            </h2>
-
-            <button
-              type="button"
-              className="refresh-button"
-              onClick={loadMatches}
-              disabled={loading}
-              aria-label="Maçları yenile"
-              style={{
-                position: "absolute",
-                right: "16px",
-                top: "50%",
-                transform:
-                  "translateY(-50%)",
-              }}
-            >
-              ↻
-            </button>
-          </div>
-
           {loading ? (
             <Loading />
           ) : error ? (
