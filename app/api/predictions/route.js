@@ -22,17 +22,6 @@ function getSupabase() {
   });
 }
 
-/**
- * Maç ID'sini Supabase matches tablosundaki
- * gerçek UUID'ye çevirir.
- *
- * Frontend Maçkolik ID gönderebilir:
- * c6f9csiwtzkjr2ei2wekrs8pg
- *
- * Supabase tarafında ise:
- * id = UUID
- * external_id = Maçkolik ID
- */
 async function findMatch(supabase, matchId) {
   if (!matchId) {
     return null;
@@ -44,9 +33,6 @@ async function findMatch(supabase, matchId) {
     return null;
   }
 
-  /*
-   * 1. Önce Maçkolik external_id üzerinden ara.
-   */
   const {
     data: externalMatch,
     error: externalError,
@@ -69,12 +55,6 @@ async function findMatch(supabase, matchId) {
     return externalMatch;
   }
 
-  /*
-   * 2. Eğer frontend zaten Supabase UUID gönderiyorsa
-   * id üzerinden de destekle.
-   *
-   * Böylece eski çalışan bölümler de bozulmaz.
-   */
   const {
     data: uuidMatch,
     error: uuidError,
@@ -85,13 +65,6 @@ async function findMatch(supabase, matchId) {
     .maybeSingle();
 
   if (uuidError) {
-    /*
-     * PostgreSQL UUID formatına uygun olmayan
-     * Maçkolik ID'lerinde burada hata oluşabilir.
-     *
-     * Bu durumda hata vermek yerine maç bulunamadı
-     * kabul ediyoruz.
-     */
     if (
       uuidError.code === "22P02" ||
       uuidError.message?.includes(
@@ -156,15 +129,6 @@ export async function GET(request) {
         ascending: false,
       });
 
-    /*
-     * GET tarafında da Maçkolik ID desteği.
-     *
-     * Örneğin:
-     * /api/predictions?match_id=c6f9csiwtzkjr2ei2wekrs8pg
-     *
-     * Önce matches.external_id bulunur,
-     * sonra predictions.match_id UUID ile sorgulanır.
-     */
     if (matchId) {
       const match = await findMatch(
         supabase,
@@ -419,9 +383,6 @@ export async function POST(request) {
     const supabase =
       getSupabase();
 
-    /*
-     * KULLANICI KONTROLÜ
-     */
     const {
       data: user,
       error: userError,
@@ -462,15 +423,6 @@ export async function POST(request) {
       );
     }
 
-    /*
-     * MAÇ KONTROLÜ
-     *
-     * Burada artık:
-     *
-     * matchId -> matches.external_id
-     *
-     * üzerinden gerçek Supabase UUID'sini buluyoruz.
-     */
     let match;
 
     try {
@@ -512,13 +464,6 @@ export async function POST(request) {
       );
     }
 
-    /*
-     * AYNI KULLANICININ AYNI MAÇA
-     * İKİNCİ KEZ TAHMİN YAPMASINI ENGELLE.
-     *
-     * Burada match.id kullanıyoruz.
-     * Çünkü predictions.match_id UUID.
-     */
     const {
       data: existingPrediction,
       error: existingError,
@@ -566,9 +511,6 @@ export async function POST(request) {
       );
     }
 
-    /*
-     * TAHMİNİ KAYDET
-     */
     const {
       data,
       error,
@@ -576,21 +518,12 @@ export async function POST(request) {
       .from("predictions")
       .insert({
         user_id: userId,
-
-        /*
-         * ÖNEMLİ:
-         * Buraya Maçkolik ID değil,
-         * Supabase matches.id UUID'si yazılıyor.
-         */
         match_id: match.id,
-
         prediction,
-
         confidence:
           confidence === null
             ? null
             : Number(confidence),
-
         message: cleanMessage,
       })
       .select(`
@@ -669,4 +602,174 @@ export async function POST(request) {
       }
     );
   }
-} 
+}
+
+export async function DELETE(request) {
+  try {
+    const supabase = getSupabase();
+    const { searchParams } = new URL(request.url);
+
+    const predictionId =
+      searchParams.get("id");
+
+    const userId =
+      searchParams.get("user_id");
+
+    if (!predictionId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Tahmin ID gerekli.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    if (!userId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Kullanıcı bilgisi gerekli.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    /*
+     * Sadece tahminin sahibi kendi tahminini silebilir.
+     */
+    const {
+      data: prediction,
+      error: predictionError,
+    } = await supabase
+      .from("predictions")
+      .select(`
+        id,
+        user_id,
+        result,
+        points
+      `)
+      .eq("id", predictionId)
+      .maybeSingle();
+
+    if (predictionError) {
+      console.error(
+        "Prediction delete lookup error:",
+        predictionError
+      );
+
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            predictionError.message,
+        },
+        {
+          status: 500,
+        }
+      );
+    }
+
+    if (!prediction) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Tahmin bulunamadı.",
+        },
+        {
+          status: 404,
+        }
+      );
+    }
+
+    if (
+      String(prediction.user_id) !==
+      String(userId)
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Bu tahmini silme yetkiniz yok.",
+        },
+        {
+          status: 403,
+        }
+      );
+    }
+
+    /*
+     * Sonucu belirlenmiş tahminler silinmez.
+     */
+    if (
+      prediction.result !== null &&
+      prediction.result !== undefined
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Sonucu belirlenmiş tahmin silinemez.",
+        },
+        {
+          status: 409,
+        }
+      );
+    }
+
+    const {
+      error: deleteError,
+    } = await supabase
+      .from("predictions")
+      .delete()
+      .eq("id", predictionId)
+      .eq("user_id", userId);
+
+    if (deleteError) {
+      console.error(
+        "Prediction DELETE error:",
+        deleteError
+      );
+
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            deleteError.message,
+        },
+        {
+          status: 500,
+        }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      message:
+        "Tahmin başarıyla silindi.",
+    });
+  } catch (error) {
+    console.error(
+      "Prediction DELETE server error:",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          "Tahmin silinirken bir sunucu hatası oluştu.",
+      },
+      {
+        status: 500,
+      }
+    );
+  }
+}
