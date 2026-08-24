@@ -72,6 +72,16 @@ to anon, authenticated
 with check (true);
 
 
+drop policy if exists "Anyone can delete predictions"
+on public.predictions;
+
+create policy "Anyone can delete predictions"
+on public.predictions
+for delete
+to anon, authenticated
+using (true);
+
+
 -- MESSAGES
 
 drop policy if exists "Anyone can view messages"
