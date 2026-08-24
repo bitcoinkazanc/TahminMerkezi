@@ -4,20 +4,33 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import ProfileCard from "../../components/ProfileCard";
+import ProfileFollowList from "../../components/ProfileFollowList";
 import Loading from "../../components/Loading";
 
 export default function ProfilePage() {
-  const searchParams = useSearchParams();
+  const searchParams =
+    useSearchParams();
 
-  const [user, setUser] = useState(null);
-  const [currentUser, setCurrentUser] = useState(null);
-  const [predictions, setPredictions] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [followLoading, setFollowLoading] = useState(false);
-  const [isFollowing, setIsFollowing] = useState(false);
-  const [followersCount, setFollowersCount] = useState(0);
-  const [followingCount, setFollowingCount] = useState(0);
-  const [error, setError] = useState("");
+  const [user, setUser] =
+    useState(null);
+
+  const [predictions, setPredictions] =
+    useState([]);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [error, setError] =
+    useState("");
+
+  const [followersCount, setFollowersCount] =
+    useState(0);
+
+  const [followingCount, setFollowingCount] =
+    useState(0);
+
+  const [followListType, setFollowListType] =
+    useState(null);
 
   const profileUserId =
     searchParams.get("user_id");
@@ -29,54 +42,27 @@ export default function ProfilePage() {
         setError("");
         setUser(null);
         setPredictions([]);
-        setIsFollowing(false);
         setFollowersCount(0);
         setFollowingCount(0);
 
         let profileUser = null;
-        let loggedUser = null;
 
         /*
          * ==================================================
-         * GİRİŞ YAPMIŞ KULLANICI
-         * ==================================================
-         */
-
-        const savedUser =
-          localStorage.getItem("tm_user");
-
-        if (savedUser) {
-          try {
-            const parsedUser =
-              JSON.parse(savedUser);
-
-            if (parsedUser?.id) {
-              loggedUser = parsedUser;
-              setCurrentUser(parsedUser);
-            }
-          } catch (error) {
-            console.error(
-              "Saved user parse error:",
-              error
-            );
-          }
-        }
-
-        /*
-         * ==================================================
-         * PROFİL KULLANICISI
+         * PROFİL KULLANICISINI BUL
          * ==================================================
          */
 
         if (profileUserId) {
-          const response = await fetch(
-            `/api/users/${encodeURIComponent(
-              profileUserId
-            )}`,
-            {
-              cache: "no-store",
-            }
-          );
+          const response =
+            await fetch(
+              `/api/users/${encodeURIComponent(
+                profileUserId
+              )}`,
+              {
+                cache: "no-store",
+              }
+            );
 
           const result =
             await response.json();
@@ -94,78 +80,106 @@ export default function ProfilePage() {
           profileUser =
             result.user;
         } else {
-          if (!loggedUser) {
+          const savedUser =
+            localStorage.getItem(
+              "tm_user"
+            );
+
+          if (!savedUser) {
+            setLoading(false);
+            return;
+          }
+
+          const parsedUser =
+            JSON.parse(
+              savedUser
+            );
+
+          if (!parsedUser?.id) {
             setLoading(false);
             return;
           }
 
           profileUser =
-            loggedUser;
-        }
-
-        if (!profileUser?.id) {
-          throw new Error(
-            "Profil kullanıcı bilgisi bulunamadı."
-          );
+            parsedUser;
         }
 
         setUser(profileUser);
 
         /*
          * ==================================================
-         * TAKİP DURUMUNU GETİR
+         * TAKİPÇİ / TAKİP SAYILARI
          * ==================================================
-         *
-         * Sadece başka bir kullanıcının profiline
-         * bakılıyorsa kontrol edilir.
          */
 
-        if (
-          loggedUser?.id &&
-          profileUser.id
-        ) {
-          try {
-            const followResponse =
-              await fetch(
-                `/api/follows?follower_id=${encodeURIComponent(
-                  loggedUser.id
-                )}&following_id=${encodeURIComponent(
-                  profileUser.id
-                )}`,
-                {
-                  cache: "no-store",
-                }
-              );
+        try {
+          const followResponse =
+            await fetch(
+              `/api/follows?user_id=${encodeURIComponent(
+                profileUser.id
+              )}&type=followers`,
+              {
+                cache: "no-store",
+              }
+            );
 
-            const followResult =
-              await followResponse.json();
+          const followResult =
+            await followResponse.json();
 
-            if (
-              followResponse.ok &&
-              followResult.success
-            ) {
-              setIsFollowing(
-                !!followResult.is_following
-              );
-
-              setFollowersCount(
-                Number(
-                  followResult.followers_count
-                ) || 0
-              );
-
-              setFollowingCount(
-                Number(
-                  followResult.following_count
-                ) || 0
-              );
-            }
-          } catch (error) {
-            console.error(
-              "Follow status loading error:",
-              error
+          if (
+            followResponse.ok &&
+            followResult.success
+          ) {
+            setFollowersCount(
+              Array.isArray(
+                followResult.users
+              )
+                ? followResult.users.length
+                : 0
             );
           }
+        } catch (
+          followError
+        ) {
+          console.error(
+            "Followers count error:",
+            followError
+          );
+        }
+
+        try {
+          const followingResponse =
+            await fetch(
+              `/api/follows?user_id=${encodeURIComponent(
+                profileUser.id
+              )}&type=following`,
+              {
+                cache: "no-store",
+              }
+            );
+
+          const followingResult =
+            await followingResponse.json();
+
+          if (
+            followingResponse.ok &&
+            followingResult.success
+          ) {
+            setFollowingCount(
+              Array.isArray(
+                followingResult.users
+              )
+                ? followingResult.users.length
+                : 0
+            );
+          }
+        } catch (
+          followingError
+        ) {
+          console.error(
+            "Following count error:",
+            followingError
+          );
         }
 
         /*
@@ -192,7 +206,8 @@ export default function ProfilePage() {
           result.success
         ) {
           setPredictions(
-            result.predictions || []
+            result.predictions ||
+              []
           );
         }
       } catch (error) {
@@ -215,131 +230,19 @@ export default function ProfilePage() {
 
   /*
    * ==================================================
-   * TAKİP ET / TAKİBİ BIRAK
+   * LOADING
    * ==================================================
    */
-
-  async function handleFollow() {
-    if (
-      !currentUser?.id ||
-      !user?.id
-    ) {
-      return;
-    }
-
-    if (
-      currentUser.id === user.id
-    ) {
-      return;
-    }
-
-    try {
-      setFollowLoading(true);
-
-      /*
-       * --------------------------------------------------
-       * TAKİBİ BIRAK
-       * --------------------------------------------------
-       */
-
-      if (isFollowing) {
-        const response =
-          await fetch(
-            `/api/follows?follower_id=${encodeURIComponent(
-              currentUser.id
-            )}&following_id=${encodeURIComponent(
-              user.id
-            )}`,
-            {
-              method: "DELETE",
-            }
-          );
-
-        const result =
-          await response.json();
-
-        if (
-          !response.ok ||
-          !result.success
-        ) {
-          throw new Error(
-            result.error ||
-              "Takip bırakma işlemi başarısız."
-          );
-        }
-
-        setIsFollowing(false);
-
-        setFollowersCount(
-          (count) =>
-            Math.max(0, count - 1)
-        );
-
-        return;
-      }
-
-      /*
-       * --------------------------------------------------
-       * TAKİP ET
-       * --------------------------------------------------
-       */
-
-      const response =
-        await fetch(
-          "/api/follows",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-            body: JSON.stringify({
-              follower_id:
-                currentUser.id,
-
-              following_id:
-                user.id,
-            }),
-          }
-        );
-
-      const result =
-        await response.json();
-
-      if (
-        !response.ok ||
-        !result.success
-      ) {
-        throw new Error(
-          result.error ||
-            "Takip işlemi başarısız."
-        );
-      }
-
-      setIsFollowing(true);
-
-      setFollowersCount(
-        (count) =>
-          count + 1
-      );
-    } catch (error) {
-      console.error(
-        "Follow action error:",
-        error
-      );
-
-      alert(
-        error.message ||
-          "Takip işlemi sırasında bir hata oluştu."
-      );
-    } finally {
-      setFollowLoading(false);
-    }
-  }
 
   if (loading) {
     return <Loading />;
   }
+
+  /*
+   * ==================================================
+   * ERROR
+   * ==================================================
+   */
 
   if (error) {
     return (
@@ -382,6 +285,12 @@ export default function ProfilePage() {
     );
   }
 
+  /*
+   * ==================================================
+   * KULLANICI YOK
+   * ==================================================
+   */
+
   if (!user) {
     return (
       <main
@@ -412,9 +321,9 @@ export default function ProfilePage() {
             <h1>Profil</h1>
 
             <p>
-              Profil bilgilerini görmek için
-              Telegram üzerinden uygulamayı
-              açmalısın.
+              Profil bilgilerini görmek
+              için Telegram üzerinden
+              uygulamayı açmalısın.
             </p>
 
             <Link
@@ -429,8 +338,11 @@ export default function ProfilePage() {
     );
   }
 
-  const isOwnProfile =
-    currentUser?.id === user.id;
+  /*
+   * ==================================================
+   * TAHMİN İSTATİSTİKLERİ
+   * ==================================================
+   */
 
   const totalPredictions =
     predictions.length;
@@ -466,450 +378,504 @@ export default function ProfilePage() {
     predictions.reduce(
       (total, item) =>
         total +
-        (Number(item.points) || 0),
+        (Number(item.points) ||
+          0),
       0
     );
 
   return (
-    <main
-      className="page"
-      style={{
-        width: "100%",
-        maxWidth: "100%",
-        minWidth: 0,
-        overflowX: "hidden",
-        boxSizing: "border-box",
-        paddingBottom: "100px",
-      }}
-    >
-      <div
-        className="page-container"
+    <>
+      <main
+        className="page"
         style={{
           width: "100%",
           maxWidth: "100%",
           minWidth: 0,
-          boxSizing: "border-box",
           overflowX: "hidden",
+          boxSizing: "border-box",
+          paddingBottom: "100px",
         }}
       >
-        <ProfileCard user={user} />
-
-        {/* ==================================================
-            TAKİP ALANI
-            ================================================== */}
-
-        <section
-          className="section-card"
+        <div
+          className="page-container"
           style={{
             width: "100%",
             maxWidth: "100%",
             minWidth: 0,
             boxSizing: "border-box",
-            overflow: "hidden",
-            marginTop: "12px",
+            overflowX: "hidden",
           }}
         >
-          <div
+          <ProfileCard
+            user={user}
+          />
+
+          {/*
+           * ==================================================
+           * TAKİP İSTATİSTİKLERİ
+           * ==================================================
+           */}
+
+          <section
+            className="profile-stats"
             style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: "12px",
               width: "100%",
+              maxWidth: "100%",
               minWidth: 0,
+              boxSizing: "border-box",
             }}
           >
-            <div
-              style={{
-                display: "flex",
-                gap: "18px",
-                minWidth: 0,
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                }}
-              >
-                <strong>
-                  {followersCount}
-                </strong>
+            <div className="stat-card">
+              <strong>
+                {totalPredictions}
+              </strong>
 
-                <small>
-                  Takipçi
-                </small>
-              </div>
-
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                }}
-              >
-                <strong>
-                  {followingCount}
-                </strong>
-
-                <small>
-                  Takip
-                </small>
-              </div>
+              <span>
+                Toplam Tahmin
+              </span>
             </div>
 
-            {!isOwnProfile &&
-              currentUser?.id && (
-                <button
-                  type="button"
-                  onClick={
-                    handleFollow
-                  }
-                  disabled={
-                    followLoading
-                  }
-                  className="primary-button"
-                  style={{
-                    flex:
-                      "0 0 auto",
-                    minWidth:
-                      "120px",
-                    opacity:
-                      followLoading
-                        ? 0.6
-                        : 1,
-                  }}
-                >
-                  {followLoading
-                    ? "Bekleyin..."
-                    : isFollowing
-                      ? "Takibi Bırak"
-                      : "Takip Et"}
-                </button>
-              )}
-          </div>
-        </section>
+            <button
+              type="button"
+              className="stat-card"
+              onClick={() =>
+                setFollowListType(
+                  "followers"
+                )
+              }
+              style={{
+                border: "none",
+                font: "inherit",
+                color: "inherit",
+                cursor: "pointer",
+                textAlign: "center",
+              }}
+            >
+              <strong>
+                {followersCount}
+              </strong>
 
-        {/* ==================================================
-            PROFİL İSTATİSTİKLERİ
-            ================================================== */}
+              <span>
+                Takipçi
+              </span>
+            </button>
 
-        <section className="profile-stats">
-          <div className="stat-card">
-            <strong>
-              {totalPredictions}
-            </strong>
+            <button
+              type="button"
+              className="stat-card"
+              onClick={() =>
+                setFollowListType(
+                  "following"
+                )
+              }
+              style={{
+                border: "none",
+                font: "inherit",
+                color: "inherit",
+                cursor: "pointer",
+                textAlign: "center",
+              }}
+            >
+              <strong>
+                {followingCount}
+              </strong>
 
-            <span>
-              Toplam Tahmin
-            </span>
-          </div>
+              <span>
+                Takip
+              </span>
+            </button>
+          </section>
 
-          <div className="stat-card">
-            <strong>
-              {successRate}%
-            </strong>
+          {/*
+           * ==================================================
+           * DİĞER İSTATİSTİKLER
+           * ==================================================
+           */}
 
-            <span>
-              Başarı Oranı
-            </span>
-          </div>
+          <section
+            className="profile-stats"
+            style={{
+              width: "100%",
+              maxWidth: "100%",
+              minWidth: 0,
+              boxSizing: "border-box",
+            }}
+          >
+            <div className="stat-card">
+              <strong>
+                {successRate}%
+              </strong>
 
-          <div className="stat-card">
-            <strong>
-              {totalPoints}
-            </strong>
+              <span>
+                Başarı Oranı
+              </span>
+            </div>
 
-            <span>
-              Puan
-            </span>
-          </div>
-        </section>
+            <div className="stat-card">
+              <strong>
+                {totalPoints}
+              </strong>
 
-        {/* ==================================================
-            TAHMİNLER
-            ================================================== */}
+              <span>
+                Puan
+              </span>
+            </div>
 
-        <section
-          className="section-card"
-          style={{
-            width: "100%",
-            maxWidth: "100%",
-            minWidth: 0,
-            boxSizing: "border-box",
-            overflow: "hidden",
-          }}
-        >
-          <div className="section-title">
-            <h2>
-              Tahminlerim
-            </h2>
+            <div className="stat-card">
+              <strong>
+                {correctPredictions}
+              </strong>
 
-            <p>
-              Daha önce yaptığı tahminler.
-            </p>
-          </div>
+              <span>
+                Doğru
+              </span>
+            </div>
+          </section>
 
-          {predictions.length === 0 ? (
-            <div className="empty-state small">
-              <div className="empty-icon">
-                🎯
-              </div>
+          {/*
+           * ==================================================
+           * TAHMİNLER
+           * ==================================================
+           */}
 
-              <h3>
-                Henüz tahmin yok
-              </h3>
+          <section
+            className="section-card"
+            style={{
+              width: "100%",
+              maxWidth: "100%",
+              minWidth: 0,
+              boxSizing: "border-box",
+              overflow: "hidden",
+            }}
+          >
+            <div className="section-title">
+              <h2>
+                Tahminlerim
+              </h2>
 
               <p>
-                Bu kullanıcının henüz
-                yaptığı bir tahmin bulunmuyor.
+                Daha önce yaptığı
+                tahminler.
               </p>
             </div>
-          ) : (
-            <div
-              className="my-predictions"
-              style={{
-                width: "100%",
-                maxWidth: "100%",
-                minWidth: 0,
-                boxSizing: "border-box",
-                overflow: "hidden",
-              }}
-            >
-              {predictions.map(
-                (item) => {
-                  const match =
-                    item.matches;
 
-                  const matchName =
-                    match
-                      ? `${match.home_team} - ${match.away_team}`
-                      : "Maç bilgisi yok";
+            {predictions.length ===
+            0 ? (
+              <div className="empty-state small">
+                <div className="empty-icon">
+                  🎯
+                </div>
 
-                  const predictionLabel =
-                    item.prediction ===
-                    "MS1"
-                      ? "MS 1"
-                      : item.prediction ===
-                        "MSX"
-                        ? "MS X"
+                <h3>
+                  Henüz tahmin yok
+                </h3>
+
+                <p>
+                  Bu kullanıcının
+                  henüz yaptığı bir
+                  tahmin bulunmuyor.
+                </p>
+              </div>
+            ) : (
+              <div
+                className="my-predictions"
+                style={{
+                  width: "100%",
+                  maxWidth: "100%",
+                  minWidth: 0,
+                  boxSizing:
+                    "border-box",
+                  overflow: "hidden",
+                }}
+              >
+                {predictions.map(
+                  (item) => {
+                    const match =
+                      item.matches;
+
+                    const matchName =
+                      match
+                        ? `${match.home_team} - ${match.away_team}`
+                        : "Maç bilgisi yok";
+
+                    const predictionLabel =
+                      item.prediction ===
+                      "MS1"
+                        ? "MS 1"
                         : item.prediction ===
-                          "MS2"
-                          ? "MS 2"
-                          : item.prediction;
+                          "MSX"
+                          ? "MS X"
+                          : item.prediction ===
+                            "MS2"
+                            ? "MS 2"
+                            : item.prediction;
 
-                  const date =
-                    item.created_at
-                      ? new Date(
-                          item.created_at
-                        ).toLocaleDateString(
-                          "tr-TR"
-                        )
-                      : "";
+                    const date =
+                      item.created_at
+                        ? new Date(
+                            item.created_at
+                          ).toLocaleDateString(
+                            "tr-TR"
+                          )
+                        : "";
 
-                  const resultLabel =
-                    item.result ===
-                    "correct"
-                      ? "✓ Doğru"
-                      : item.result ===
-                        "wrong"
-                        ? "✕ Yanlış"
-                        : "⏳ Bekliyor";
+                    const resultLabel =
+                      item.result ===
+                      "correct"
+                        ? "✓ Doğru"
+                        : item.result ===
+                          "wrong"
+                          ? "✕ Yanlış"
+                          : "⏳ Bekliyor";
 
-                  const points =
-                    Number(
-                      item.points
-                    ) || 0;
+                    const points =
+                      Number(
+                        item.points
+                      ) || 0;
 
-                  const content = (
-                    <div
-                      className="my-prediction-item"
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        width: "100%",
-                        maxWidth: "100%",
-                        minWidth: 0,
-                        boxSizing: "border-box",
-                        overflow: "hidden",
-                      }}
-                    >
+                    const content = (
                       <div
-                        className="my-prediction-info"
+                        className="my-prediction-item"
                         style={{
-                          flex: "1 1 auto",
-                          width: 0,
-                          minWidth: 0,
-                          maxWidth: "100%",
-                          boxSizing: "border-box",
-                          overflow: "hidden",
-                        }}
-                      >
-                        <strong
-                          style={{
-                            display: "block",
-                            width: "100%",
-                            maxWidth: "100%",
-                            minWidth: 0,
-                            overflow: "hidden",
-                            textOverflow:
-                              "ellipsis",
-                            whiteSpace:
-                              "nowrap",
-                            boxSizing:
-                              "border-box",
-                          }}
-                        >
-                          {matchName}
-                        </strong>
-
-                        <span
-                          style={{
-                            display: "block",
-                            width: "100%",
-                            maxWidth: "100%",
-                            minWidth: 0,
-                            overflow: "hidden",
-                            textOverflow:
-                              "ellipsis",
-                            whiteSpace:
-                              "nowrap",
-                          }}
-                        >
-                          {match?.league ||
-                            "Futbol"}
-                        </span>
-
-                        <small>
-                          {date}
-                        </small>
-                      </div>
-
-                      <div
-                        className="my-prediction-value"
-                        style={{
-                          flex:
-                            "0 0 auto",
-                          width: "78px",
-                          minWidth: "78px",
-                          maxWidth: "78px",
-                          boxSizing:
-                            "border-box",
-                          overflow:
-                            "hidden",
-                          textAlign:
-                            "center",
-                          display: "flex",
-                          flexDirection:
-                            "column",
+                          display:
+                            "flex",
                           alignItems:
                             "center",
-                          justifyContent:
-                            "center",
-                        }}
-                      >
-                        <strong
-                          style={{
-                            display:
-                              "block",
-                            maxWidth:
-                              "100%",
-                            overflow:
-                              "hidden",
-                            textOverflow:
-                              "ellipsis",
-                            whiteSpace:
-                              "nowrap",
-                          }}
-                        >
-                          {
-                            predictionLabel
-                          }
-                        </strong>
-
-                        <small
-                          style={{
-                            display:
-                              "block",
-                            maxWidth:
-                              "100%",
-                            overflow:
-                              "hidden",
-                            textOverflow:
-                              "ellipsis",
-                            whiteSpace:
-                              "nowrap",
-                          }}
-                        >
-                          {resultLabel}
-                        </small>
-
-                        <small
-                          style={{
-                            display:
-                              "block",
-                            maxWidth:
-                              "100%",
-                            overflow:
-                              "hidden",
-                            textOverflow:
-                              "ellipsis",
-                            whiteSpace:
-                              "nowrap",
-                          }}
-                        >
-                          +{points} puan
-                        </small>
-                      </div>
-                    </div>
-                  );
-
-                  if (match?.id) {
-                    return (
-                      <Link
-                        key={item.id}
-                        href={`/mac/${match.id}`}
-                        style={{
-                          display: "block",
                           width: "100%",
-                          maxWidth: "100%",
+                          maxWidth:
+                            "100%",
                           minWidth: 0,
                           boxSizing:
                             "border-box",
                           overflow:
                             "hidden",
-                          textDecoration:
-                            "none",
+                        }}
+                      >
+                        <div
+                          className="my-prediction-info"
+                          style={{
+                            flex:
+                              "1 1 auto",
+                            width: 0,
+                            minWidth: 0,
+                            maxWidth:
+                              "100%",
+                            boxSizing:
+                              "border-box",
+                            overflow:
+                              "hidden",
+                          }}
+                        >
+                          <strong
+                            style={{
+                              display:
+                                "block",
+                              width:
+                                "100%",
+                              maxWidth:
+                                "100%",
+                              minWidth: 0,
+                              overflow:
+                                "hidden",
+                              textOverflow:
+                                "ellipsis",
+                              whiteSpace:
+                                "nowrap",
+                            }}
+                          >
+                            {
+                              matchName
+                            }
+                          </strong>
+
+                          <span
+                            style={{
+                              display:
+                                "block",
+                              width:
+                                "100%",
+                              maxWidth:
+                                "100%",
+                              minWidth: 0,
+                              overflow:
+                                "hidden",
+                              textOverflow:
+                                "ellipsis",
+                              whiteSpace:
+                                "nowrap",
+                            }}
+                          >
+                            {match?.league ||
+                              "Futbol"}
+                          </span>
+
+                          <small>
+                            {date}
+                          </small>
+                        </div>
+
+                        <div
+                          className="my-prediction-value"
+                          style={{
+                            flex:
+                              "0 0 auto",
+                            width:
+                              "78px",
+                            minWidth:
+                              "78px",
+                            maxWidth:
+                              "78px",
+                            boxSizing:
+                              "border-box",
+                            overflow:
+                              "hidden",
+                            textAlign:
+                              "center",
+                            display:
+                              "flex",
+                            flexDirection:
+                              "column",
+                            alignItems:
+                              "center",
+                            justifyContent:
+                              "center",
+                          }}
+                        >
+                          <strong
+                            style={{
+                              display:
+                                "block",
+                              maxWidth:
+                                "100%",
+                              overflow:
+                                "hidden",
+                              textOverflow:
+                                "ellipsis",
+                              whiteSpace:
+                                "nowrap",
+                            }}
+                          >
+                            {
+                              predictionLabel
+                            }
+                          </strong>
+
+                          <small
+                            style={{
+                              display:
+                                "block",
+                              maxWidth:
+                                "100%",
+                              overflow:
+                                "hidden",
+                              textOverflow:
+                                "ellipsis",
+                              whiteSpace:
+                                "nowrap",
+                            }}
+                          >
+                            {
+                              resultLabel
+                            }
+                          </small>
+
+                          <small
+                            style={{
+                              display:
+                                "block",
+                              maxWidth:
+                                "100%",
+                              overflow:
+                                "hidden",
+                              textOverflow:
+                                "ellipsis",
+                              whiteSpace:
+                                "nowrap",
+                            }}
+                          >
+                            +{points} puan
+                          </small>
+                        </div>
+                      </div>
+                    );
+
+                    if (
+                      match?.id
+                    ) {
+                      return (
+                        <Link
+                          key={
+                            item.id
+                          }
+                          href={`/mac/${match.id}`}
+                          style={{
+                            display:
+                              "block",
+                            width:
+                              "100%",
+                            maxWidth:
+                              "100%",
+                            minWidth: 0,
+                            boxSizing:
+                              "border-box",
+                            overflow:
+                              "hidden",
+                            textDecoration:
+                              "none",
+                          }}
+                        >
+                          {content}
+                        </Link>
+                      );
+                    }
+
+                    return (
+                      <div
+                        key={
+                          item.id
+                        }
+                        style={{
+                          width:
+                            "100%",
+                          maxWidth:
+                            "100%",
+                          minWidth: 0,
+                          boxSizing:
+                            "border-box",
+                          overflow:
+                            "hidden",
                         }}
                       >
                         {content}
-                      </Link>
+                      </div>
                     );
                   }
+                )}
+              </div>
+            )}
+          </section>
+        </div>
+      </main>
 
-                  return (
-                    <div
-                      key={item.id}
-                      style={{
-                        width: "100%",
-                        maxWidth: "100%",
-                        minWidth: 0,
-                        boxSizing:
-                          "border-box",
-                        overflow:
-                          "hidden",
-                      }}
-                    >
-                      {content}
-                    </div>
-                  );
-                }
-              )}
-            </div>
-          )}
-        </section>
-      </div>
-    </main>
+      {/*
+       * ==================================================
+       * TAKİPÇİ / TAKİP EDİLEN LİSTESİ
+       * ==================================================
+       */}
+
+      {followListType ? (
+        <ProfileFollowList
+          userId={user.id}
+          type={
+            followListType
+          }
+          onClose={() =>
+            setFollowListType(
+              null
+            )
+          }
+        />
+      ) : null}
+    </>
   );
 }
