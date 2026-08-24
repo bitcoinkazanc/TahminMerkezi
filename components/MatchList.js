@@ -1,6 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import MatchCard from "./MatchCard";
 import AdsGramTask from "./AdsGramTask";
 import { getMatchStatus } from "../lib/match-utils";
@@ -12,11 +16,14 @@ export default function MatchList({
   const [statusFilter, setStatusFilter] =
     useState("all");
 
-  const [leagueFilter, setLeagueFilter] =
-    useState("all");
-
   const [search, setSearch] =
     useState("");
+
+  const [searchResults, setSearchResults] =
+    useState([]);
+
+  const [searchLoading, setSearchLoading] =
+    useState(false);
 
   const filterCategories = [
     {
@@ -37,106 +44,138 @@ export default function MatchList({
     },
   ];
 
-  const leagues = useMemo(() => {
-    const uniqueLeagues = [
-      ...new Set(
-        matches
-          .map((match) =>
-            String(
-              match?.league || ""
-            ).trim()
-          )
-          .filter(Boolean)
-      ),
-    ];
-
-    return uniqueLeagues.sort(
-      (a, b) =>
-        a.localeCompare(
-          b,
-          "tr"
-        )
-    );
-  }, [matches]);
-
-  const filteredMatches = useMemo(() => {
+  useEffect(() => {
     if (!enableFilters) {
-      return matches;
+      return;
     }
 
     const searchText =
-      search
-        .toLowerCase()
-        .trim();
+      search.trim();
 
-    return matches.filter(
-      (match) => {
-        const status =
-          getMatchStatus(match);
+    if (!searchText) {
+      setSearchResults([]);
+      setSearchLoading(false);
+      return;
+    }
 
-        if (
-          statusFilter !== "all" &&
-          status !== statusFilter
-        ) {
-          return false;
-        }
+    const controller =
+      new AbortController();
 
-        if (
-          leagueFilter !== "all" &&
-          String(
-            match?.league || ""
-          ).trim() !==
-            leagueFilter
-        ) {
-          return false;
-        }
+    const timer =
+      setTimeout(
+        async () => {
+          try {
+            setSearchLoading(true);
 
-        if (searchText) {
-          const homeTeam =
-            String(
-              match?.home_team || ""
-            ).toLowerCase();
+            const params =
+              new URLSearchParams();
 
-          const awayTeam =
-            String(
-              match?.away_team || ""
-            ).toLowerCase();
+            params.set(
+              "search",
+              searchText
+            );
 
-          const league =
-            String(
-              match?.league || ""
-            ).toLowerCase();
+            const response =
+              await fetch(
+                `/api/matches?${params.toString()}`,
+                {
+                  cache: "no-store",
+                  signal:
+                    controller.signal,
+                }
+              );
+
+            const result =
+              await response.json();
+
+            if (
+              !response.ok ||
+              !result.success
+            ) {
+              throw new Error(
+                result.error ||
+                  "Arama yapılamadı."
+              );
+            }
+
+            setSearchResults(
+              Array.isArray(
+                result.matches
+              )
+                ? result.matches
+                : []
+            );
+          } catch (error) {
+            if (
+              error?.name !==
+              "AbortError"
+            ) {
+              console.error(
+                "Match search error:",
+                error
+              );
+
+              setSearchResults([]);
+            }
+          } finally {
+            if (
+              !controller.signal.aborted
+            ) {
+              setSearchLoading(false);
+            }
+          }
+        },
+        350
+      );
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [
+    search,
+    enableFilters,
+  ]);
+
+  const sourceMatches =
+    search.trim()
+      ? searchResults
+      : matches;
+
+  const filteredMatches =
+    useMemo(() => {
+      if (!enableFilters) {
+        return matches;
+      }
+
+      return sourceMatches.filter(
+        (match) => {
+          const status =
+            getMatchStatus(match);
 
           if (
-            !homeTeam.includes(
-              searchText
-            ) &&
-            !awayTeam.includes(
-              searchText
-            ) &&
-            !league.includes(
-              searchText
-            )
+            statusFilter !==
+              "all" &&
+            status !==
+              statusFilter
           ) {
             return false;
           }
-        }
 
-        return true;
-      }
-    );
-  }, [
-    matches,
-    enableFilters,
-    statusFilter,
-    leagueFilter,
-    search,
-  ]);
+          return true;
+        }
+      );
+    }, [
+      matches,
+      sourceMatches,
+      enableFilters,
+      statusFilter,
+    ]);
 
   function clearFilters() {
     setStatusFilter("all");
-    setLeagueFilter("all");
     setSearch("");
+    setSearchResults([]);
   }
 
   if (
@@ -168,8 +207,8 @@ export default function MatchList({
           style={{
             border:
               "1px solid var(--border)",
-            borderRadius: "9px",
-            padding: "8px",
+            borderRadius: "12px",
+            padding: "10px",
             marginBottom: "12px",
             background:
               "var(--surface-soft)",
@@ -182,8 +221,8 @@ export default function MatchList({
               display: "flex",
               gap: "6px",
               overflowX: "auto",
-              paddingBottom: "7px",
-              marginBottom: "8px",
+              paddingBottom: "8px",
+              marginBottom: "9px",
               scrollbarWidth: "thin",
             }}
           >
@@ -211,7 +250,7 @@ export default function MatchList({
                           ? "1px solid var(--primary)"
                           : "1px solid var(--border)",
                       borderRadius:
-                        "7px",
+                        "8px",
                       background:
                         active
                           ? "var(--primary)"
@@ -221,13 +260,17 @@ export default function MatchList({
                           ? "#fff"
                           : "var(--text)",
                       padding:
-                        "6px 9px",
+                        "7px 10px",
                       fontSize:
                         "10px",
                       fontWeight:
                         800,
                       cursor:
                         "pointer",
+                      boxShadow:
+                        active
+                          ? "0 2px 7px rgba(0,0,0,0.12)"
+                          : "none",
                     }}
                   >
                     {
@@ -239,165 +282,104 @@ export default function MatchList({
             )}
           </div>
 
-          {/* LİG FİLTRELERİ */}
-
-          {leagues.length > 0 ? (
-            <div
-              style={{
-                display: "flex",
-                gap: "6px",
-                overflowX: "auto",
-                paddingBottom: "7px",
-                marginBottom: "8px",
-                scrollbarWidth: "thin",
-              }}
-            >
-              <button
-                type="button"
-                onClick={() =>
-                  setLeagueFilter(
-                    "all"
-                  )
-                }
-                style={{
-                  flexShrink: 0,
-                  border:
-                    leagueFilter ===
-                    "all"
-                      ? "1px solid var(--primary)"
-                      : "1px solid var(--border)",
-                  borderRadius:
-                    "7px",
-                  background:
-                    leagueFilter ===
-                    "all"
-                      ? "var(--primary)"
-                      : "var(--surface)",
-                  color:
-                    leagueFilter ===
-                    "all"
-                      ? "#fff"
-                      : "var(--text)",
-                  padding:
-                    "6px 9px",
-                  fontSize:
-                    "10px",
-                  fontWeight:
-                    800,
-                  cursor:
-                    "pointer",
-                }}
-              >
-                🏆 Tüm Ligler
-              </button>
-
-              {leagues.map(
-                (league) => {
-                  const active =
-                    leagueFilter ===
-                    league;
-
-                  return (
-                    <button
-                      key={
-                        league
-                      }
-                      type="button"
-                      onClick={() =>
-                        setLeagueFilter(
-                          league
-                        )
-                      }
-                      style={{
-                        flexShrink: 0,
-                        border:
-                          active
-                            ? "1px solid var(--primary)"
-                            : "1px solid var(--border)",
-                        borderRadius:
-                          "7px",
-                        background:
-                          active
-                            ? "var(--primary)"
-                            : "var(--surface)",
-                        color:
-                          active
-                            ? "#fff"
-                            : "var(--text)",
-                        padding:
-                          "6px 9px",
-                        fontSize:
-                          "10px",
-                        fontWeight:
-                          800,
-                        cursor:
-                          "pointer",
-                        maxWidth:
-                          "180px",
-                        whiteSpace:
-                          "nowrap",
-                        overflow:
-                          "hidden",
-                        textOverflow:
-                          "ellipsis",
-                      }}
-                    >
-                      {league}
-                    </button>
-                  );
-                }
-              )}
-            </div>
-          ) : null}
-
           {/* ARAMA */}
 
           <div
             style={{
+              position:
+                "relative",
               display: "flex",
               alignItems:
                 "center",
               gap: "6px",
             }}
           >
-            <input
-              type="text"
-              value={search}
-              onChange={(event) =>
-                setSearch(
-                  event.target.value
-                )
-              }
-              placeholder="🔎 Takım veya lig ara..."
+            <div
               style={{
+                position:
+                  "relative",
                 flex: 1,
                 minWidth: 0,
-                height: "32px",
-                boxSizing:
-                  "border-box",
-                padding:
-                  "6px 9px",
-                border:
-                  "1px solid var(--border)",
-                borderRadius:
-                  "7px",
-                background:
-                  "var(--surface)",
-                color:
-                  "var(--text)",
-                outline: "none",
-                fontSize:
-                  "10px",
-                fontWeight:
-                  600,
               }}
-            />
+            >
+              <span
+                style={{
+                  position:
+                    "absolute",
+                  left: "10px",
+                  top: "50%",
+                  transform:
+                    "translateY(-50%)",
+                  fontSize:
+                    "12px",
+                  pointerEvents:
+                    "none",
+                  opacity: 0.7,
+                }}
+              >
+                🔎
+              </span>
 
-            {(statusFilter !==
-              "all" ||
-              leagueFilter !==
+              <input
+                type="text"
+                value={search}
+                onChange={(
+                  event
+                ) =>
+                  setSearch(
+                    event.target
+                      .value
+                  )
+                }
+                placeholder="Takım veya lig ara..."
+                style={{
+                  width: "100%",
+                  minWidth: 0,
+                  height: "36px",
+                  boxSizing:
+                    "border-box",
+                  padding:
+                    "7px 30px 7px 29px",
+                  border:
+                    "1px solid var(--border)",
+                  borderRadius:
+                    "9px",
+                  background:
+                    "var(--surface)",
+                  color:
+                    "var(--text)",
+                  outline: "none",
+                  fontSize:
+                    "11px",
+                  fontWeight:
+                    600,
+                }}
+              />
+
+              {searchLoading ? (
+                <span
+                  style={{
+                    position:
+                      "absolute",
+                    right: "10px",
+                    top: "50%",
+                    transform:
+                      "translateY(-50%)",
+                    fontSize:
+                      "10px",
+                    opacity: 0.65,
+                  }}
+                >
+                  ⏳
+                </span>
+              ) : null}
+            </div>
+
+            {(
+              statusFilter !==
                 "all" ||
-              search) ? (
+              search
+            ) ? (
               <button
                 type="button"
                 onClick={
@@ -405,13 +387,13 @@ export default function MatchList({
                 }
                 style={{
                   flexShrink: 0,
-                  height: "32px",
+                  height: "36px",
                   padding:
-                    "0 9px",
+                    "0 10px",
                   border:
                     "1px solid var(--border)",
                   borderRadius:
-                    "7px",
+                    "9px",
                   background:
                     "var(--surface)",
                   color:
@@ -428,6 +410,35 @@ export default function MatchList({
               </button>
             ) : null}
           </div>
+
+          {/* ARAMA BİLGİSİ */}
+
+          {search.trim() ? (
+            <div
+              style={{
+                marginTop:
+                  "8px",
+                padding:
+                  "7px 8px",
+                borderRadius:
+                  "8px",
+                background:
+                  "var(--surface)",
+                border:
+                  "1px solid var(--border)",
+                fontSize:
+                  "9px",
+                color:
+                  "var(--muted)",
+                fontWeight:
+                  700,
+              }}
+            >
+              {searchLoading
+                ? "Geçmiş maçlar aranıyor..."
+                : "Bugün ve son 3 gündeki maçlar aranıyor."}
+            </div>
+          ) : null}
 
           {/* SONUÇ SAYISI */}
 
@@ -448,7 +459,9 @@ export default function MatchList({
             }}
           >
             <span>
-              Maçlar
+              {search.trim()
+                ? "Arama sonuçları"
+                : "Maçlar"}
             </span>
 
             <span>
@@ -470,8 +483,9 @@ export default function MatchList({
           </h3>
 
           <p>
-            Seçtiğin filtrelere
-            uygun maç bulunmuyor.
+            {search.trim()
+              ? "Takım veya lig adına uygun maç bulunmuyor."
+              : "Seçtiğin filtrelere uygun maç bulunmuyor."}
           </p>
 
           <button
