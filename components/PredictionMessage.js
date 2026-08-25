@@ -12,16 +12,19 @@ export default function PredictionMessage({
   const [userId, setUserId] =
     useState(null);
 
-  const [likeCount, setLikeCount] =
+  const [upCount, setUpCount] =
     useState(0);
 
-  const [liked, setLiked] =
+  const [downCount, setDownCount] =
+    useState(0);
+
+  const [userVote, setUserVote] =
+    useState(null);
+
+  const [voteLoading, setVoteLoading] =
     useState(false);
 
-  const [likeLoading, setLikeLoading] =
-    useState(false);
-
-  const [likeError, setLikeError] =
+  const [voteError, setVoteError] =
     useState("");
 
   const [commentCount, setCommentCount] =
@@ -38,6 +41,137 @@ export default function PredictionMessage({
 
   const [commentLoading, setCommentLoading] =
     useState(false);
+
+  useEffect(() => {
+    try {
+      const savedUser =
+        localStorage.getItem("tm_user");
+
+      if (!savedUser) {
+        return;
+      }
+
+      const parsed =
+        JSON.parse(savedUser);
+
+      if (parsed?.id) {
+        setUserId(
+          String(parsed.id)
+        );
+      }
+    } catch (error) {
+      console.error(
+        "Prediction user loading error:",
+        error
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!prediction?.id) {
+      return;
+    }
+
+    async function loadSocialData() {
+      try {
+        const voteQuery =
+          new URLSearchParams();
+
+        voteQuery.set(
+          "prediction_id",
+          String(prediction.id)
+        );
+
+        if (userId) {
+          voteQuery.set(
+            "user_id",
+            String(userId)
+          );
+        }
+
+        const [
+          votesResponse,
+          commentsResponse,
+        ] = await Promise.all([
+          fetch(
+            `/api/likes?${voteQuery.toString()}`,
+            {
+              cache: "no-store",
+            }
+          ),
+
+          fetch(
+            `/api/comments?prediction_id=${encodeURIComponent(
+              prediction.id
+            )}`,
+            {
+              cache: "no-store",
+            }
+          ),
+        ]);
+
+        const votesResult =
+          await votesResponse.json();
+
+        const commentsResult =
+          await commentsResponse.json();
+
+        if (
+          votesResponse.ok &&
+          votesResult.success
+        ) {
+          setUpCount(
+            Number(
+              votesResult.upCount
+            ) || 0
+          );
+
+          setDownCount(
+            Number(
+              votesResult.downCount
+            ) || 0
+          );
+
+          setUserVote(
+            votesResult.userVote ||
+              null
+          );
+        }
+
+        if (
+          commentsResponse.ok &&
+          commentsResult.success
+        ) {
+          const loadedComments =
+            Array.isArray(
+              commentsResult.comments
+            )
+              ? commentsResult.comments
+              : [];
+
+          setCommentCount(
+            loadedComments.length
+          );
+
+          if (commentsOpen) {
+            setComments(
+              loadedComments
+            );
+          }
+        }
+      } catch (error) {
+        console.error(
+          "Prediction social data error:",
+          error
+        );
+      }
+    }
+
+    loadSocialData();
+  }, [
+    prediction?.id,
+    userId,
+  ]);
 
   if (!prediction) {
     return null;
@@ -106,150 +240,23 @@ export default function PredictionMessage({
     ? `${match.home_team} - ${match.away_team}`
     : "Maç bilgisi yok";
 
-  useEffect(() => {
-    try {
-      const savedUser =
-        localStorage.getItem(
-          "tm_user"
-        );
-
-      if (!savedUser) {
-        return;
-      }
-
-      const parsed =
-        JSON.parse(savedUser);
-
-      if (parsed?.id) {
-        setUserId(
-          String(parsed.id)
-        );
-      }
-    } catch (error) {
-      console.error(
-        "Prediction user loading error:",
-        error
-      );
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!prediction.id) {
-      return;
-    }
-
-    async function loadSocialData() {
-      try {
-        const likeQuery =
-          new URLSearchParams();
-
-        likeQuery.set(
-          "prediction_id",
-          String(
-            prediction.id
-          )
-        );
-
-        if (userId) {
-          likeQuery.set(
-            "user_id",
-            String(userId)
-          );
-        }
-
-        const [
-          likesResponse,
-          commentsResponse,
-        ] = await Promise.all([
-          fetch(
-            `/api/likes?${likeQuery.toString()}`,
-            {
-              cache: "no-store",
-            }
-          ),
-          fetch(
-            `/api/comments?prediction_id=${encodeURIComponent(
-              prediction.id
-            )}`,
-            {
-              cache: "no-store",
-            }
-          ),
-        ]);
-
-        const likesResult =
-          await likesResponse.json();
-
-        const commentsResult =
-          await commentsResponse.json();
-
-        if (
-          likesResponse.ok &&
-          likesResult.success
-        ) {
-          setLikeCount(
-            Number(
-              likesResult.count
-            ) || 0
-          );
-
-          setLiked(
-            !!likesResult.liked
-          );
-        }
-
-        if (
-          commentsResponse.ok &&
-          commentsResult.success
-        ) {
-          const loadedComments =
-            Array.isArray(
-              commentsResult.comments
-            )
-              ? commentsResult.comments
-              : [];
-
-          setCommentCount(
-            loadedComments.length
-          );
-
-          if (
-            commentsOpen
-          ) {
-            setComments(
-              loadedComments
-            );
-          }
-        }
-      } catch (error) {
-        console.error(
-          "Prediction social data error:",
-          error
-        );
-      }
-    }
-
-    loadSocialData();
-  }, [
-    prediction.id,
-    userId,
-  ]);
-
-  async function handleLike() {
+  async function handleVote(
+    voteType
+  ) {
     if (!userId) {
-      setLikeError(
-        "Beğenmek için kullanıcı girişi gerekli."
+      setVoteError(
+        "Oy vermek için kullanıcı girişi gerekli."
       );
       return;
     }
 
-    if (likeLoading) {
+    if (voteLoading) {
       return;
     }
 
     try {
-      setLikeLoading(true);
-      setLikeError("");
+      setVoteLoading(true);
+      setVoteError("");
 
       const response =
         await fetch(
@@ -263,10 +270,14 @@ export default function PredictionMessage({
             body: JSON.stringify({
               user_id:
                 String(userId),
+
               prediction_id:
                 String(
                   prediction.id
                 ),
+
+              vote_type:
+                voteType,
             }),
           }
         );
@@ -280,45 +291,72 @@ export default function PredictionMessage({
       ) {
         throw new Error(
           result.error ||
-            "Beğeni işlemi başarısız."
+            "Oy işlemi başarısız."
         );
       }
 
-      setLiked(
-        !!result.liked
+      setUserVote(
+        result.userVote ||
+          null
       );
 
+      const query =
+        new URLSearchParams();
+
+      query.set(
+        "prediction_id",
+        String(prediction.id)
+      );
+
+      query.set(
+        "user_id",
+        String(userId)
+      );
+
+      const refreshResponse =
+        await fetch(
+          `/api/likes?${query.toString()}`,
+          {
+            cache: "no-store",
+          }
+        );
+
+      const refreshResult =
+        await refreshResponse.json();
+
       if (
-        result.count != null
+        refreshResponse.ok &&
+        refreshResult.success
       ) {
-        setLikeCount(
+        setUpCount(
           Number(
-            result.count
+            refreshResult.upCount
           ) || 0
         );
-      } else {
-        setLikeCount(
-          (current) =>
-            result.liked
-              ? current + 1
-              : Math.max(
-                  0,
-                  current - 1
-                )
+
+        setDownCount(
+          Number(
+            refreshResult.downCount
+          ) || 0
+        );
+
+        setUserVote(
+          refreshResult.userVote ||
+            null
         );
       }
     } catch (error) {
       console.error(
-        "Like error:",
+        "Vote error:",
         error
       );
 
-      setLikeError(
+      setVoteError(
         error.message ||
-          "Beğeni işlemi başarısız."
+          "Oy işlemi başarısız."
       );
     } finally {
-      setLikeLoading(false);
+      setVoteLoading(false);
     }
   }
 
@@ -405,10 +443,12 @@ export default function PredictionMessage({
             body: JSON.stringify({
               user_id:
                 String(userId),
+
               prediction_id:
                 String(
                   prediction.id
                 ),
+
               content:
                 commentText.trim(),
             }),
@@ -428,9 +468,7 @@ export default function PredictionMessage({
         );
       }
 
-      if (
-        result.comment
-      ) {
+      if (result.comment) {
         setComments(
           (current) => [
             ...current,
@@ -572,9 +610,7 @@ export default function PredictionMessage({
                   }}
                 >
                   🏆{" "}
-                  {
-                    match.league
-                  }
+                  {match.league}
                 </div>
               ) : null}
             </div>
@@ -586,7 +622,8 @@ export default function PredictionMessage({
                 "flex",
               alignItems:
                 "center",
-              gap: "5px",
+              gap:
+                "5px",
               flexWrap:
                 "wrap",
               marginBottom:
@@ -614,9 +651,7 @@ export default function PredictionMessage({
               }}
             >
               🎯{" "}
-              {
-                predictionLabel
-              }
+              {predictionLabel}
             </span>
 
             {prediction.confidence !=
@@ -687,9 +722,7 @@ export default function PredictionMessage({
                     "anywhere",
                 }}
               >
-                {
-                  prediction.message
-                }
+                {prediction.message}
               </p>
             </div>
           ) : null}
@@ -706,13 +739,9 @@ export default function PredictionMessage({
               }}
             >
               🕐{" "}
-              {
-                formattedDate
-              }{" "}
+              {formattedDate}{" "}
               ·{" "}
-              {
-                formattedTime
-              }
+              {formattedTime}
             </div>
           ) : null}
         </div>
@@ -724,7 +753,8 @@ export default function PredictionMessage({
             "flex",
           alignItems:
             "center",
-          gap: "4px",
+          gap:
+            "4px",
           marginTop:
             "5px",
           paddingTop:
@@ -735,21 +765,21 @@ export default function PredictionMessage({
       >
         <button
           type="button"
-          onClick={
-            handleLike
+          onClick={() =>
+            handleVote("up")
           }
           disabled={
-            likeLoading
+            voteLoading
           }
           style={{
             border:
               "none",
             background:
-              liked
+              userVote === "up"
                 ? "var(--surface-soft)"
                 : "transparent",
             color:
-              liked
+              userVote === "up"
                 ? "var(--primary)"
                 : "var(--muted)",
             padding:
@@ -761,15 +791,48 @@ export default function PredictionMessage({
             fontWeight:
               800,
             cursor:
-              likeLoading
+              voteLoading
                 ? "wait"
                 : "pointer",
           }}
         >
-          {liked
-            ? "❤️"
-            : "🤍"}{" "}
-          {likeCount}
+          👍 {upCount}
+        </button>
+
+        <button
+          type="button"
+          onClick={() =>
+            handleVote("down")
+          }
+          disabled={
+            voteLoading
+          }
+          style={{
+            border:
+              "none",
+            background:
+              userVote === "down"
+                ? "var(--surface-soft)"
+                : "transparent",
+            color:
+              userVote === "down"
+                ? "#d93025"
+                : "var(--muted)",
+            padding:
+              "4px 6px",
+            borderRadius:
+              "6px",
+            fontSize:
+              "10px",
+            fontWeight:
+              800,
+            cursor:
+              voteLoading
+                ? "wait"
+                : "pointer",
+          }}
+        >
+          👎 {downCount}
         </button>
 
         <button
@@ -803,7 +866,7 @@ export default function PredictionMessage({
         </button>
       </div>
 
-      {likeError ? (
+      {voteError ? (
         <div
           style={{
             marginTop:
@@ -814,7 +877,7 @@ export default function PredictionMessage({
               "#d93025",
           }}
         >
-          {likeError}
+          {voteError}
         </div>
       ) : null}
 
@@ -942,9 +1005,7 @@ export default function PredictionMessage({
                   event
                 ) =>
                   setCommentText(
-                    event
-                      .target
-                      .value
+                    event.target.value
                   )
                 }
                 maxLength={
