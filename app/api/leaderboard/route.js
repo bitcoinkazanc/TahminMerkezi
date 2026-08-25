@@ -5,11 +5,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 function getSupabase() {
-  const url =
-    process.env.NEXT_PUBLIC_SUPABASE_URL;
-
-  const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!url || !key) {
     throw new Error(
@@ -17,29 +14,15 @@ function getSupabase() {
     );
   }
 
-  return createClient(
-    url,
-    key,
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    }
-  );
+  return createClient(url, key, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
 }
 
-/*
- * ==================================================
- * RÜTBE HESAPLA
- * ==================================================
- */
-
-function getRank(
-  correct,
-  accuracy,
-  points
-) {
+function getRank(correct, accuracy, points) {
   if (
     correct >= 500 &&
     accuracy >= 75 &&
@@ -119,22 +102,26 @@ function getRank(
   };
 }
 
-/*
- * ==================================================
- * DÖNEM BAŞLANGICI
- * ==================================================
- */
-
 function getPeriodStart(period) {
-  const now =
-    new Date();
+  const now = new Date();
+
+  if (period === "daily") {
+    const date = new Date(now);
+
+    date.setHours(
+      0,
+      0,
+      0,
+      0
+    );
+
+    return date;
+  }
 
   if (period === "weekly") {
-    const date =
-      new Date(now);
+    const date = new Date(now);
 
-    const day =
-      date.getDay();
+    const day = date.getDay();
 
     const diff =
       day === 0
@@ -170,97 +157,62 @@ function getPeriodStart(period) {
   return null;
 }
 
-/*
- * ==================================================
- * GET
- * ==================================================
- *
- * /api/leaderboard
- *
- * /api/leaderboard?period=weekly
- *
- * /api/leaderboard?period=monthly
- *
- * /api/leaderboard?user_id=UUID
- */
-
-export async function GET(
-  request
-) {
+export async function GET(request) {
   try {
-    const supabase =
-      getSupabase();
+    const supabase = getSupabase();
 
-    const {
-      searchParams,
-    } = new URL(
-      request.url
-    );
+    const { searchParams } =
+      new URL(request.url);
 
     const requestedPeriod =
-      searchParams.get(
-        "period"
-      ) || "all";
+      searchParams.get("period") ||
+      "daily";
 
-    const period =
-      [
-        "all",
-        "weekly",
-        "monthly",
-      ].includes(
-        requestedPeriod
-      )
-        ? requestedPeriod
-        : "all";
+    const period = [
+      "daily",
+      "weekly",
+      "monthly",
+      "all",
+    ].includes(requestedPeriod)
+      ? requestedPeriod
+      : "daily";
 
     const requestedUserId =
-      searchParams.get(
-        "user_id"
-      );
+      searchParams.get("user_id");
 
-    /*
-     * --------------------------------------------------
-     * TAHMİNLERİ GETİR
-     * --------------------------------------------------
-     */
-
-    let query =
-      supabase
-        .from("predictions")
-        .select(
-          `
+    let query = supabase
+      .from("predictions")
+      .select(
+        `
+          id,
+          user_id,
+          result,
+          points,
+          created_at,
+          users (
             id,
-            user_id,
-            result,
-            points,
-            created_at,
-            users (
-              id,
-              username,
-              first_name,
-              last_name,
-              avatar_url
-            )
-          `
-        )
-        .order(
-          "created_at",
-          {
-            ascending: false,
-          }
-        );
+            username,
+            first_name,
+            last_name,
+            avatar_url
+          )
+        `
+      )
+      .order(
+        "created_at",
+        {
+          ascending: false,
+        }
+      );
 
     const periodStart =
-      getPeriodStart(
-        period
-      );
+      getPeriodStart(period);
 
     if (periodStart) {
-      query =
-        query.gte(
-          "created_at",
-          periodStart.toISOString()
-        );
+      query = query.gte(
+        "created_at",
+        periodStart.toISOString()
+      );
     }
 
     const {
@@ -277,8 +229,7 @@ export async function GET(
       return NextResponse.json(
         {
           success: false,
-          error:
-            error.message,
+          error: error.message,
         },
         {
           status: 500,
@@ -286,19 +237,9 @@ export async function GET(
       );
     }
 
-    /*
-     * --------------------------------------------------
-     * KULLANICILARI TOPLA
-     * --------------------------------------------------
-     */
+    const users = new Map();
 
-    const users =
-      new Map();
-
-    for (
-      const prediction of
-        predictions || []
-    ) {
+    for (const prediction of predictions || []) {
       const userId =
         prediction.user_id;
 
@@ -308,91 +249,66 @@ export async function GET(
 
       if (!users.has(userId)) {
         const user =
-          prediction.users ||
-          {};
+          prediction.users || {};
 
-        users.set(
-          userId,
-          {
-            id: userId,
+        users.set(userId, {
+          id: userId,
 
-            username:
-              user.username ||
-              null,
+          username:
+            user.username || null,
 
-            first_name:
-              user.first_name ||
-              null,
+          first_name:
+            user.first_name || null,
 
-            last_name:
-              user.last_name ||
-              null,
+          last_name:
+            user.last_name || null,
 
-            avatar_url:
-              user.avatar_url ||
-              null,
+          avatar_url:
+            user.avatar_url || null,
 
-            predictions: 0,
-            decided: 0,
-            correct: 0,
-            points: 0,
-          }
-        );
+          predictions: 0,
+          decided: 0,
+          correct: 0,
+          points: 0,
+        });
       }
 
       const stats =
-        users.get(
-          userId
-        );
+        users.get(userId);
 
       stats.predictions += 1;
 
-      /*
-       * Sonuçlanmış tahminler
-       */
+      const result = String(
+        prediction.result || ""
+      )
+        .trim()
+        .toLowerCase();
 
-      const result =
-        String(
-          prediction.result ||
-            ""
-        )
-          .trim()
-          .toLowerCase();
+      const isCorrect = [
+        "correct",
+        "won",
+        "win",
+        "success",
+        "successful",
+        "doğru",
+        "dogru",
+        "kazandı",
+        "kazandi",
+      ].includes(result);
 
-      const isCorrect =
-        [
-          "correct",
-          "won",
-          "win",
-          "success",
-          "successful",
-          "doğru",
-          "dogru",
-          "kazandı",
-          "kazandi",
-        ].includes(
-          result
-        );
+      const isWrong = [
+        "wrong",
+        "lost",
+        "lose",
+        "failed",
+        "failure",
+        "yanlış",
+        "yanlis",
+        "kaybetti",
+        "kaybetti",
+      ].includes(result);
 
-      const isWrong =
-        [
-          "wrong",
-          "lost",
-          "lose",
-          "failed",
-          "failure",
-          "yanlış",
-          "yanlis",
-          "kaybetti",
-          "kaybetti",
-        ].includes(
-          result
-        );
-
-      if (
-        isCorrect ||
-        isWrong
-      ) {
+      if (isCorrect || isWrong) {
         stats.decided += 1;
       }
 
@@ -401,148 +317,114 @@ export async function GET(
       }
 
       const points =
-        Number(
-          prediction.points
-        );
+        Number(prediction.points);
 
-      if (
-        Number.isFinite(
-          points
-        )
-      ) {
+      if (Number.isFinite(points)) {
         stats.points += points;
       }
     }
 
-    /*
-     * --------------------------------------------------
-     * LİDERLİĞİ HAZIRLA
-     * --------------------------------------------------
-     */
-
     const leaderboard =
-      Array.from(
-        users.values()
-      )
-        .map(
-          (user) => {
-            const accuracy =
-              user.decided >
-              0
-                ? Math.round(
-                    (user.correct /
-                      user.decided) *
-                      100
-                  )
-                : 0;
+      Array.from(users.values())
+        .map((user) => {
+          const accuracy =
+            user.decided > 0
+              ? Math.round(
+                  (user.correct /
+                    user.decided) *
+                    100
+                )
+              : 0;
 
-            const rank =
-              getRank(
-                user.correct,
-                accuracy,
-                user.points
-              );
+          const rank = getRank(
+            user.correct,
+            accuracy,
+            user.points
+          );
 
-            return {
-              id: user.id,
+          return {
+            id: user.id,
 
-              username:
-                user.username,
+            username:
+              user.username,
 
-              first_name:
-                user.first_name,
+            first_name:
+              user.first_name,
 
-              last_name:
-                user.last_name,
+            last_name:
+              user.last_name,
 
-              avatar_url:
-                user.avatar_url,
+            avatar_url:
+              user.avatar_url,
 
-              predictions:
-                user.predictions,
+            predictions:
+              user.predictions,
 
-              decided:
-                user.decided,
+            decided:
+              user.decided,
 
-              correct:
-                user.correct,
+            correct:
+              user.correct,
 
-              accuracy,
+            accuracy,
 
-              points:
-                user.points,
+            points:
+              user.points,
 
-              rank:
-                rank,
-            };
-          }
-        )
+            rank,
+          };
+        })
         .filter(
           (user) =>
-            user.predictions >
-            0
+            user.predictions > 0
         )
-        .sort(
-          (a, b) => {
-            if (
-              b.points !==
-              a.points
-            ) {
-              return (
-                b.points -
-                a.points
-              );
-            }
-
-            if (
-              b.correct !==
-              a.correct
-            ) {
-              return (
-                b.correct -
-                a.correct
-              );
-            }
-
-            if (
-              b.accuracy !==
-              a.accuracy
-            ) {
-              return (
-                b.accuracy -
-                a.accuracy
-              );
-            }
-
+        .sort((a, b) => {
+          if (
+            b.points !==
+            a.points
+          ) {
             return (
-              b.predictions -
-              a.predictions
+              b.points -
+              a.points
             );
           }
-        )
+
+          if (
+            b.correct !==
+            a.correct
+          ) {
+            return (
+              b.correct -
+              a.correct
+            );
+          }
+
+          if (
+            b.accuracy !==
+            a.accuracy
+          ) {
+            return (
+              b.accuracy -
+              a.accuracy
+            );
+          }
+
+          return (
+            b.predictions -
+            a.predictions
+          );
+        })
         .map(
-          (
-            user,
-            index
-          ) => ({
+          (user, index) => ({
             ...user,
             position:
               index + 1,
           })
         );
 
-    /*
-     * --------------------------------------------------
-     * KULLANICI SIRASI
-     * --------------------------------------------------
-     */
+    let currentUser = null;
 
-    let currentUser =
-      null;
-
-    if (
-      requestedUserId
-    ) {
+    if (requestedUserId) {
       currentUser =
         leaderboard.find(
           (user) =>
@@ -553,14 +435,10 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
-
       period,
-
       count:
         leaderboard.length,
-
       leaderboard,
-
       current_user:
         currentUser,
     });
