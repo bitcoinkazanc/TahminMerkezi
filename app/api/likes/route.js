@@ -5,11 +5,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 function getSupabase() {
-  const url =
-    process.env.NEXT_PUBLIC_SUPABASE_URL;
-
-  const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!url || !key) {
     throw new Error(
@@ -29,13 +26,10 @@ export async function GET(request) {
   try {
     const supabase = getSupabase();
 
-    const { searchParams } =
-      new URL(request.url);
+    const { searchParams } = new URL(request.url);
 
     const predictionId =
-      searchParams.get(
-        "prediction_id"
-      );
+      searchParams.get("prediction_id");
 
     const userId =
       searchParams.get("user_id");
@@ -44,92 +38,74 @@ export async function GET(request) {
       return NextResponse.json(
         {
           success: false,
-          error:
-            "Tahmin bilgisi gerekli.",
+          error: "Tahmin bilgisi gerekli.",
         },
         { status: 400 }
       );
     }
 
-    const {
-      count,
-      error: countError,
-    } = await supabase
+    const { data, error } = await supabase
       .from("likes")
-      .select("*", {
-        count: "exact",
-        head: true,
-      })
-      .eq(
-        "prediction_id",
-        predictionId
-      );
+      .select("vote_type")
+      .eq("prediction_id", predictionId);
 
-    if (countError) {
-      console.error(
-        "Likes count error:",
-        countError
-      );
-
+    if (error) {
       return NextResponse.json(
         {
           success: false,
-          error: countError.message,
+          error: error.message,
         },
         { status: 500 }
       );
     }
 
-    let liked = false;
+    const votes = data || [];
+
+    const upCount = votes.filter(
+      (vote) => vote.vote_type === "up"
+    ).length;
+
+    const downCount = votes.filter(
+      (vote) => vote.vote_type === "down"
+    ).length;
+
+    let userVote = null;
 
     if (userId) {
-      const {
-        data,
-        error,
-      } = await supabase
-        .from("likes")
-        .select("id")
-        .eq(
-          "prediction_id",
-          predictionId
-        )
-        .eq("user_id", userId)
-        .maybeSingle();
+      const { data: userVoteData, error: userVoteError } =
+        await supabase
+          .from("likes")
+          .select("vote_type")
+          .eq("prediction_id", predictionId)
+          .eq("user_id", userId)
+          .maybeSingle();
 
-      if (error) {
-        console.error(
-          "Likes user check error:",
-          error
-        );
-
+      if (userVoteError) {
         return NextResponse.json(
           {
             success: false,
-            error: error.message,
+            error: userVoteError.message,
           },
           { status: 500 }
         );
       }
 
-      liked = !!data;
+      userVote = userVoteData?.vote_type || null;
     }
 
     return NextResponse.json({
       success: true,
-      count: Number(count) || 0,
-      liked,
+      upCount,
+      downCount,
+      userVote,
     });
   } catch (error) {
-    console.error(
-      "Likes GET error:",
-      error
-    );
+    console.error("Votes GET error:", error);
 
     return NextResponse.json(
       {
         success: false,
-        error:
-          "Beğeni bilgisi alınamadı.",
+        error: "Oy bilgisi alınamadı.",
       },
       { status: 500 }
     );
@@ -140,14 +116,11 @@ export async function POST(request) {
   try {
     const supabase = getSupabase();
 
-    const body =
-      await request.json();
+    const body = await request.json();
 
-    const userId =
-      body?.user_id;
-
-    const predictionId =
-      body?.prediction_id;
+    const userId = body?.user_id;
+    const predictionId = body?.prediction_id;
+    const voteType = body?.vote_type;
 
     if (!userId || !predictionId) {
       return NextResponse.json(
@@ -160,234 +133,112 @@ export async function POST(request) {
       );
     }
 
-    const {
-      data: user,
-      error: userError,
-    } = await supabase
-      .from("users")
-      .select("id")
-      .eq("id", userId)
-      .maybeSingle();
-
-    if (userError) {
-      console.error(
-        "Like user check error:",
-        userError
-      );
-
+    if (!["up", "down"].includes(voteType)) {
       return NextResponse.json(
         {
           success: false,
-          error: userError.message,
+          error: "Geçersiz oy türü.",
         },
-        { status: 500 }
+        { status: 400 }
       );
     }
 
-    if (!user) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Kullanıcı bulunamadı.",
-        },
-        { status: 404 }
-      );
-    }
-
-    const {
-      data: prediction,
-      error: predictionError,
-    } = await supabase
-      .from("predictions")
-      .select("id")
-      .eq(
-        "id",
-        predictionId
-      )
-      .maybeSingle();
-
-    if (predictionError) {
-      console.error(
-        "Like prediction check error:",
-        predictionError
-      );
-
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            predictionError.message,
-        },
-        { status: 500 }
-      );
-    }
-
-    if (!prediction) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Tahmin bulunamadı.",
-        },
-        { status: 404 }
-      );
-    }
-
-    const {
-      data: existing,
-      error: existingError,
-    } = await supabase
-      .from("likes")
-      .select("id")
-      .eq(
-        "user_id",
-        userId
-      )
-      .eq(
-        "prediction_id",
-        predictionId
-      )
-      .maybeSingle();
+    const { data: existing, error: existingError } =
+      await supabase
+        .from("likes")
+        .select("id, vote_type")
+        .eq("user_id", userId)
+        .eq("prediction_id", predictionId)
+        .maybeSingle();
 
     if (existingError) {
-      console.error(
-        "Existing like check error:",
-        existingError
-      );
-
       return NextResponse.json(
         {
           success: false,
-          error:
-            existingError.message,
+          error: existingError.message,
         },
         { status: 500 }
       );
     }
 
     if (existing) {
-      const {
-        error: deleteError,
-      } = await supabase
-        .from("likes")
-        .delete()
-        .eq(
-          "id",
-          existing.id
-        );
+      if (existing.vote_type === voteType) {
+        const { error: deleteError } =
+          await supabase
+            .from("likes")
+            .delete()
+            .eq("id", existing.id);
 
-      if (deleteError) {
-        console.error(
-          "Like delete error:",
-          deleteError
-        );
+        if (deleteError) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: deleteError.message,
+            },
+            { status: 500 }
+          );
+        }
 
+        return NextResponse.json({
+          success: true,
+          userVote: null,
+        });
+      }
+
+      const { error: updateError } =
+        await supabase
+          .from("likes")
+          .update({
+            vote_type: voteType,
+          })
+          .eq("id", existing.id);
+
+      if (updateError) {
         return NextResponse.json(
           {
             success: false,
-            error:
-              deleteError.message,
+            error: updateError.message,
           },
           { status: 500 }
         );
       }
 
-      const {
-        count,
-        error: countError,
-      } = await supabase
-        .from("likes")
-        .select("*", {
-          count: "exact",
-          head: true,
-        })
-        .eq(
-          "prediction_id",
-          predictionId
-        );
-
-      if (countError) {
-        return NextResponse.json(
-          {
-            success: true,
-            liked: false,
-          }
-        );
-      }
-
       return NextResponse.json({
         success: true,
-        liked: false,
-        count:
-          Number(count) || 0,
+        userVote: voteType,
       });
     }
 
-    const {
-      error: insertError,
-    } = await supabase
-      .from("likes")
-      .insert({
-        user_id: userId,
-        prediction_id:
-          predictionId,
-      });
+    const { error: insertError } =
+      await supabase
+        .from("likes")
+        .insert({
+          user_id: userId,
+          prediction_id: predictionId,
+          vote_type: voteType,
+        });
 
     if (insertError) {
-      console.error(
-        "Like insert error:",
-        insertError
-      );
-
       return NextResponse.json(
         {
           success: false,
-          error:
-            insertError.message,
+          error: insertError.message,
         },
         { status: 500 }
       );
     }
 
-    const {
-      count,
-      error: countError,
-    } = await supabase
-      .from("likes")
-      .select("*", {
-        count: "exact",
-        head: true,
-      })
-      .eq(
-        "prediction_id",
-        predictionId
-      );
-
-    if (countError) {
-      return NextResponse.json({
-        success: true,
-        liked: true,
-      });
-    }
-
     return NextResponse.json({
       success: true,
-      liked: true,
-      count:
-        Number(count) || 0,
+      userVote: voteType,
     });
   } catch (error) {
-    console.error(
-      "Likes POST error:",
-      error
-    );
+    console.error("Votes POST error:", error);
 
     return NextResponse.json(
       {
         success: false,
-        error:
-          "Beğeni işlemi başarısız.",
+        error: "Oy işlemi başarısız.",
       },
       { status: 500 }
     );
