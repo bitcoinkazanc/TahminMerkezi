@@ -1,11 +1,18 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { getMatchStatus } from "../lib/match-utils";
 
 export default function MatchCard({
   match,
 }) {
+  const [predictionCount, setPredictionCount] =
+    useState(0);
+
+  const [commentCount, setCommentCount] =
+    useState(0);
+
   if (!match) {
     return null;
   }
@@ -99,6 +106,160 @@ export default function MatchCard({
       undefined
       ? match.away_score
       : 0;
+
+  /*
+   * ==================================================
+   * MAÇIN TAHMİN / YORUM SAYILARINI GETİR
+   * ==================================================
+   */
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadMatchSocialCounts() {
+      try {
+        const matchId =
+          match.id ||
+          match.external_id;
+
+        if (!matchId) {
+          return;
+        }
+
+        const response =
+          await fetch(
+            `/api/predictions?match_id=${encodeURIComponent(
+              matchId
+            )}`,
+            {
+              cache: "no-store",
+            }
+          );
+
+        if (!response.ok) {
+          return;
+        }
+
+        const result =
+          await response.json();
+
+        if (
+          !result?.success ||
+          !Array.isArray(
+            result.predictions
+          )
+        ) {
+          return;
+        }
+
+        if (cancelled) {
+          return;
+        }
+
+        const predictions =
+          result.predictions;
+
+        /*
+         * Toplam tahmin sayısı
+         */
+        setPredictionCount(
+          predictions.length
+        );
+
+        /*
+         * Yorum sayısı
+         *
+         * Her tahminin yorumlarını
+         * mevcut comments API'sinden
+         * alıyoruz.
+         */
+        if (
+          predictions.length === 0
+        ) {
+          setCommentCount(0);
+          return;
+        }
+
+        const commentResults =
+          await Promise.all(
+            predictions.map(
+              async (prediction) => {
+                try {
+                  const commentResponse =
+                    await fetch(
+                      `/api/comments?prediction_id=${encodeURIComponent(
+                        prediction.id
+                      )}`,
+                      {
+                        cache:
+                          "no-store",
+                      }
+                    );
+
+                  if (
+                    !commentResponse.ok
+                  ) {
+                    return 0;
+                  }
+
+                  const commentResult =
+                    await commentResponse.json();
+
+                  if (
+                    !commentResult?.success ||
+                    !Array.isArray(
+                      commentResult.comments
+                    )
+                  ) {
+                    return 0;
+                  }
+
+                  return (
+                    commentResult
+                      .comments
+                      .length
+                  );
+                } catch {
+                  return 0;
+                }
+              }
+            )
+          );
+
+        if (cancelled) {
+          return;
+        }
+
+        const totalComments =
+          commentResults.reduce(
+            (
+              total,
+              count
+            ) =>
+              total + count,
+            0
+          );
+
+        setCommentCount(
+          totalComments
+        );
+      } catch (error) {
+        console.error(
+          "Match social counts loading error:",
+          error
+        );
+      }
+    }
+
+    loadMatchSocialCounts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    match.id,
+    match.external_id,
+  ]);
 
   const cardContent = (
     <>
@@ -218,6 +379,48 @@ export default function MatchCard({
             yapılamaz
           </span>
         )}
+      </div>
+
+      {/*
+       * ==================================================
+       * MAÇ SOSYAL İSTATİSTİKLERİ
+       * ==================================================
+       */}
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "10px",
+          marginTop: "5px",
+          paddingTop: "5px",
+          borderTop:
+            "1px solid var(--border)",
+          fontSize: "9px",
+          color: "var(--muted)",
+        }}
+      >
+        <span
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "3px",
+            fontWeight: 700,
+          }}
+        >
+          🎯 {predictionCount} tahmin
+        </span>
+
+        <span
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "3px",
+            fontWeight: 700,
+          }}
+        >
+          💬 {commentCount} yorum
+        </span>
       </div>
     </>
   );
