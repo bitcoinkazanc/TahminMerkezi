@@ -414,6 +414,136 @@ async function findMatch(
 
 /*
  * ==================================================
+ * MAÇIN TAHMİN + YORUM SAYILARINI GETİR
+ * ==================================================
+ *
+ * Bu bölüm mevcut sistemi bozmaz.
+ *
+ * match_id ile çağrıldığında:
+ *
+ * prediction_count
+ * comment_count
+ *
+ * döndürür.
+ */
+
+async function getMatchSocialCounts(
+  supabase,
+  matchId
+) {
+  if (!supabase || !matchId) {
+    return {
+      prediction_count: 0,
+      comment_count: 0,
+    };
+  }
+
+  try {
+    /*
+     * ------------------------------------------------
+     * MAÇTAKİ TAHMİNLER
+     * ------------------------------------------------
+     */
+
+    const {
+      data: predictionRows,
+      error: predictionError,
+    } = await supabase
+      .from("predictions")
+      .select("id")
+      .eq(
+        "match_id",
+        matchId
+      );
+
+    if (predictionError) {
+      console.error(
+        "Match prediction count error:",
+        predictionError
+      );
+
+      return {
+        prediction_count: 0,
+        comment_count: 0,
+      };
+    }
+
+    const predictionIds =
+      Array.isArray(
+        predictionRows
+      )
+        ? predictionRows
+            .map(
+              (prediction) =>
+                prediction?.id
+            )
+            .filter(Boolean)
+        : [];
+
+    const predictionCount =
+      predictionIds.length;
+
+    /*
+     * ------------------------------------------------
+     * TAHMİNLERE YAPILAN YORUMLAR
+     * ------------------------------------------------
+     */
+
+    let commentCount = 0;
+
+    if (
+      predictionIds.length > 0
+    ) {
+      const {
+        count,
+        error: commentError,
+      } = await supabase
+        .from("comments")
+        .select(
+          "id",
+          {
+            count: "exact",
+            head: true,
+          }
+        )
+        .in(
+          "prediction_id",
+          predictionIds
+        );
+
+      if (commentError) {
+        console.error(
+          "Match comment count error:",
+          commentError
+        );
+      } else {
+        commentCount =
+          Number(count) || 0;
+      }
+    }
+
+    return {
+      prediction_count:
+        predictionCount,
+
+      comment_count:
+        commentCount,
+    };
+  } catch (error) {
+    console.error(
+      "Match social counts error:",
+      error
+    );
+
+    return {
+      prediction_count: 0,
+      comment_count: 0,
+    };
+  }
+}
+
+/*
+ * ==================================================
  * GET
  * ==================================================
  */
@@ -485,6 +615,11 @@ export async function GET(
           }
         );
 
+    let socialCounts = {
+      prediction_count: 0,
+      comment_count: 0,
+    };
+
     if (matchId) {
       const match =
         await findMatch(
@@ -496,12 +631,25 @@ export async function GET(
         return NextResponse.json({
           success: true,
           predictions: [],
+          prediction_count: 0,
+          comment_count: 0,
         });
       }
 
       query =
         query.eq(
           "match_id",
+          match.id
+        );
+
+      /*
+       * Maçın toplam tahmin ve
+       * yorum sayılarını al.
+       */
+
+      socialCounts =
+        await getMatchSocialCounts(
+          supabase,
           match.id
         );
     }
@@ -539,8 +687,15 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
+
       predictions:
         data || [],
+
+      prediction_count:
+        socialCounts.prediction_count,
+
+      comment_count:
+        socialCounts.comment_count,
     });
   } catch (error) {
     console.error(
