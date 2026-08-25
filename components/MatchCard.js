@@ -1,18 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { getMatchStatus } from "../lib/match-utils";
 
 export default function MatchCard({
   match,
 }) {
-  const [predictionCount, setPredictionCount] =
-    useState(0);
-
-  const [commentCount, setCommentCount] =
-    useState(0);
-
   if (!match) {
     return null;
   }
@@ -92,174 +85,50 @@ export default function MatchCard({
     isFinished;
 
   const homeScore =
-    match.home_score !==
-      null &&
-    match.home_score !==
-      undefined
+    match.home_score !== null &&
+    match.home_score !== undefined
       ? match.home_score
       : 0;
 
   const awayScore =
-    match.away_score !==
-      null &&
-    match.away_score !==
-      undefined
+    match.away_score !== null &&
+    match.away_score !== undefined
       ? match.away_score
       : 0;
 
   /*
    * ==================================================
-   * MAÇIN TAHMİN / YORUM SAYILARINI GETİR
+   * SOSYAL SAYILAR
    * ==================================================
+   *
+   * Sayılar artık MatchCard tarafından API'den
+   * çekilmiyor.
+   *
+   * /api/matches toplu olarak:
+   *
+   * prediction_count
+   * comment_count
+   *
+   * alanlarını gönderdiğinde burada doğrudan
+   * gösterilecek.
+   *
+   * Böylece her maç kartı için ekstra fetch
+   * yapılmaz.
    */
 
-  useEffect(() => {
-    let cancelled = false;
+  const predictionCount =
+    Number(
+      match.prediction_count ??
+        match.predictionCount ??
+        0
+    ) || 0;
 
-    async function loadMatchSocialCounts() {
-      try {
-        const matchId =
-          match.id ||
-          match.external_id;
-
-        if (!matchId) {
-          return;
-        }
-
-        const response =
-          await fetch(
-            `/api/predictions?match_id=${encodeURIComponent(
-              matchId
-            )}`,
-            {
-              cache: "no-store",
-            }
-          );
-
-        if (!response.ok) {
-          return;
-        }
-
-        const result =
-          await response.json();
-
-        if (
-          !result?.success ||
-          !Array.isArray(
-            result.predictions
-          )
-        ) {
-          return;
-        }
-
-        if (cancelled) {
-          return;
-        }
-
-        const predictions =
-          result.predictions;
-
-        /*
-         * Toplam tahmin sayısı
-         */
-        setPredictionCount(
-          predictions.length
-        );
-
-        /*
-         * Yorum sayısı
-         *
-         * Her tahminin yorumlarını
-         * mevcut comments API'sinden
-         * alıyoruz.
-         */
-        if (
-          predictions.length === 0
-        ) {
-          setCommentCount(0);
-          return;
-        }
-
-        const commentResults =
-          await Promise.all(
-            predictions.map(
-              async (prediction) => {
-                try {
-                  const commentResponse =
-                    await fetch(
-                      `/api/comments?prediction_id=${encodeURIComponent(
-                        prediction.id
-                      )}`,
-                      {
-                        cache:
-                          "no-store",
-                      }
-                    );
-
-                  if (
-                    !commentResponse.ok
-                  ) {
-                    return 0;
-                  }
-
-                  const commentResult =
-                    await commentResponse.json();
-
-                  if (
-                    !commentResult?.success ||
-                    !Array.isArray(
-                      commentResult.comments
-                    )
-                  ) {
-                    return 0;
-                  }
-
-                  return (
-                    commentResult
-                      .comments
-                      .length
-                  );
-                } catch {
-                  return 0;
-                }
-              }
-            )
-          );
-
-        if (cancelled) {
-          return;
-        }
-
-        const totalComments =
-          commentResults.reduce(
-            (
-              total,
-              count
-            ) =>
-              total + count,
-            0
-          );
-
-        setCommentCount(
-          totalComments
-        );
-      } catch (error) {
-        console.error(
-          "Match social counts loading error:",
-          error
-        );
-      }
-    }
-
-    loadMatchSocialCounts();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    match.id,
-    match.external_id,
-  ]);
+  const commentCount =
+    Number(
+      match.comment_count ??
+        match.commentCount ??
+        0
+    ) || 0;
 
   const cardContent = (
     <>
@@ -272,6 +141,7 @@ export default function MatchCard({
               }
               alt=""
               className="league-logo"
+              loading="lazy"
             />
           ) : null}
 
@@ -303,6 +173,7 @@ export default function MatchCard({
                 match.home_team
               }
               className="team-logo"
+              loading="lazy"
             />
           ) : (
             <div className="team-logo-placeholder">
@@ -340,6 +211,7 @@ export default function MatchCard({
                 match.away_team
               }
               className="team-logo"
+              loading="lazy"
             />
           ) : (
             <div className="team-logo-placeholder">
@@ -349,7 +221,13 @@ export default function MatchCard({
         </div>
       </div>
 
-      <div className="match-card-bottom">
+      <div
+        className="match-card-bottom"
+        style={{
+          flexWrap: "wrap",
+          rowGap: "5px",
+        }}
+      >
         <div className="match-date-time">
           <span>
             {formattedDate ||
@@ -383,7 +261,7 @@ export default function MatchCard({
 
       {/*
        * ==================================================
-       * MAÇ SOSYAL İSTATİSTİKLERİ
+       * TAHMİN / YORUM SAYILARI
        * ==================================================
        */}
 
@@ -391,44 +269,39 @@ export default function MatchCard({
         style={{
           display: "flex",
           alignItems: "center",
-          gap: "10px",
+          gap: "6px",
           marginTop: "5px",
           paddingTop: "5px",
           borderTop:
             "1px solid var(--border)",
           fontSize: "9px",
+          fontWeight: 700,
           color: "var(--muted)",
         }}
       >
-        <span
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "3px",
-            fontWeight: 700,
-          }}
-        >
-          🎯 {predictionCount} tahmin
+        <span>
+          🎯 {predictionCount} Tahmin
         </span>
 
         <span
           style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "3px",
-            fontWeight: 700,
+            opacity: 0.45,
           }}
         >
-          💬 {commentCount} yorum
+          ·
+        </span>
+
+        <span>
+          💬 {commentCount} Yorum
         </span>
       </div>
     </>
   );
 
   /*
-   * Sadece canlı ve başlamamış
-   * maçlar tahmin ekranına
-   * açılabilir.
+   * ==================================================
+   * CANLI / YAKLAŞAN MAÇ
+   * ==================================================
    */
 
   if (canPredict) {
@@ -443,8 +316,9 @@ export default function MatchCard({
   }
 
   /*
-   * Biten / ertelenen / iptal
-   * maçlar link değildir.
+   * ==================================================
+   * BİTEN / ERTELENEN / İPTAL MAÇ
+   * ==================================================
    */
 
   return (
