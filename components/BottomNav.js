@@ -35,8 +35,26 @@ export default function BottomNav() {
   ];
 
   return (
-    <nav className="bottom-nav">
-      <div className="bottom-nav-inner">
+    <nav
+      className="bottom-nav"
+      style={{
+        width: "100%",
+        boxSizing: "border-box",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        className="bottom-nav-inner"
+        style={{
+          width: "100%",
+          maxWidth: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          boxSizing: "border-box",
+          overflow: "hidden",
+        }}
+      >
         {items.map((item) => {
           const active =
             item.href === "/"
@@ -50,12 +68,38 @@ export default function BottomNav() {
               className={`bottom-nav-item ${
                 active ? "active" : ""
               }`}
+              style={{
+                flex: "1 1 0",
+                width: "20%",
+                minWidth: 0,
+                maxWidth: "20%",
+                boxSizing: "border-box",
+                paddingLeft: "2px",
+                paddingRight: "2px",
+                overflow: "hidden",
+              }}
             >
-              <span className="bottom-nav-icon">
+              <span
+                className="bottom-nav-icon"
+                style={{
+                  fontSize: "17px",
+                  lineHeight: 1,
+                }}
+              >
                 {item.icon}
               </span>
 
-              <span className="bottom-nav-label">
+              <span
+                className="bottom-nav-label"
+                style={{
+                  fontSize: "9px",
+                  lineHeight: "12px",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  maxWidth: "100%",
+                }}
+              >
                 {item.label}
               </span>
             </Link>
@@ -64,4 +108,4 @@ export default function BottomNav() {
       </div>
     </nav>
   );
-} 
+}
