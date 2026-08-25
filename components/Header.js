@@ -83,14 +83,14 @@ export default function Header() {
     loadStats();
   }, [user?.id]);
 
+  const username = user?.username
+    ? `@${user.username}`
+    : "@kullanıcı";
+
   const displayName =
     user?.first_name ||
     user?.username ||
-    "Misafir";
-
-  const username = user?.username
-    ? `@${user.username}`
-    : displayName;
+    "Kullanıcı";
 
   function goHome() {
     router.push("/");
@@ -135,27 +135,47 @@ export default function Header() {
             padding: 0,
             margin: 0,
             cursor: "pointer",
+
             display: "flex",
+            flexDirection: "row",
             alignItems: "center",
+            justifyContent: "flex-end",
+
+            width: "auto",
+            minWidth: 0,
+            flexShrink: 0,
+
+            overflow: "visible",
+            boxSizing: "border-box",
           }}
         >
 
           <div
             style={{
-              textAlign: "right",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-end",
+              justifyContent: "center",
+
+              minWidth: 0,
+              flexShrink: 1,
+
               marginRight: "8px",
               lineHeight: 1.15,
-              minWidth: 0,
+              textAlign: "right",
+              overflow: "hidden",
             }}
           >
             <div
               style={{
                 fontSize: "11px",
                 fontWeight: 800,
+
                 whiteSpace: "nowrap",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
-                maxWidth: "120px",
+
+                maxWidth: "110px",
               }}
             >
               {username}
@@ -165,8 +185,14 @@ export default function Header() {
               style={{
                 marginTop: "3px",
                 fontSize: "9px",
-                opacity: 0.75,
+                fontWeight: 700,
+
                 whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+
+                maxWidth: "125px",
+                opacity: 0.75,
               }}
             >
               {stats.rank?.icon || "🌱"}{" "}
@@ -178,19 +204,31 @@ export default function Header() {
             </div>
           </div>
 
-          {user?.avatar_url ? (
-            <img
-              src={user.avatar_url}
-              alt={displayName}
-              className="header-avatar"
-            />
-          ) : (
-            <div className="header-avatar-placeholder">
-              {displayName
-                .charAt(0)
-                .toUpperCase()}
-            </div>
-          )}
+          <div
+            style={{
+              width: "40px",
+              height: "40px",
+              minWidth: "40px",
+              flexShrink: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            {user?.avatar_url ? (
+              <img
+                src={user.avatar_url}
+                alt={displayName}
+                className="header-avatar"
+              />
+            ) : (
+              <div className="header-avatar-placeholder">
+                {displayName
+                  .charAt(0)
+                  .toUpperCase()}
+              </div>
+            )}
+          </div>
 
         </button>
       </div>
