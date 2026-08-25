@@ -25,12 +25,13 @@ export default function PredictionsPage() {
       setLoading(true);
       setError("");
 
-      const response = await fetch(
-        "/api/predictions",
-        {
-          cache: "no-store",
-        }
-      );
+      const response =
+        await fetch(
+          "/api/predictions",
+          {
+            cache: "no-store",
+          }
+        );
 
       const result =
         await response.json();
