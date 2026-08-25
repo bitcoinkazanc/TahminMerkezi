@@ -7,10 +7,10 @@ export default function Header() {
   const router = useRouter();
 
   const [user, setUser] = useState(null);
+
   const [stats, setStats] = useState({
     accuracy: 0,
     points: 0,
-    correct: 0,
     rank: {
       name: "Çaylak",
       icon: "🌱",
@@ -57,22 +57,16 @@ export default function Header() {
           return;
         }
 
-        const currentUser =
-          result.current_user;
-
-        if (currentUser) {
+        if (result.current_user) {
           setStats({
             accuracy:
-              currentUser.accuracy || 0,
+              result.current_user.accuracy || 0,
 
             points:
-              currentUser.points || 0,
-
-            correct:
-              currentUser.correct || 0,
+              result.current_user.points || 0,
 
             rank:
-              currentUser.rank || {
+              result.current_user.rank || {
                 name: "Çaylak",
                 icon: "🌱",
               },
@@ -109,6 +103,7 @@ export default function Header() {
   return (
     <header className="header">
       <div className="header-inner">
+
         <button
           type="button"
           onClick={goHome}
@@ -119,7 +114,6 @@ export default function Header() {
             padding: 0,
             margin: 0,
             cursor: "pointer",
-            textAlign: "left",
           }}
         >
           <span className="header-logo">
@@ -143,14 +137,15 @@ export default function Header() {
             cursor: "pointer",
             display: "flex",
             alignItems: "center",
-            gap: "8px",
           }}
         >
+
           <div
             style={{
-              minWidth: 0,
               textAlign: "right",
+              marginRight: "8px",
               lineHeight: 1.15,
+              minWidth: 0,
             }}
           >
             <div
@@ -160,7 +155,7 @@ export default function Header() {
                 whiteSpace: "nowrap",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
-                maxWidth: "130px",
+                maxWidth: "120px",
               }}
             >
               {username}
@@ -196,6 +191,7 @@ export default function Header() {
                 .toUpperCase()}
             </div>
           )}
+
         </button>
       </div>
     </header>
