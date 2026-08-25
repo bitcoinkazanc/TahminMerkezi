@@ -83,22 +83,15 @@ export default function Header() {
     loadStats();
   }, [user?.id]);
 
-  const username = user?.username
-    ? `@${user.username}`
-    : "@kullanıcı";
+  const username =
+    user?.username
+      ? `@${user.username}`
+      : "@kullanıcı";
 
   const displayName =
     user?.first_name ||
     user?.username ||
     "Kullanıcı";
-
-  function goHome() {
-    router.push("/");
-  }
-
-  function goProfile() {
-    router.push("/profil");
-  }
 
   return (
     <header className="header">
@@ -106,7 +99,7 @@ export default function Header() {
 
         <button
           type="button"
-          onClick={goHome}
+          onClick={() => router.push("/")}
           className="header-brand"
           style={{
             border: "none",
@@ -125,57 +118,36 @@ export default function Header() {
           </span>
         </button>
 
-        <button
-          type="button"
-          onClick={goProfile}
-          className="header-profile"
+        <div
           style={{
-            border: "none",
-            background: "transparent",
-            padding: 0,
-            margin: 0,
-            cursor: "pointer",
-
             display: "flex",
-            flexDirection: "row",
             alignItems: "center",
-            justifyContent: "flex-end",
-
-            width: "auto",
-            minWidth: 0,
             flexShrink: 0,
-
-            overflow: "visible",
-            boxSizing: "border-box",
+            gap: "8px",
           }}
         >
 
-          <div
+          <button
+            type="button"
+            onClick={() =>
+              router.push("/profil")
+            }
             style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "flex-end",
-              justifyContent: "center",
-
-              minWidth: 0,
-              flexShrink: 1,
-
-              marginRight: "8px",
-              lineHeight: 1.15,
+              border: "none",
+              background: "transparent",
+              padding: 0,
+              margin: 0,
+              cursor: "pointer",
               textAlign: "right",
-              overflow: "hidden",
+              color: "inherit",
             }}
           >
             <div
               style={{
                 fontSize: "11px",
                 fontWeight: 800,
-
+                lineHeight: "14px",
                 whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-
-                maxWidth: "110px",
               }}
             >
               {username}
@@ -183,15 +155,11 @@ export default function Header() {
 
             <div
               style={{
-                marginTop: "3px",
+                marginTop: "2px",
                 fontSize: "9px",
                 fontWeight: 700,
-
+                lineHeight: "12px",
                 whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-
-                maxWidth: "125px",
                 opacity: 0.75,
               }}
             >
@@ -202,14 +170,19 @@ export default function Header() {
               {" · "}
               ⭐{stats.points}
             </div>
-          </div>
+          </button>
 
-          <div
+          <button
+            type="button"
+            onClick={() =>
+              router.push("/profil")
+            }
             style={{
-              width: "40px",
-              height: "40px",
-              minWidth: "40px",
-              flexShrink: 0,
+              border: "none",
+              background: "transparent",
+              padding: 0,
+              margin: 0,
+              cursor: "pointer",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -228,9 +201,9 @@ export default function Header() {
                   .toUpperCase()}
               </div>
             )}
-          </div>
+          </button>
 
-        </button>
+        </div>
       </div>
     </header>
   );
