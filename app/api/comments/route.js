@@ -5,8 +5,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 function getSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url =
+    process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+  const key =
+    process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!url || !key) {
     throw new Error(
@@ -26,18 +29,20 @@ export async function GET(request) {
   try {
     const supabase = getSupabase();
 
-    const { searchParams } = new URL(
-      request.url
-    );
+    const { searchParams } =
+      new URL(request.url);
 
     const predictionId =
-      searchParams.get("prediction_id");
+      searchParams.get(
+        "prediction_id"
+      );
 
     if (!predictionId) {
       return NextResponse.json(
         {
           success: false,
-          error: "Tahmin bilgisi gerekli.",
+          error:
+            "Tahmin bilgisi gerekli.",
         },
         { status: 400 }
       );
@@ -71,6 +76,11 @@ export async function GET(request) {
       .limit(100);
 
     if (error) {
+      console.error(
+        "Comments GET query error:",
+        error
+      );
+
       return NextResponse.json(
         {
           success: false,
@@ -82,6 +92,10 @@ export async function GET(request) {
 
     return NextResponse.json({
       success: true,
+      count:
+        Array.isArray(data)
+          ? data.length
+          : 0,
       comments: data || [],
     });
   } catch (error) {
@@ -105,9 +119,12 @@ export async function POST(request) {
   try {
     const supabase = getSupabase();
 
-    const body = await request.json();
+    const body =
+      await request.json();
 
-    const userId = body?.user_id;
+    const userId =
+      body?.user_id;
+
     const predictionId =
       body?.prediction_id;
 
@@ -131,7 +148,8 @@ export async function POST(request) {
       return NextResponse.json(
         {
           success: false,
-          error: "Yorum boş olamaz.",
+          error:
+            "Yorum boş olamaz.",
         },
         { status: 400 }
       );
@@ -149,12 +167,46 @@ export async function POST(request) {
     }
 
     const {
+      data: user,
+      error: userError,
+    } = await supabase
+      .from("users")
+      .select("id")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (userError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            userError.message,
+        },
+        { status: 500 }
+      );
+    }
+
+    if (!user) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Kullanıcı bulunamadı.",
+        },
+        { status: 404 }
+      );
+    }
+
+    const {
       data: prediction,
       error: predictionError,
     } = await supabase
       .from("predictions")
       .select("id")
-      .eq("id", predictionId)
+      .eq(
+        "id",
+        predictionId
+      )
       .maybeSingle();
 
     if (predictionError) {
@@ -172,7 +224,8 @@ export async function POST(request) {
       return NextResponse.json(
         {
           success: false,
-          error: "Tahmin bulunamadı.",
+          error:
+            "Tahmin bulunamadı.",
         },
         { status: 404 }
       );
@@ -185,7 +238,8 @@ export async function POST(request) {
       .from("messages")
       .insert({
         user_id: userId,
-        prediction_id: predictionId,
+        prediction_id:
+          predictionId,
         content,
       })
       .select(`
@@ -204,6 +258,11 @@ export async function POST(request) {
       .single();
 
     if (error) {
+      console.error(
+        "Comments POST insert error:",
+        error
+      );
+
       return NextResponse.json(
         {
           success: false,
