@@ -123,6 +123,8 @@ export default function PredictionMessage({
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
+                fontSize: "12px",
+                lineHeight: 1.2,
               }}
             >
               {username}
@@ -132,8 +134,8 @@ export default function PredictionMessage({
           {match ? (
             <div
               style={{
-                marginTop: "8px",
-                marginBottom: "10px",
+                marginTop: "5px",
+                marginBottom: "6px",
                 minWidth: 0,
                 maxWidth: "100%",
                 overflow: "hidden",
@@ -143,10 +145,10 @@ export default function PredictionMessage({
                 style={{
                   maxWidth: "100%",
                   minWidth: 0,
-                  fontSize: "14px",
+                  fontSize: "12px",
                   fontWeight: 800,
                   color: "var(--text)",
-                  lineHeight: 1.35,
+                  lineHeight: 1.25,
                   overflowWrap: "anywhere",
                   wordBreak: "break-word",
                 }}
@@ -157,10 +159,10 @@ export default function PredictionMessage({
               {match.league ? (
                 <div
                   style={{
-                    marginTop: "3px",
+                    marginTop: "2px",
                     maxWidth: "100%",
                     minWidth: 0,
-                    fontSize: "11px",
+                    fontSize: "9px",
                     color: "var(--muted)",
                     overflowWrap: "anywhere",
                     wordBreak: "break-word",
@@ -176,11 +178,11 @@ export default function PredictionMessage({
             style={{
               display: "flex",
               alignItems: "center",
-              gap: "8px",
+              gap: "6px",
               flexWrap: "wrap",
               maxWidth: "100%",
               minWidth: 0,
-              marginBottom: "8px",
+              marginBottom: "5px",
             }}
           >
             <span
@@ -189,31 +191,31 @@ export default function PredictionMessage({
                 alignItems: "center",
                 maxWidth: "100%",
                 boxSizing: "border-box",
-                padding: "6px 10px",
-                borderRadius: "8px",
+                padding: "4px 7px",
+                borderRadius: "6px",
                 background: "var(--primary)",
                 color: "#fff",
-                fontSize: "12px",
+                fontSize: "10px",
                 fontWeight: 800,
                 overflowWrap: "anywhere",
                 wordBreak: "break-word",
               }}
             >
-              🎯 Tahmin: {predictionLabel}
+              🎯 {predictionLabel}
             </span>
 
             {prediction.confidence != null ? (
               <span
                 style={{
                   maxWidth: "100%",
-                  fontSize: "12px",
+                  fontSize: "10px",
                   fontWeight: 700,
                   color: "var(--text)",
                   overflowWrap: "anywhere",
                   wordBreak: "break-word",
                 }}
               >
-                📊 Güven: %{prediction.confidence}
+                📊 %{prediction.confidence}
               </span>
             ) : null}
           </div>
@@ -224,9 +226,9 @@ export default function PredictionMessage({
                 width: "100%",
                 maxWidth: "100%",
                 minWidth: 0,
-                marginTop: "8px",
-                padding: "10px 12px",
-                borderRadius: "10px",
+                marginTop: "5px",
+                padding: "7px 9px",
+                borderRadius: "7px",
                 background: "var(--surface-soft)",
                 border: "1px solid var(--border)",
                 boxSizing: "border-box",
@@ -235,8 +237,8 @@ export default function PredictionMessage({
             >
               <div
                 style={{
-                  marginBottom: "4px",
-                  fontSize: "11px",
+                  marginBottom: "2px",
+                  fontSize: "9px",
                   fontWeight: 800,
                   color: "var(--muted)",
                 }}
@@ -248,8 +250,8 @@ export default function PredictionMessage({
                 style={{
                   margin: 0,
                   maxWidth: "100%",
-                  fontSize: "12px",
-                  lineHeight: 1.5,
+                  fontSize: "10px",
+                  lineHeight: 1.35,
                   color: "var(--text)",
                   whiteSpace: "pre-wrap",
                   overflowWrap: "anywhere",
@@ -264,9 +266,9 @@ export default function PredictionMessage({
           {formattedDate ? (
             <div
               style={{
-                marginTop: "8px",
+                marginTop: "5px",
                 maxWidth: "100%",
-                fontSize: "10px",
+                fontSize: "8px",
                 color: "var(--muted)",
                 overflowWrap: "anywhere",
               }}
@@ -281,12 +283,12 @@ export default function PredictionMessage({
         <div
           style={{
             display: "flex",
-            gap: "8px",
+            gap: "5px",
             width: "100%",
             maxWidth: "100%",
             minWidth: 0,
-            marginTop: "12px",
-            paddingTop: "10px",
+            marginTop: "7px",
+            paddingTop: "6px",
             borderTop: "1px solid var(--border)",
             boxSizing: "border-box",
           }}
@@ -302,13 +304,13 @@ export default function PredictionMessage({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                minHeight: "34px",
-                padding: "7px 8px",
+                minHeight: "29px",
+                padding: "5px 6px",
                 border: "1px solid var(--border)",
-                borderRadius: "9px",
+                borderRadius: "7px",
                 background: "var(--surface-soft)",
                 color: "var(--text)",
-                fontSize: "11px",
+                fontSize: "9px",
                 fontWeight: 800,
                 textDecoration: "none",
                 boxSizing: "border-box",
@@ -317,7 +319,7 @@ export default function PredictionMessage({
                 textOverflow: "ellipsis",
               }}
             >
-              👤 Profile Git
+              👤 Profil
             </Link>
           ) : null}
 
@@ -331,13 +333,13 @@ export default function PredictionMessage({
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              minHeight: "34px",
-              padding: "7px 8px",
+              minHeight: "29px",
+              padding: "5px 6px",
               border: "1px solid var(--primary)",
-              borderRadius: "9px",
+              borderRadius: "7px",
               background: "var(--primary)",
               color: "#fff",
-              fontSize: "11px",
+              fontSize: "9px",
               fontWeight: 800,
               textDecoration: "none",
               boxSizing: "border-box",
