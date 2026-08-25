@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 export default function LiderlikPage() {
   const [period, setPeriod] =
@@ -112,25 +113,22 @@ export default function LiderlikPage() {
     );
   }, [period]);
 
-  function getUserName(user) {
-    const fullName =
-      [
-        user.first_name,
-        user.last_name,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .trim();
-
-    if (fullName) {
-      return fullName;
-    }
-
+  function getUsername(user) {
     if (user.username) {
       return `@${user.username}`;
     }
 
     return "Telegram kullanıcısı";
+  }
+
+  function getProfileHref(user) {
+    if (!user?.id) {
+      return "/profil";
+    }
+
+    return `/profil?user_id=${encodeURIComponent(
+      user.id
+    )}`;
   }
 
   function getPositionStyle(
@@ -603,7 +601,6 @@ export default function LiderlikPage() {
                       }}
                     >
                       {(
-                        user.first_name ||
                         user.username ||
                         "T"
                       )
@@ -622,36 +619,35 @@ export default function LiderlikPage() {
                         0,
                     }}
                   >
-                    <div
+                    <Link
+                      href={getProfileHref(
+                        user
+                      )}
                       style={{
                         display:
-                          "flex",
-                        alignItems:
-                          "center",
-                        gap: "4px",
-                        minWidth:
-                          0,
+                          "inline-block",
+                        maxWidth:
+                          "100%",
+                        color:
+                          "var(--primary)",
+                        textDecoration:
+                          "none",
+                        fontWeight:
+                          800,
+                        fontSize:
+                          "12px",
+                        overflow:
+                          "hidden",
+                        textOverflow:
+                          "ellipsis",
+                        whiteSpace:
+                          "nowrap",
                       }}
                     >
-                      <strong
-                        style={{
-                          minWidth:
-                            0,
-                          overflow:
-                            "hidden",
-                          textOverflow:
-                            "ellipsis",
-                          whiteSpace:
-                            "nowrap",
-                          fontSize:
-                            "12px",
-                        }}
-                      >
-                        {getUserName(
-                          user
-                        )}
-                      </strong>
-                    </div>
+                      {getUsername(
+                        user
+                      )}
+                    </Link>
 
                     <div
                       style={{
