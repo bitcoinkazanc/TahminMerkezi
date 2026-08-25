@@ -23,6 +23,11 @@ export default function BottomNav() {
       icon: "🎯",
     },
     {
+      href: "/liderlik",
+      label: "Liderlik",
+      icon: "🏆",
+    },
+    {
       href: "/profil",
       label: "Profil",
       icon: "👤",
