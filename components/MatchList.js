@@ -1,3 +1,5 @@
+"components/MatchList.js"
+
 "use client";
 
 import {
@@ -29,13 +31,27 @@ const FILTER_CATEGORIES = [
   },
 ];
 
-const filterButtonBaseStyle = {
-  flexShrink: 0,
-  borderRadius: "8px",
-  padding: "7px 10px",
-  fontSize: "10px",
-  fontWeight: 800,
-  cursor: "pointer",
+const filterPanelStyle = {
+  border: "1px solid var(--border)",
+  borderRadius: "12px",
+  padding: "10px",
+  marginBottom: "12px",
+  background: "var(--surface-soft)",
+};
+
+const filterRowStyle = {
+  display: "flex",
+  gap: "6px",
+  overflowX: "auto",
+  paddingBottom: "8px",
+  marginBottom: "9px",
+  scrollbarWidth: "thin",
+};
+
+const searchInputWrapperStyle = {
+  position: "relative",
+  flex: 1,
+  minWidth: 0,
 };
 
 const searchInputStyle = {
@@ -66,6 +82,187 @@ const clearButtonStyle = {
   cursor: "pointer",
 };
 
+function FilterPanel({
+  statusFilter,
+  setStatusFilter,
+  search,
+  setSearch,
+  searchLoading,
+  searchResultsCount,
+  onClear,
+}) {
+  const hasActiveFilters =
+    statusFilter !== "all" ||
+    search.trim().length > 0;
+
+  return (
+    <div style={filterPanelStyle}>
+      <div style={filterRowStyle}>
+        {FILTER_CATEGORIES.map(
+          (category) => {
+            const active =
+              statusFilter === category.id;
+
+            return (
+              <button
+                key={category.id}
+                type="button"
+                onClick={() =>
+                  setStatusFilter(
+                    category.id
+                  )
+                }
+                style={{
+                  flexShrink: 0,
+                  border: active
+                    ? "1px solid var(--primary)"
+                    : "1px solid var(--border)",
+                  borderRadius: "8px",
+                  background: active
+                    ? "var(--primary)"
+                    : "var(--surface)",
+                  color: active
+                    ? "#fff"
+                    : "var(--text)",
+                  padding: "7px 10px",
+                  fontSize: "10px",
+                  fontWeight: 800,
+                  cursor: "pointer",
+                  boxShadow: active
+                    ? "0 2px 7px rgba(0,0,0,0.12)"
+                    : "none",
+                }}
+              >
+                {category.label}
+              </button>
+            );
+          }
+        )}
+      </div>
+
+      <div
+        style={{
+          position: "relative",
+          display: "flex",
+          alignItems: "center",
+          gap: "6px",
+        }}
+      >
+        <div style={searchInputWrapperStyle}>
+          <span
+            style={{
+              position: "absolute",
+              left: "10px",
+              top: "50%",
+              transform:
+                "translateY(-50%)",
+              fontSize: "12px",
+              pointerEvents: "none",
+              opacity: 0.7,
+            }}
+          >
+            🔎
+          </span>
+
+          <input
+            type="text"
+            value={search}
+            onChange={(event) =>
+              setSearch(
+                event.target.value
+              )
+            }
+            placeholder="Takım veya lig ara..."
+            style={searchInputStyle}
+          />
+
+          {searchLoading ? (
+            <span
+              style={{
+                position: "absolute",
+                right: "10px",
+                top: "50%",
+                transform:
+                  "translateY(-50%)",
+                fontSize: "10px",
+                opacity: 0.65,
+              }}
+            >
+              ⏳
+            </span>
+          ) : null}
+        </div>
+
+        {hasActiveFilters ? (
+          <button
+            type="button"
+            onClick={onClear}
+            style={clearButtonStyle}
+          >
+            Temizle
+          </button>
+        ) : null}
+      </div>
+
+      {search.trim() ? (
+        <div
+          style={{
+            marginTop: "8px",
+            padding: "7px 8px",
+            borderRadius: "8px",
+            background: "var(--surface)",
+            border:
+              "1px solid var(--border)",
+            fontSize: "9px",
+            color: "var(--muted)",
+            fontWeight: 700,
+          }}
+        >
+          {searchLoading
+            ? "Bugünkü maçlar aranıyor..."
+            : `${searchResultsCount} arama sonucu bulundu.`}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function EmptyMatches({
+  search,
+  hasFilters,
+  onClear,
+}) {
+  return (
+    <div className="empty-state small">
+      <div className="empty-icon">
+        {search.trim() ? "🔎" : "⚽"}
+      </div>
+
+      <h3>
+        Maç bulunamadı
+      </h3>
+
+      <p>
+        {search.trim()
+          ? "Bugünkü maçlar içinde takım veya lig adına uygun maç bulunmuyor."
+          : hasFilters
+            ? "Seçtiğin filtrelere uygun maç bulunmuyor."
+            : "Şu anda gösterilecek bir maç bulunmuyor."}
+      </p>
+
+      {hasFilters ? (
+        <button
+          type="button"
+          className="primary-button"
+          onClick={onClear}
+        >
+          Filtreleri Temizle
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
 export default function MatchList({
   matches = [],
   enableFilters = false,
@@ -82,34 +279,19 @@ export default function MatchList({
   const [searchLoading, setSearchLoading] =
     useState(false);
 
-  const normalizedMatches = useMemo(() => {
-    return Array.isArray(matches)
-      ? matches
-      : [];
-  }, [matches]);
-
-  const trimmedSearch = search.trim();
-
-  /*
-   * ==================================================
-   * MAÇ ARAMA
-   * ==================================================
-   *
-   * Kullanıcı yazmayı bıraktıktan 350 ms sonra
-   * yalnızca bir istek gönderilir.
-   *
-   * Yeni arama gelirse önceki istek iptal edilir.
-   */
-
   useEffect(() => {
     if (!enableFilters) {
-      return;
+      return undefined;
     }
 
-    if (!trimmedSearch) {
+    const searchText =
+      search.trim();
+
+    if (!searchText) {
       setSearchResults([]);
       setSearchLoading(false);
-      return;
+
+      return undefined;
     }
 
     const controller =
@@ -125,7 +307,7 @@ export default function MatchList({
 
           params.set(
             "search",
-            trimmedSearch
+            searchText
           );
 
           const response =
@@ -139,30 +321,29 @@ export default function MatchList({
               }
             );
 
+          if (!response.ok) {
+            throw new Error(
+              `Arama isteği başarısız oldu (${response.status}).`
+            );
+          }
+
           const result =
             await response.json();
 
-          if (
-            !response.ok ||
-            !result.success
-          ) {
+          if (!result?.success) {
             throw new Error(
-              result.error ||
+              result?.error ||
                 "Arama yapılamadı."
             );
           }
 
-          if (
-            !controller.signal.aborted
-          ) {
-            setSearchResults(
-              Array.isArray(
-                result.matches
-              )
-                ? result.matches
-                : []
-            );
-          }
+          setSearchResults(
+            Array.isArray(
+              result.matches
+            )
+              ? result.matches
+              : []
+          );
         } catch (error) {
           if (
             error?.name !==
@@ -173,11 +354,7 @@ export default function MatchList({
               error
             );
 
-            if (
-              !controller.signal.aborted
-            ) {
-              setSearchResults([]);
-            }
+            setSearchResults([]);
           }
         } finally {
           if (
@@ -194,27 +371,22 @@ export default function MatchList({
       clearTimeout(timer);
       controller.abort();
     };
-  }, [
-    enableFilters,
-    trimmedSearch,
-  ]);
+  }, [search, enableFilters]);
 
-  /*
-   * ==================================================
-   * GÖSTERİLECEK MAÇ KAYNAĞI
-   * ==================================================
-   */
+  const normalizedMatches =
+    useMemo(
+      () =>
+        Array.isArray(matches)
+          ? matches
+          : [],
+      [matches]
+    );
 
   const sourceMatches =
-    trimmedSearch
+    enableFilters &&
+    search.trim()
       ? searchResults
       : normalizedMatches;
-
-  /*
-   * ==================================================
-   * FİLTRELEME
-   * ==================================================
-   */
 
   const filteredMatches =
     useMemo(() => {
@@ -222,9 +394,7 @@ export default function MatchList({
         return normalizedMatches;
       }
 
-      if (
-        statusFilter === "all"
-      ) {
+      if (statusFilter === "all") {
         return sourceMatches;
       }
 
@@ -240,11 +410,12 @@ export default function MatchList({
       statusFilter,
     ]);
 
-  /*
-   * ==================================================
-   * FİLTRELERİ TEMİZLE
-   * ==================================================
-   */
+  const hasActiveFilters =
+    enableFilters &&
+    (
+      statusFilter !== "all" ||
+      search.trim().length > 0
+    );
 
   function clearFilters() {
     setStatusFilter("all");
@@ -253,327 +424,93 @@ export default function MatchList({
     setSearchLoading(false);
   }
 
-  /*
-   * ==================================================
-   * FİLTRE PANELİ
-   * ==================================================
-   */
-
-  const filterPanel = enableFilters ? (
-    <div
-      style={{
-        border:
-          "1px solid var(--border)",
-        borderRadius:
-          "12px",
-        padding: "10px",
-        marginBottom:
-          "12px",
-        background:
-          "var(--surface-soft)",
-      }}
-    >
-      <div
-        style={{
-          display:
-            "flex",
-          gap: "6px",
-          overflowX:
-            "auto",
-          paddingBottom:
-            "8px",
-          marginBottom:
-            "9px",
-          scrollbarWidth:
-            "thin",
-        }}
-      >
-        {FILTER_CATEGORIES.map(
-          (category) => {
-            const active =
-              statusFilter ===
-              category.id;
-
-            return (
-              <button
-                key={
-                  category.id
-                }
-                type="button"
-                onClick={() =>
-                  setStatusFilter(
-                    category.id
-                  )
-                }
-                style={{
-                  ...filterButtonBaseStyle,
-                  border: active
-                    ? "1px solid var(--primary)"
-                    : "1px solid var(--border)",
-                  background: active
-                    ? "var(--primary)"
-                    : "var(--surface)",
-                  color: active
-                    ? "#fff"
-                    : "var(--text)",
-                  boxShadow: active
-                    ? "0 2px 7px rgba(0,0,0,0.12)"
-                    : "none",
-                }}
-              >
-                {
-                  category.label
-                }
-              </button>
-            );
-          }
-        )}
-      </div>
-
-      <div
-        style={{
-          position:
-            "relative",
-          display:
-            "flex",
-          alignItems:
-            "center",
-          gap: "6px",
-        }}
-      >
-        <div
-          style={{
-            position:
-              "relative",
-            flex: 1,
-            minWidth: 0,
-          }}
-        >
-          <span
-            style={{
-              position:
-                "absolute",
-              left: "10px",
-              top: "50%",
-              transform:
-                "translateY(-50%)",
-              fontSize: "12px",
-              pointerEvents:
-                "none",
-              opacity: 0.7,
-            }}
-          >
-            🔎
-          </span>
-
-          <input
-            type="text"
-            value={search}
-            onChange={(event) =>
-              setSearch(
-                event.target
-                  .value
-              )
-            }
-            placeholder="Takım veya lig ara..."
-            style={
-              searchInputStyle
-            }
-          />
-
-          {searchLoading ? (
-            <span
-              style={{
-                position:
-                  "absolute",
-                right: "10px",
-                top: "50%",
-                transform:
-                  "translateY(-50%)",
-                fontSize: "10px",
-                opacity: 0.65,
-              }}
-            >
-              ⏳
-            </span>
-          ) : null}
-        </div>
-
-        {(
-          statusFilter !==
-            "all" ||
-          trimmedSearch
-        ) ? (
-          <button
-            type="button"
-            onClick={
-              clearFilters
-            }
-            style={
-              clearButtonStyle
-            }
-          >
-            Temizle
-          </button>
-        ) : null}
-      </div>
-
-      {trimmedSearch ? (
-        <div
-          style={{
-            marginTop: "8px",
-            padding: "7px 8px",
-            borderRadius: "8px",
-            background:
-              "var(--surface)",
-            border:
-              "1px solid var(--border)",
-            fontSize: "9px",
-            color:
-              "var(--muted)",
-            fontWeight: 700,
-          }}
-        >
-          {searchLoading
-            ? "Bugünkü maçlar aranıyor..."
-            : `${searchResults.length} arama sonucu bulundu.`}
-        </div>
-      ) : null}
-
-      <div
-        style={{
-          display:
-            "flex",
-          justifyContent:
-            "space-between",
-          alignItems:
-            "center",
-          marginTop: "8px",
-          padding: "0 2px",
-          fontSize: "9px",
-          color:
-            "var(--muted)",
-          fontWeight: 700,
-        }}
-      >
-        <span>
-          {trimmedSearch
-            ? "Arama sonuçları"
-            : "Maçlar"}
-        </span>
-
-        <span>
-          {filteredMatches.length}{" "}
-          maç
-        </span>
-      </div>
-    </div>
-  ) : null;
-
-  /*
-   * ==================================================
-   * BOŞ LİSTE
-   * ==================================================
-   */
-
   if (
-    filteredMatches.length ===
-    0
+    enableFilters &&
+    normalizedMatches.length === 0 &&
+    !search.trim()
   ) {
-    if (
-      enableFilters &&
-      !trimmedSearch &&
-      normalizedMatches.length ===
-        0
-    ) {
-      return (
-        <>
-          {filterPanel}
-
-          <div className="empty-state small">
-            <div className="empty-icon">
-              ⚽
-            </div>
-
-            <h3>
-              Maç bulunamadı
-            </h3>
-
-            <p>
-              Şu anda gösterilecek
-              bir maç bulunmuyor.
-            </p>
-          </div>
-        </>
-      );
-    }
-
     return (
       <>
-        {filterPanel}
+        <FilterPanel
+          statusFilter={statusFilter}
+          setStatusFilter={
+            setStatusFilter
+          }
+          search={search}
+          setSearch={setSearch}
+          searchLoading={
+            searchLoading
+          }
+          searchResultsCount={
+            searchResults.length
+          }
+          onClear={clearFilters}
+        />
 
-        <div className="empty-state small">
-          <div className="empty-icon">
-            🔎
-          </div>
-
-          <h3>
-            Maç bulunamadı
-          </h3>
-
-          <p>
-            {trimmedSearch
-              ? "Bugünkü maçlar içinde takım veya lig adına uygun maç bulunmuyor."
-              : "Seçtiğin filtrelere uygun maç bulunmuyor."}
-          </p>
-
-          <button
-            type="button"
-            className="primary-button"
-            onClick={
-              clearFilters
-            }
-          >
-            Filtreleri Temizle
-          </button>
-        </div>
+        <EmptyMatches
+          search={search}
+          hasFilters={
+            hasActiveFilters
+          }
+          onClear={clearFilters}
+        />
       </>
     );
   }
 
-  /*
-   * ==================================================
-   * MAÇ LİSTESİ
-   * ==================================================
-   */
-
   return (
     <>
-      {filterPanel}
+      {enableFilters ? (
+        <FilterPanel
+          statusFilter={statusFilter}
+          setStatusFilter={
+            setStatusFilter
+          }
+          search={search}
+          setSearch={setSearch}
+          searchLoading={
+            searchLoading
+          }
+          searchResultsCount={
+            searchResults.length
+          }
+          onClear={clearFilters}
+        />
+      ) : null}
 
-      <div className="match-list">
-        {filteredMatches.map(
-          (match, index) => (
-            <div
-              key={
-                match.id ||
-                match.external_id ||
-                `${match.home_team}-${match.away_team}-${index}`
-              }
-            >
-              <MatchCard
-                match={match}
-              />
+      {filteredMatches.length === 0 ? (
+        <EmptyMatches
+          search={search}
+          hasFilters={
+            hasActiveFilters
+          }
+          onClear={clearFilters}
+        />
+      ) : (
+        <div className="match-list">
+          {filteredMatches.map(
+            (match, index) => {
+              const key =
+                match?.id ||
+                match?.external_id ||
+                `match-${index}`;
 
-              {(index + 1) %
-                3 ===
-              0 ? (
-                <AdsGramTask />
-              ) : null}
-            </div>
-          )
-        )}
-      </div>
+              return (
+                <div key={key}>
+                  <MatchCard
+                    match={match}
+                  />
+
+                  {(index + 1) % 3 ===
+                  0 ? (
+                    <AdsGramTask />
+                  ) : null}
+                </div>
+              );
+            }
+          )}
+        </div>
+      )}
     </>
   );
 }
