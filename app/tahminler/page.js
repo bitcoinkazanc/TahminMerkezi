@@ -2,13 +2,19 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+
 import Loading from "../../components/Loading";
 import PredictionMessage from "../../components/PredictionMessage";
 
 export default function PredictionsPage() {
-  const [predictions, setPredictions] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [predictions, setPredictions] =
+    useState([]);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [error, setError] =
+    useState("");
 
   useEffect(() => {
     loadPredictions();
@@ -26,16 +32,22 @@ export default function PredictionsPage() {
         }
       );
 
-      const result = await response.json();
+      const result =
+        await response.json();
 
-      if (!response.ok || !result.success) {
+      if (
+        !response.ok ||
+        !result.success
+      ) {
         throw new Error(
           result.error ||
             "Tahminler alınamadı."
         );
       }
 
-      setPredictions(result.predictions || []);
+      setPredictions(
+        result.predictions || []
+      );
     } catch (err) {
       console.error(
         "Predictions page error:",
@@ -66,14 +78,18 @@ export default function PredictionsPage() {
       <main className="page">
         <div className="page-container">
           <div className="error-box">
-            <h2>Bir sorun oluştu</h2>
+            <h2>
+              Bir sorun oluştu
+            </h2>
 
             <p>{error}</p>
 
             <button
               type="button"
               className="primary-button"
-              onClick={loadPredictions}
+              onClick={
+                loadPredictions
+              }
             >
               Tekrar Dene
             </button>
@@ -85,12 +101,33 @@ export default function PredictionsPage() {
 
   return (
     <main className="page">
-      <div className="page-container">
-        <section className="section-card">
-          <div className="section-title">
-            <h1>🎯 Tahminler</h1>
-
-            <p>
+      <div
+        className="page-container"
+        style={{
+          paddingTop: "4px",
+        }}
+      >
+        <section
+          className="section-card"
+          style={{
+            paddingTop: "6px",
+          }}
+        >
+          <div
+            className="section-title"
+            style={{
+              marginTop: 0,
+              marginBottom: "8px",
+            }}
+          >
+            <p
+              style={{
+                margin: 0,
+                fontSize: "10px",
+                lineHeight: 1.2,
+                color: "var(--muted)",
+              }}
+            >
               Topluluğun yaptığı son
               tahminleri keşfet.
             </p>
@@ -107,7 +144,8 @@ export default function PredictionsPage() {
               </h3>
 
               <p>
-                İlk tahmini sen yapabilirsin.
+                İlk tahmini sen
+                yapabilirsin.
               </p>
 
               <Link
@@ -119,25 +157,31 @@ export default function PredictionsPage() {
             </div>
           ) : (
             <div className="prediction-list">
-              {predictions.map((prediction) => {
-                const match =
-                  prediction?.matches;
+              {predictions.map(
+                (prediction) => {
+                  const match =
+                    prediction?.matches;
 
-                if (!match) {
-                  return null;
+                  if (!match) {
+                    return null;
+                  }
+
+                  return (
+                    <div
+                      key={
+                        prediction.id
+                      }
+                      className="prediction-feed-item"
+                    >
+                      <PredictionMessage
+                        prediction={
+                          prediction
+                        }
+                      />
+                    </div>
+                  );
                 }
-
-                return (
-                  <div
-                    key={prediction.id}
-                    className="prediction-feed-item"
-                  >
-                    <PredictionMessage
-                      prediction={prediction}
-                    />
-                  </div>
-                );
-              })}
+              )}
             </div>
           )}
         </section>
