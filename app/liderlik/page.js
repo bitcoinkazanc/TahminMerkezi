@@ -5,7 +5,7 @@ import Link from "next/link";
 
 export default function LiderlikPage() {
   const [period, setPeriod] =
-    useState("all");
+    useState("daily");
 
   const [leaderboard, setLeaderboard] =
     useState([]);
@@ -233,12 +233,13 @@ export default function LiderlikPage() {
           background:
             "rgba(128,128,128,0.10)",
           boxSizing: "border-box",
+          gap: "2px",
         }}
       >
         {[
           {
-            value: "all",
-            label: "Genel",
+            value: "daily",
+            label: "Günlük",
           },
           {
             value: "weekly",
@@ -247,6 +248,10 @@ export default function LiderlikPage() {
           {
             value: "monthly",
             label: "Aylık",
+          },
+          {
+            value: "all",
+            label: "Tüm Zamanlar",
           },
         ].map((item) => {
           const active =
@@ -265,13 +270,13 @@ export default function LiderlikPage() {
                 )
               }
               style={{
-                flex: 1,
+                flex: "1 1 0",
                 minWidth: 0,
                 border: "none",
                 borderRadius:
                   "8px",
                 padding:
-                  "8px 3px",
+                  "8px 2px",
                 background:
                   active
                     ? "var(--primary)"
@@ -284,9 +289,11 @@ export default function LiderlikPage() {
                   active
                     ? 800
                     : 700,
-                fontSize: "10px",
+                fontSize: "9px",
                 cursor:
                   "pointer",
+                whiteSpace:
+                  "nowrap",
               }}
             >
               {item.label}
